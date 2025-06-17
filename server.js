@@ -112,17 +112,71 @@ app.post('/login', (req, res) => {
   });
 });
 
-// Protect operator endpoints with JWT
-app.post('/deliveries', authenticateJWT, (req, res) => {
-  const { trackingId, customerName, phoneNumber, currentStatus, checkpoints, driverDetails } = req.body;
-  db.run(
-    `INSERT INTO deliveries (trackingId, customerName, phoneNumber, currentStatus, checkpoints, driverDetails) VALUES (?, ?, ?, ?, ?, ?)`,
-    [trackingId, customerName, phoneNumber, currentStatus, JSON.stringify(checkpoints || []), JSON.stringify(driverDetails || {})],
-    function (err) {
-      if (err) return res.status(400).json({ error: err.message });
-      res.json({ success: true });
-    }
+// Helper: Validate Zimbabwe phone number
+function validateZimPhone(phone) {
+  const cleaned = phone.replace(/\D/g, '');
+  return (
+    (cleaned.length === 9 && cleaned.startsWith('7')) ||
+    (cleaned.length === 10 && cleaned.startsWith('07')) ||
+    (cleaned.length === 12 && cleaned.startsWith('2637')) ||
+    (cleaned.length === 13 && cleaned.startsWith('2637'))
   );
+}
+
+// Helper: Generate unique tracking ID
+function generateTrackingId() {
+  const letters = Math.random().toString(36).substring(2, 5).toUpperCase();
+  const digits = Math.floor(1000 + Math.random() * 9000);
+  return letters + digits;
+}
+
+// Improved delivery creation route
+app.post('/deliveries', authenticateJWT, (req, res) => {
+  let { customerName, phoneNumber, currentStatus, checkpoints, driverDetails } = req.body;
+
+  // 1. Validate input
+  if (!customerName || !phoneNumber || !currentStatus) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
+  if (!validateZimPhone(phoneNumber)) {
+    return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
+  }
+
+  // 2. Generate unique trackingId (guaranteed unique)
+  function tryInsert(trackingId, attempt = 0) {
+    db.run(
+      `INSERT INTO deliveries (trackingId, customerName, phoneNumber, currentStatus, checkpoints, driverDetails) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        trackingId,
+        customerName,
+        phoneNumber,
+        currentStatus,
+        JSON.stringify(checkpoints || []),
+        JSON.stringify(driverDetails || {})
+      ],
+      async function (err) {
+        if (err && err.message.includes('UNIQUE constraint failed') && attempt < 5) {
+          // Try again with a new ID
+          return tryInsert(generateTrackingId(), attempt + 1);
+        }
+        if (err) return res.status(400).json({ error: err.message });
+
+        // 3. Send SMS to customer
+        const smsMessage = `Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${currentStatus}`;
+        const smsRes = await sendSMS(phoneNumber, smsMessage);
+
+        // 4. Audit log
+        console.log(`[AUDIT] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${trackingId}`);
+
+        if (!smsRes.success) {
+          return res.status(207).json({ success: true, warning: 'Delivery created, but SMS failed', trackingId, smsError: smsRes.error });
+        }
+        res.json({ success: true, trackingId });
+      }
+    );
+  }
+
+  tryInsert(generateTrackingId());
 });
 
 app.post('/updateCheckpoint', authenticateJWT, async (req, res) => {

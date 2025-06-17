@@ -93,11 +93,11 @@ export default function OperatorDashboard() {
   const handleCreateDelivery = async (deliveryData) => {
     const token = localStorage.getItem('morres_jwt');
     try {
-      await axios.post('https://your-backend-url/deliveries', deliveryData, {
+      await axios.post(`${import.meta.env.VITE_API_URL}/deliveries`, deliveryData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // Refresh deliveries
-      const res = await axios.get('https://your-backend-url/deliveries', {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDeliveries(res.data);
@@ -112,11 +112,11 @@ export default function OperatorDashboard() {
   const handleUpdateCheckpoint = async (trackingId, checkpoint, currentStatus) => {
     const token = localStorage.getItem('morres_jwt');
     try {
-      await axios.post('https://your-backend-url/updateCheckpoint', { trackingId, checkpoint, currentStatus }, {
+      await axios.post(`${import.meta.env.VITE_API_URL}/updateCheckpoint`, { trackingId, checkpoint, currentStatus }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // Refresh deliveries
-      const res = await axios.get('https://your-backend-url/deliveries', {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDeliveries(res.data);
