@@ -45,7 +45,7 @@ export default function OperatorDashboard() {
       const token = localStorage.getItem('morres_jwt');
       if (!token) return navigate('/login');
       try {
-        const res = await axios.get('https://your-backend-url/deliveries', {
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setDeliveries(res.data);
