@@ -40,7 +40,7 @@ export default function OperatorDashboard() {
   const [smsPreview, setSmsPreview] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:3000/session', { credentials: 'include' })
+    fetch(`${import.meta.env.VITE_API_URL}/session`, { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (!data.authenticated) {
@@ -57,7 +57,7 @@ export default function OperatorDashboard() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('http://localhost:3000/deliveries', { credentials: 'include' });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/deliveries`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to fetch deliveries');
         const data = await res.json();
         setDeliveries(data);
@@ -115,7 +115,7 @@ export default function OperatorDashboard() {
       driverDetails: { name: createForm.driverName, vehicleReg: createForm.vehicleReg },
     };
     try {
-      const res = await fetch('http://localhost:3000/deliveries', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/deliveries`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -132,7 +132,7 @@ export default function OperatorDashboard() {
         setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${createForm.currentStatus}`);
         setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
         // Refresh deliveries
-        const res2 = await fetch('http://localhost:3000/deliveries', { credentials: 'include' });
+        const res2 = await fetch(`${import.meta.env.VITE_API_URL}/deliveries`, { credentials: 'include' });
         const data = await res2.json();
         setDeliveries(data);
         setTimeout(() => {
@@ -155,7 +155,7 @@ export default function OperatorDashboard() {
     setToastMsg('Sending SMS...');
     const message = `Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${status}`;
     try {
-      const res = await fetch('http://localhost:3000/send-initial-sms', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/send-initial-sms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: phone, message }),
@@ -188,7 +188,7 @@ export default function OperatorDashboard() {
       comment: form.comment,
     };
     try {
-      const res = await fetch('http://localhost:3000/updateCheckpoint', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/updateCheckpoint`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -204,7 +204,7 @@ export default function OperatorDashboard() {
       } else {
         setFeedback('Checkpoint updated successfully!');
         // Refresh deliveries
-        const res2 = await fetch('http://localhost:3000/deliveries', { credentials: 'include' });
+        const res2 = await fetch(`${import.meta.env.VITE_API_URL}/deliveries`, { credentials: 'include' });
         const data = await res2.json();
         setDeliveries(data);
         setForm({ location: '', operator: '', comment: '', status: '' });
@@ -217,7 +217,7 @@ export default function OperatorDashboard() {
   }
 
   async function handleLogout() {
-    await fetch('http://localhost:3000/logout', { method: 'POST', credentials: 'include' });
+    await fetch(`${import.meta.env.VITE_API_URL}/logout`, { method: 'POST', credentials: 'include' });
     setIsAuthenticated(false);
     navigate('/login');
   }

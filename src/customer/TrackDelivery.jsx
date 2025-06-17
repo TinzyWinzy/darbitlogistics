@@ -23,7 +23,7 @@ export default function TrackDelivery() {
     setError('');
     setDelivery(null);
     try {
-      const res = await fetch(`http://localhost:3000/deliveries/${trackingId}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/deliveries/${trackingId}`);
       if (!res.ok) {
         setError('Delivery not found.');
       } else {
