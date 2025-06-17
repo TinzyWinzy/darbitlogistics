@@ -31,7 +31,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'morres_secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false }, // true if using HTTPS
+  cookie: {
+    secure: true, // Only send cookie over HTTPS
+    sameSite: 'none', // Allow cross-site cookie
+  },
 }));
 
 // SQLite DB setup
