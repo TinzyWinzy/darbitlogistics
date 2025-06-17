@@ -43,7 +43,10 @@ export default function OperatorDashboard() {
   useEffect(() => {
     const fetchDeliveries = async () => {
       const token = localStorage.getItem('morres_jwt');
-      if (!token) return navigate('/login');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
       try {
         const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -55,6 +58,7 @@ export default function OperatorDashboard() {
           navigate('/login');
         }
       }
+      setLoading(false);
     };
     fetchDeliveries();
   }, [navigate]);
