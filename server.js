@@ -4,8 +4,8 @@ import sqlite3 from 'sqlite3';
 import axios from 'axios';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
-import session from 'express-session';
 import cors from 'cors';
+import jwt from 'jsonwebtoken';
 dotenv.config();
 
 const app = express();
@@ -26,15 +26,6 @@ app.use(cors({
     }
   },
   credentials: true,
-}));
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'morres_secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: true, // Only send cookie over HTTPS
-    sameSite: 'none', // Allow cross-site cookie
-  },
 }));
 
 // SQLite DB setup
@@ -86,8 +77,36 @@ async function sendSMS(to, message) {
   }
 }
 
-// Create delivery (for operator/testing)
-app.post('/deliveries', (req, res) => {
+// JWT secret
+const JWT_SECRET = process.env.JWT_SECRET || 'morres_jwt_secret';
+
+// JWT middleware
+function authenticateJWT(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) return res.status(401).json({ error: 'Missing Authorization header' });
+  const token = authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Missing token' });
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+    req.user = user;
+    next();
+  });
+}
+
+// Operator login endpoint (returns JWT)
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  db.get(`SELECT * FROM users WHERE username = ? AND password = ?`, [username, password], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(401).json({ error: 'Invalid credentials' });
+    // Generate JWT
+    const token = jwt.sign({ username: row.username }, JWT_SECRET, { expiresIn: '12h' });
+    res.json({ success: true, username: row.username, token });
+  });
+});
+
+// Protect operator endpoints with JWT
+app.post('/deliveries', authenticateJWT, (req, res) => {
   const { trackingId, customerName, phoneNumber, currentStatus, checkpoints, driverDetails } = req.body;
   db.run(
     `INSERT INTO deliveries (trackingId, customerName, phoneNumber, currentStatus, checkpoints, driverDetails) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -99,19 +118,7 @@ app.post('/deliveries', (req, res) => {
   );
 });
 
-// Get delivery by trackingId
-app.get('/deliveries/:trackingId', (req, res) => {
-  db.get(`SELECT * FROM deliveries WHERE trackingId = ?`, [req.params.trackingId], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(404).json({ error: 'Delivery not found' });
-    row.checkpoints = JSON.parse(row.checkpoints);
-    row.driverDetails = JSON.parse(row.driverDetails);
-    res.json(row);
-  });
-});
-
-// Update checkpoint and send SMS
-app.post('/updateCheckpoint', async (req, res) => {
+app.post('/updateCheckpoint', authenticateJWT, async (req, res) => {
   const { trackingId, checkpoint, currentStatus } = req.body;
   db.get(`SELECT * FROM deliveries WHERE trackingId = ?`, [trackingId], async (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -136,35 +143,7 @@ app.post('/updateCheckpoint', async (req, res) => {
   });
 });
 
-// Operator login endpoint
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  db.get(`SELECT * FROM users WHERE username = ? AND password = ?`, [username, password], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(401).json({ error: 'Invalid credentials' });
-    req.session.user = { username: row.username };
-    res.json({ success: true, username: row.username });
-  });
-});
-
-// Add a route to check session
-app.get('/session', (req, res) => {
-  if (req.session.user) {
-    res.json({ authenticated: true, user: req.session.user });
-  } else {
-    res.json({ authenticated: false });
-  }
-});
-
-// Add a logout endpoint
-app.post('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.json({ success: true });
-  });
-});
-
-// List all deliveries (for operator dashboard)
-app.get('/deliveries', (req, res) => {
+app.get('/deliveries', authenticateJWT, (req, res) => {
   db.all(`SELECT * FROM deliveries`, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     // Parse JSON fields for each row
@@ -174,6 +153,17 @@ app.get('/deliveries', (req, res) => {
       driverDetails: JSON.parse(row.driverDetails),
     }));
     res.json(deliveries);
+  });
+});
+
+// Get delivery by trackingId
+app.get('/deliveries/:trackingId', (req, res) => {
+  db.get(`SELECT * FROM deliveries WHERE trackingId = ?`, [req.params.trackingId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Delivery not found' });
+    row.checkpoints = JSON.parse(row.checkpoints);
+    row.driverDetails = JSON.parse(row.driverDetails);
+    res.json(row);
   });
 });
 

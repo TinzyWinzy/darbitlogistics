@@ -1,6 +1,7 @@
 import { useEffect, useState, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
+import axios from 'axios';
 
 // Spinner component
 function Spinner() {
@@ -40,34 +41,23 @@ export default function OperatorDashboard() {
   const [smsPreview, setSmsPreview] = useState('');
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/session`, { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        if (!data.authenticated) {
-          setIsAuthenticated(false);
-          navigate('/login');
-        } else {
-          setIsAuthenticated(true);
-        }
-      });
-  }, []);
-
-  useEffect(() => {
-    async function fetchDeliveries() {
-      setLoading(true);
-      setError(null);
+    const fetchDeliveries = async () => {
+      const token = localStorage.getItem('morres_jwt');
+      if (!token) return navigate('/login');
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/deliveries`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch deliveries');
-        const data = await res.json();
-        setDeliveries(data);
-      } catch (err) {
-        setError(err.message);
+        const res = await axios.get('https://your-backend-url/deliveries', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setDeliveries(res.data);
+      } catch (error) {
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+          localStorage.removeItem('morres_jwt');
+          navigate('/login');
+        }
       }
-      setLoading(false);
-    }
+    };
     fetchDeliveries();
-  }, []);
+  }, [navigate]);
 
   const filteredDeliveries = deliveries.filter(d => {
     const q = search.toLowerCase();
@@ -96,58 +86,48 @@ export default function OperatorDashboard() {
     );
   }
 
-  async function handleCreateDelivery(e) {
-    e.preventDefault();
-    setCreating(true);
-    setCreateFeedback('');
-    const trackingId = generateTrackingId();
-    if (!validateZimPhone(createForm.phoneNumber)) {
-      setCreateFeedback('Error: Invalid Zimbabwean phone number.');
-      setCreating(false);
-      return;
-    }
-    const body = {
-      trackingId,
-      customerName: createForm.customerName,
-      phoneNumber: createForm.phoneNumber,
-      currentStatus: createForm.currentStatus,
-      checkpoints: [],
-      driverDetails: { name: createForm.driverName, vehicleReg: createForm.vehicleReg },
-    };
+  const handleCreateDelivery = async (deliveryData) => {
+    const token = localStorage.getItem('morres_jwt');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/deliveries`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body),
+      await axios.post('https://your-backend-url/deliveries', deliveryData, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) {
-        const errData = await res.json();
-        setCreateFeedback('Error: ' + (errData.error || 'Failed to create delivery'));
-      } else {
-        setCreateFeedback('');
-        setShowToast(true);
-        setToastMsg('Delivery created! Tracking ID: ' + trackingId);
-        setShowSmsPreview(true);
-        setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${createForm.currentStatus}`);
-        setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
-        // Refresh deliveries
-        const res2 = await fetch(`${import.meta.env.VITE_API_URL}/deliveries`, { credentials: 'include' });
-        const data = await res2.json();
-        setDeliveries(data);
-        setTimeout(() => {
-          setShowToast(false);
-        }, 3500);
-        // Auto-focus first field
-        setTimeout(() => {
-          customerNameRef.current && customerNameRef.current.focus();
-        }, 100);
+      // Refresh deliveries
+      const res = await axios.get('https://your-backend-url/deliveries', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setDeliveries(res.data);
+    } catch (error) {
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        localStorage.removeItem('morres_jwt');
+        navigate('/login');
       }
-    } catch (err) {
-      setCreateFeedback('Network error: ' + err.message);
     }
-    setCreating(false);
-  }
+  };
+
+  const handleUpdateCheckpoint = async (trackingId, checkpoint, currentStatus) => {
+    const token = localStorage.getItem('morres_jwt');
+    try {
+      await axios.post('https://your-backend-url/updateCheckpoint', { trackingId, checkpoint, currentStatus }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Refresh deliveries
+      const res = await axios.get('https://your-backend-url/deliveries', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setDeliveries(res.data);
+    } catch (error) {
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        localStorage.removeItem('morres_jwt');
+        navigate('/login');
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('morres_jwt');
+    navigate('/login');
+  };
 
   async function handleSendInitialSMS(trackingId, phone, status) {
     setShowSmsPreview(false);
@@ -188,38 +168,14 @@ export default function OperatorDashboard() {
       comment: form.comment,
     };
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/updateCheckpoint`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          trackingId: selectedId,
-          checkpoint,
-          currentStatus: form.status,
-        }),
-      });
-      if (!res.ok) {
-        const errData = await res.json();
-        setFeedback('Error: ' + (errData.error || 'Failed to update checkpoint'));
-      } else {
-        setFeedback('Checkpoint updated successfully!');
-        // Refresh deliveries
-        const res2 = await fetch(`${import.meta.env.VITE_API_URL}/deliveries`, { credentials: 'include' });
-        const data = await res2.json();
-        setDeliveries(data);
-        setForm({ location: '', operator: '', comment: '', status: '' });
-        setSelectedId('');
-      }
+      await handleUpdateCheckpoint(selectedId, checkpoint, form.status);
+      setFeedback('Checkpoint updated successfully!');
+      setForm({ location: '', operator: '', comment: '', status: '' });
+      setSelectedId('');
     } catch (err) {
       setFeedback('Network error: ' + err.message);
     }
     setSubmitting(false);
-  }
-
-  async function handleLogout() {
-    await fetch(`${import.meta.env.VITE_API_URL}/logout`, { method: 'POST', credentials: 'include' });
-    setIsAuthenticated(false);
-    navigate('/login');
   }
 
   return (

@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
+import axios from 'axios';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -9,23 +10,21 @@ export default function Login() {
   const navigate = useNavigate();
   const { setIsAuthenticated } = useContext(AuthContext);
 
-  async function handleSubmit(e) {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ username: email, password }),
-    });
-    if (res.ok) {
-      setIsAuthenticated(true);
-      navigate('/dashboard');
-    } else {
-      const data = await res.json();
-      setError(data.error || 'Login failed');
+    try {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/login`, { username: email, password });
+      if (res.data.success && res.data.token) {
+        localStorage.setItem('morres_jwt', res.data.token);
+        setIsAuthenticated(true);
+        navigate('/operator/dashboard');
+      } else {
+        setError('Invalid credentials');
+      }
+    } catch (err) {
+      setError('Login failed');
     }
-  }
+  };
 
   return (
     <div className="container d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
@@ -34,7 +33,7 @@ export default function Login() {
           <span className="material-icons fs-1 mb-2" style={{ color: '#D2691E' }}>login</span>
           <h1 className="h3 fw-bold mb-3" style={{ color: '#a14e13' }}>Operator Login</h1>
         </div>
-        <form className="w-100" onSubmit={handleSubmit}>
+        <form className="w-100" onSubmit={handleLogin}>
           <div className="mb-3">
             <label htmlFor="email" className="form-label fw-semibold">Username</label>
             <input id="email" type="text" className="form-control" placeholder="operator" required value={email} onChange={e => setEmail(e.target.value)} />
