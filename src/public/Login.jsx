@@ -17,7 +17,7 @@ export default function Login() {
       if (res.data.success && res.data.token) {
         localStorage.setItem('morres_jwt', res.data.token);
         setIsAuthenticated(true);
-        navigate('/operator/dashboard');
+        navigate('/dashboard');
       } else {
         setError('Invalid credentials');
       }
