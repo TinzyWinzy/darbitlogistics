@@ -1,26 +1,97 @@
 # Morres Logistics SMS Tracking System
 
-This project uses [UnoCSS](https://unocss.dev/) for utility-first styling instead of Tailwind CSS.
+An internal logistics system for real-time shipment tracking and automated SMS notifications. Built with Vite + React, Supabase, and Africa's Talking. Operators update checkpoints, customers track deliveries, and everyone gets instant status updates.
 
-## UnoCSS Usage
-- Utility classes are available globally in your React components.
-- No special CSS imports are needed; just use utility classes in your JSX as you would with Tailwind.
-- Configuration is in `uno.config.ts`.
+---
 
-## Development
-- Install dependencies: `npm install`
-- Start dev server: `npm run dev`
+## Features
+- Operator dashboard: create deliveries, update checkpoints
+- Customer tracking page: real-time status and timeline
+- SMS notifications at every checkpoint (Africa's Talking)
+- Modern, mobile-friendly UI
 
-# React + Vite
+---
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Tech Stack
+- **Frontend:** Vite + React (hosted on Vercel)
+- **Backend:** Node.js/Express (hosted on Render)
+- **Database:** Supabase
+- **SMS API:** Africa's Talking (Zimbabwe)
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Environment Variables
+Create a `.env` file (or use your host's dashboard) with:
 
-## Expanding the ESLint configuration
+```
+# Africa's Talking
+AT_USERNAME=your_africas_talking_username
+AT_API_KEY=your_africas_talking_api_key
+AT_SENDER_ID=MorresLogistics
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-# morres-logistics
+# Supabase
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# (Frontend only)
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_API_URL=https://your-backend.onrender.com
+```
+
+---
+
+## Deployment Guide
+
+### 1. GitHub
+```bash
+git init
+git remote add origin https://github.com/YOUR_USERNAME/morres-logistics.git
+git add .
+git commit -m "Initial MVP commit"
+git branch -M main
+git push -u origin main
+```
+
+### 2. Vercel (Frontend)
+- Import repo, set root to `/morres-app`
+- Set env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_URL`
+- Deploy
+
+### 3. Render (Backend)
+- New Web Service, root `/morres-app`
+- Build: `npm install`
+- Start: `node server.js`
+- Env vars: `AT_USERNAME`, `AT_API_KEY`, `AT_SENDER_ID`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+- Deploy
+
+### 4. Connect Frontend to Backend
+- Update API URLs in frontend to use your Render backend URL via `VITE_API_URL`
+
+---
+
+## Usage & Testing
+1. **Operator:** Log in, create a delivery, copy tracking code, update checkpoints.
+2. **Customer:** Go to tracking page, enter tracking code, view status/timeline.
+3. **SMS:** Receive SMS on checkpoint update and delivery creation (if enabled).
+4. **Test:**
+   - Create delivery with dummy data
+   - Update checkpoint from dashboard
+   - Verify SMS received
+   - Track order as customer
+
+---
+
+## Data Model (Supabase)
+- **deliveries**
+  - trackingId: string (PK)
+  - customerName: string
+  - phoneNumber: string
+  - currentStatus: string
+  - checkpoints: array (location, timestamp, operator, comment)
+  - driverDetails: { name, vehicleReg }
+
+---
+
+## License
+MIT
