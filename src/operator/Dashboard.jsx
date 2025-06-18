@@ -131,6 +131,22 @@ export default function OperatorDashboard() {
         setTimeout(() => {
           customerNameRef.current && customerNameRef.current.focus();
         }, 100);
+      } else if (res.data.success) {
+        setShowToast(true);
+        setToastMsg('Delivery created!');
+        setShowSmsPreview(false);
+        setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
+        // Refresh deliveries
+        const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setDeliveries(res2.data);
+        setTimeout(() => {
+          setShowToast(false);
+        }, 3500);
+        setTimeout(() => {
+          customerNameRef.current && customerNameRef.current.focus();
+        }, 100);
       } else if (res.data.warning) {
         setCreateFeedback('Warning: ' + res.data.warning);
       }
