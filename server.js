@@ -132,6 +132,10 @@ function generateTrackingId() {
 
 // Improved delivery creation route
 app.post('/deliveries', authenticateJWT, (req, res) => {
+  // Defensive: Ignore any trackingId from the client
+  if ('trackingId' in req.body) {
+    console.warn('[SECURITY] Client tried to set trackingId. Ignoring.');
+  }
   let { customerName, phoneNumber, currentStatus, checkpoints, driverDetails } = req.body;
 
   // 1. Validate input

@@ -90,23 +90,58 @@ export default function OperatorDashboard() {
     );
   }
 
-  const handleCreateDelivery = async (deliveryData) => {
+  const handleCreateDelivery = async (e) => {
+    console.log('Form submitted');
+    e.preventDefault();
+    setCreating(true);
+    setCreateFeedback('');
+    // Validate client-side for UX, but backend will also validate
+    if (!createForm.customerName || !createForm.phoneNumber || !createForm.currentStatus) {
+      setCreateFeedback('All required fields must be filled.');
+      setCreating(false);
+      return;
+    }
+    // Optionally, add client-side phone validation here
     const token = localStorage.getItem('morres_jwt');
+    const deliveryData = {
+      customerName: createForm.customerName,
+      phoneNumber: createForm.phoneNumber,
+      currentStatus: createForm.currentStatus,
+      checkpoints: [],
+      driverDetails: { name: createForm.driverName, vehicleReg: createForm.vehicleReg },
+    };
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/deliveries`, deliveryData, {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/deliveries`, deliveryData, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Refresh deliveries
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setDeliveries(res.data);
+      if (res.data.success && res.data.trackingId) {
+        setShowToast(true);
+        setToastMsg('Delivery created! Tracking ID: ' + res.data.trackingId);
+        setShowSmsPreview(true);
+        setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${res.data.trackingId}. Status: ${createForm.currentStatus}`);
+        setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
+        // Refresh deliveries
+        const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setDeliveries(res2.data);
+        setTimeout(() => {
+          setShowToast(false);
+        }, 3500);
+        setTimeout(() => {
+          customerNameRef.current && customerNameRef.current.focus();
+        }, 100);
+      } else if (res.data.warning) {
+        setCreateFeedback('Warning: ' + res.data.warning);
+      }
     } catch (error) {
-      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-        localStorage.removeItem('morres_jwt');
-        navigate('/login');
+      if (error.response && error.response.data && error.response.data.error) {
+        setCreateFeedback('Error: ' + error.response.data.error);
+      } else {
+        setCreateFeedback('Network error: ' + (error.message || 'Unknown error'));
       }
     }
+    setCreating(false);
   };
 
   const handleUpdateCheckpoint = async (trackingId, checkpoint, currentStatus) => {
