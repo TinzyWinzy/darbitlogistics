@@ -121,8 +121,8 @@ app.post('/login', (req, res) => {
       if (err2) return res.status(500).json({ error: err2.message });
       res.cookie('session_id', sessionId, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: true,
+        sameSite: 'none',
         maxAge: 1000 * 60 * 60 * 12
       });
       res.json({ success: true, username: row.username });
