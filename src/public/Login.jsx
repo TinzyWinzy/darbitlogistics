@@ -13,9 +13,8 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/login`, { username: email, password });
-      if (res.data.success && res.data.token) {
-        localStorage.setItem('morres_jwt', res.data.token);
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/login`, { username: email, password }, { withCredentials: true });
+      if (res.data.success) {
         setIsAuthenticated(true);
         navigate('/dashboard');
       } else {
