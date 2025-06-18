@@ -5,11 +5,13 @@ import axios from 'axios';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import jwt from 'jsonwebtoken';
+import cookieParser from 'cookie-parser';
+import crypto from 'crypto';
 dotenv.config();
 
 const app = express();
 app.use(bodyParser.json());
+app.use(cookieParser());
 
 const allowedOrigins = [
   'https://morres-logistics.vercel.app',
@@ -33,7 +35,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Explicitly handle preflight requests for all routes
-app.options('*', cors(corsOptions));
+app.options('/*any', cors(corsOptions));
 
 // SQLite DB setup
 const db = new sqlite3.Database('morres.db');
@@ -51,6 +53,12 @@ db.serialize(() => {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
     password TEXT
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS sessions (
+    sessionId TEXT PRIMARY KEY,
+    username TEXT,
+    expiresAt INTEGER
   )`);
 
   db.get(`SELECT * FROM users WHERE username = ?`, ['operator'], (err, row) => {
@@ -84,31 +92,41 @@ async function sendSMS(to, message) {
   }
 }
 
-// JWT secret
-const JWT_SECRET = process.env.JWT_SECRET || 'morres_jwt_secret';
-
-// JWT middleware
-function authenticateJWT(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ error: 'Missing Authorization header' });
-  const token = authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Missing token' });
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
-    req.user = user;
+// Session middleware
+function authenticateSession(req, res, next) {
+  const sessionId = req.cookies.session_id;
+  if (!sessionId) return res.status(401).json({ error: 'Missing session cookie' });
+  db.get(`SELECT * FROM sessions WHERE sessionId = ?`, [sessionId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(401).json({ error: 'Invalid session' });
+    if (row.expiresAt < Date.now()) {
+      db.run(`DELETE FROM sessions WHERE sessionId = ?`, [sessionId]);
+      return res.status(401).json({ error: 'Session expired' });
+    }
+    req.user = { username: row.username };
     next();
   });
 }
 
-// Operator login endpoint (returns JWT)
+// Operator login endpoint (sets session cookie)
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   db.get(`SELECT * FROM users WHERE username = ? AND password = ?`, [username, password], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(401).json({ error: 'Invalid credentials' });
-    // Generate JWT
-    const token = jwt.sign({ username: row.username }, JWT_SECRET, { expiresIn: '12h' });
-    res.json({ success: true, username: row.username, token });
+    // Generate session
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Date.now() + 1000 * 60 * 60 * 12; // 12 hours
+    db.run(`INSERT INTO sessions (sessionId, username, expiresAt) VALUES (?, ?, ?)`, [sessionId, row.username, expiresAt], (err2) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      res.cookie('session_id', sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 1000 * 60 * 60 * 12
+      });
+      res.json({ success: true, username: row.username });
+    });
   });
 });
 
@@ -131,7 +149,7 @@ function generateTrackingId() {
 }
 
 // Improved delivery creation route
-app.post('/deliveries', authenticateJWT, (req, res) => {
+app.post('/deliveries', authenticateSession, (req, res) => {
   // Defensive: Ignore any trackingId from the client
   if ('trackingId' in req.body) {
     console.warn('[SECURITY] Client tried to set trackingId. Ignoring.');
@@ -148,6 +166,10 @@ app.post('/deliveries', authenticateJWT, (req, res) => {
 
   // 2. Generate unique trackingId (guaranteed unique)
   function tryInsert(trackingId, attempt = 0) {
+    if (!trackingId) {
+      console.error('[FATAL] Refusing to insert delivery with null or empty trackingId');
+      return res.status(500).json({ error: 'Failed to generate trackingId' });
+    }
     db.run(
       `INSERT INTO deliveries (trackingId, customerName, phoneNumber, currentStatus, checkpoints, driverDetails) VALUES (?, ?, ?, ?, ?, ?)`,
       [
@@ -160,10 +182,12 @@ app.post('/deliveries', authenticateJWT, (req, res) => {
       ],
       async function (err) {
         if (err && err.message.includes('UNIQUE constraint failed') && attempt < 5) {
-          // Try again with a new ID
           return tryInsert(generateTrackingId(), attempt + 1);
         }
-        if (err) return res.status(400).json({ error: err.message });
+        if (err) {
+          console.error('[DB ERROR]', err.message);
+          return res.status(400).json({ error: err.message });
+        }
 
         // 3. Send SMS to customer
         const smsMessage = `Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${currentStatus}`;
@@ -183,7 +207,7 @@ app.post('/deliveries', authenticateJWT, (req, res) => {
   tryInsert(generateTrackingId());
 });
 
-app.post('/updateCheckpoint', authenticateJWT, async (req, res) => {
+app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
   const { trackingId, checkpoint, currentStatus } = req.body;
   db.get(`SELECT * FROM deliveries WHERE trackingId = ?`, [trackingId], async (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -208,7 +232,7 @@ app.post('/updateCheckpoint', authenticateJWT, async (req, res) => {
   });
 });
 
-app.get('/deliveries', authenticateJWT, (req, res) => {
+app.get('/deliveries', authenticateSession, (req, res) => {
   db.all(`SELECT * FROM deliveries`, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     // Parse JSON fields for each row
@@ -243,5 +267,16 @@ app.post('/send-initial-sms', async (req, res) => {
   res.json({ success: true });
 });
 
+// Add logout endpoint
+app.post('/logout', authenticateSession, (req, res) => {
+  const sessionId = req.cookies.session_id;
+  db.run(`DELETE FROM sessions WHERE sessionId = ?`, [sessionId], () => {
+    res.clearCookie('session_id');
+    res.json({ success: true });
+  });
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Local API running on port ${PORT}`)); 
+app.listen(PORT, () => {
+  console.log(`Local API running on port ${PORT}`);
+}); 

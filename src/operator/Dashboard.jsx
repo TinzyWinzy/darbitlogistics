@@ -42,19 +42,11 @@ export default function OperatorDashboard() {
 
   useEffect(() => {
     const fetchDeliveries = async () => {
-      const token = localStorage.getItem('morres_jwt');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
         setDeliveries(res.data);
       } catch (error) {
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-          localStorage.removeItem('morres_jwt');
           navigate('/login');
         }
       }
@@ -93,18 +85,14 @@ export default function OperatorDashboard() {
   }
 
   const handleCreateDelivery = async (e) => {
-    console.log('Form submitted');
     e.preventDefault();
     setCreating(true);
     setCreateFeedback('');
-    // Validate client-side for UX, but backend will also validate
     if (!createForm.customerName || !createForm.phoneNumber || !createForm.currentStatus) {
       setCreateFeedback('All required fields must be filled.');
       setCreating(false);
       return;
     }
-    // Optionally, add client-side phone validation here
-    const token = localStorage.getItem('morres_jwt');
     const deliveryData = {
       customerName: createForm.customerName,
       phoneNumber: createForm.phoneNumber,
@@ -113,9 +101,7 @@ export default function OperatorDashboard() {
       driverDetails: { name: createForm.driverName, vehicleReg: createForm.vehicleReg },
     };
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/deliveries`, deliveryData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/deliveries`, deliveryData, { withCredentials: true });
       if (res.data.success && res.data.trackingId) {
         setShowToast(true);
         setToastMsg('Delivery created! Tracking ID: ' + res.data.trackingId);
@@ -123,9 +109,7 @@ export default function OperatorDashboard() {
         setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${res.data.trackingId}. Status: ${createForm.currentStatus}`);
         setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
         // Refresh deliveries
-        const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
         setDeliveries(res2.data);
         setTimeout(() => {
           setShowToast(false);
@@ -139,9 +123,7 @@ export default function OperatorDashboard() {
         setShowSmsPreview(false);
         setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
         // Refresh deliveries
-        const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
         setDeliveries(res2.data);
         setTimeout(() => {
           setShowToast(false);
@@ -163,26 +145,22 @@ export default function OperatorDashboard() {
   };
 
   const handleUpdateCheckpoint = async (trackingId, checkpoint, currentStatus) => {
-    const token = localStorage.getItem('morres_jwt');
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/updateCheckpoint`, { trackingId, checkpoint, currentStatus }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post(`${import.meta.env.VITE_API_URL}/updateCheckpoint`, { trackingId, checkpoint, currentStatus }, { withCredentials: true });
       // Refresh deliveries
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
       setDeliveries(res.data);
     } catch (error) {
       if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-        localStorage.removeItem('morres_jwt');
         navigate('/login');
       }
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('morres_jwt');
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${import.meta.env.VITE_API_URL}/logout`, {}, { withCredentials: true });
+    } catch {}
     navigate('/login');
   };
 
