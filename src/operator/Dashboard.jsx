@@ -63,14 +63,16 @@ export default function OperatorDashboard() {
     fetchDeliveries();
   }, [navigate]);
 
-  const filteredDeliveries = deliveries.filter(d => {
-    const q = search.toLowerCase();
-    return (
-      d.customerName.toLowerCase().includes(q) ||
-      d.trackingId.toLowerCase().includes(q) ||
-      (d.currentStatus || '').toLowerCase().includes(q)
-    );
-  });
+  const filteredDeliveries = deliveries
+    .filter(d => d.trackingId) // Only include deliveries with a valid trackingId
+    .filter(d => {
+      const q = search.toLowerCase();
+      return (
+        d.customerName.toLowerCase().includes(q) ||
+        d.trackingId.toLowerCase().includes(q) ||
+        (d.currentStatus || '').toLowerCase().includes(q)
+      );
+    });
 
   function generateTrackingId() {
     // Simple unique code: 3 letters + 4 digits
