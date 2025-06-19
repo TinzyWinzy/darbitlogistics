@@ -189,12 +189,12 @@ export default function OperatorDashboard() {
     .filter(d => {
       const q = search.toLowerCase();
       return (
-        d.customerName.toLowerCase().includes(q) ||
-        d.trackingId.toLowerCase().includes(q) ||
-        d.bookingReference.toLowerCase().includes(q) ||
-        d.mineral_type.toLowerCase().includes(q) ||
-        d.mineral_grade.toLowerCase().includes(q) ||
-        d.destination.toLowerCase().includes(q) ||
+        (d.customerName || '').toLowerCase().includes(q) ||
+        (d.trackingId || '').toLowerCase().includes(q) ||
+        (d.bookingReference || '').toLowerCase().includes(q) ||
+        (d.mineral_type || '').toLowerCase().includes(q) ||
+        (d.mineral_grade || '').toLowerCase().includes(q) ||
+        (d.destination || '').toLowerCase().includes(q) ||
         (d.currentStatus || '').toLowerCase().includes(q)
       );
     });
