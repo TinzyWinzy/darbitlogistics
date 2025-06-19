@@ -1,12 +1,13 @@
-// Minimal Express + SQLite backend for Morres Logistics MVP (ES Module version)
+// Minimal Express + PostgreSQL backend for Morres Logistics MVP (ES Module version)
 import express from 'express';
-import sqlite3 from 'sqlite3';
 import axios from 'axios';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
+import pool from './config/database.js';
+
 dotenv.config();
 
 const app = express();
@@ -37,37 +38,6 @@ app.use(cors(corsOptions));
 // Explicitly handle preflight requests for all routes
 app.options('/*any', cors(corsOptions));
 
-// SQLite DB setup
-const db = new sqlite3.Database('morres.db');
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS deliveries (
-    trackingId TEXT PRIMARY KEY,
-    customerName TEXT,
-    phoneNumber TEXT,
-    currentStatus TEXT,
-    checkpoints TEXT, -- JSON string
-    driverDetails TEXT -- JSON string
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS sessions (
-    sessionId TEXT PRIMARY KEY,
-    username TEXT,
-    expiresAt INTEGER
-  )`);
-
-  db.get(`SELECT * FROM users WHERE username = ?`, ['operator'], (err, row) => {
-    if (!row) {
-      db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, ['operator', 'password123']);
-    }
-  });
-});
-
 // Helper: Send SMS via Africa's Talking
 async function sendSMS(to, message) {
   const username = process.env.AT_USERNAME;
@@ -93,41 +63,63 @@ async function sendSMS(to, message) {
 }
 
 // Session middleware
-function authenticateSession(req, res, next) {
+async function authenticateSession(req, res, next) {
   const sessionId = req.cookies.session_id;
   if (!sessionId) return res.status(401).json({ error: 'Missing session cookie' });
-  db.get(`SELECT * FROM sessions WHERE sessionId = ?`, [sessionId], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(401).json({ error: 'Invalid session' });
-    if (row.expiresAt < Date.now()) {
-      db.run(`DELETE FROM sessions WHERE sessionId = ?`, [sessionId]);
-      return res.status(401).json({ error: 'Session expired' });
+  
+  try {
+    const result = await pool.query(
+      'SELECT * FROM sessions WHERE session_id = $1 AND expires_at > NOW()',
+      [sessionId]
+    );
+    
+    if (result.rows.length === 0) {
+      await pool.query('DELETE FROM sessions WHERE session_id = $1', [sessionId]);
+      return res.status(401).json({ error: 'Invalid or expired session' });
     }
-    req.user = { username: row.username };
+    
+    req.user = { username: result.rows[0].username };
     next();
-  });
+  } catch (err) {
+    console.error('Session auth error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 // Operator login endpoint (sets session cookie)
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  db.get(`SELECT * FROM users WHERE username = ? AND password = ?`, [username, password], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(401).json({ error: 'Invalid credentials' });
-    // Generate session
+  
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE username = $1 AND password = $2',
+      [username, password]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
     const sessionId = crypto.randomBytes(32).toString('hex');
-    const expiresAt = Date.now() + 1000 * 60 * 60 * 12; // 12 hours
-    db.run(`INSERT INTO sessions (sessionId, username, expiresAt) VALUES (?, ?, ?)`, [sessionId, row.username, expiresAt], (err2) => {
-      if (err2) return res.status(500).json({ error: err2.message });
-      res.cookie('session_id', sessionId, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        maxAge: 1000 * 60 * 60 * 12
-      });
-      res.json({ success: true, username: row.username });
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 12); // 12 hours
+    
+    await pool.query(
+      'INSERT INTO sessions (session_id, username, expires_at) VALUES ($1, $2, $3)',
+      [sessionId, username, expiresAt]
+    );
+    
+    res.cookie('session_id', sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      maxAge: 1000 * 60 * 60 * 12
     });
-  });
+    
+    res.json({ success: true, username });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Helper: Validate Zimbabwe phone number
@@ -149,12 +141,8 @@ function generateTrackingId() {
 }
 
 // Improved delivery creation route
-app.post('/deliveries', authenticateSession, (req, res) => {
-  // Defensive: Ignore any trackingId from the client
-  if ('trackingId' in req.body) {
-    console.warn('[SECURITY] Client tried to set trackingId. Ignoring.');
-  }
-  let { customerName, phoneNumber, currentStatus, checkpoints, driverDetails } = req.body;
+app.post('/deliveries', authenticateSession, async (req, res) => {
+  let { customerName, phoneNumber, currentStatus, checkpoints = [], driverDetails = {} } = req.body;
 
   // 1. Validate input
   if (!customerName || !phoneNumber || !currentStatus) {
@@ -164,96 +152,118 @@ app.post('/deliveries', authenticateSession, (req, res) => {
     return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
   }
 
-  // 2. Generate unique trackingId (guaranteed unique)
-  function tryInsert(trackingId, attempt = 0) {
-    if (!trackingId) {
-      console.error('[FATAL] Refusing to insert delivery with null or empty trackingId');
-      return res.status(500).json({ error: 'Failed to generate trackingId' });
+  // 2. Generate unique trackingId and try insert
+  async function tryInsert(attempt = 0) {
+    if (attempt >= 5) {
+      return res.status(500).json({ error: 'Failed to generate unique tracking ID' });
     }
-    db.run(
-      `INSERT INTO deliveries (trackingId, customerName, phoneNumber, currentStatus, checkpoints, driverDetails) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        trackingId,
-        customerName,
-        phoneNumber,
-        currentStatus,
-        JSON.stringify(checkpoints || []),
-        JSON.stringify(driverDetails || {})
-      ],
-      async function (err) {
-        if (err && err.message.includes('UNIQUE constraint failed') && attempt < 5) {
-          return tryInsert(generateTrackingId(), attempt + 1);
-        }
-        if (err) {
-          console.error('[DB ERROR]', err.message);
-          return res.status(400).json({ error: err.message });
-        }
 
-        // 3. Send SMS to customer
-        const smsMessage = `Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${currentStatus}`;
-        const smsRes = await sendSMS(phoneNumber, smsMessage);
+    const trackingId = generateTrackingId();
+    
+    try {
+      await pool.query(
+        `INSERT INTO deliveries (tracking_id, customer_name, phone_number, current_status, checkpoints, driver_details)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [trackingId, customerName, phoneNumber, currentStatus, JSON.stringify(checkpoints), JSON.stringify(driverDetails)]
+      );
 
-        // 4. Audit log
-        console.log(`[AUDIT] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${trackingId}`);
+      // 3. Send SMS to customer
+      const smsMessage = `Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${currentStatus}`;
+      const smsRes = await sendSMS(phoneNumber, smsMessage);
 
-        if (!smsRes.success) {
-          return res.status(207).json({ success: true, warning: 'Delivery created, but SMS failed', trackingId, smsError: smsRes.error });
-        }
-        res.json({ success: true, trackingId });
+      // 4. Audit log
+      console.log(`[AUDIT] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${trackingId}`);
+
+      if (!smsRes.success) {
+        return res.status(207).json({
+          success: true,
+          warning: 'Delivery created, but SMS failed',
+          trackingId,
+          smsError: smsRes.error
+        });
       }
-    );
+
+      res.json({ success: true, trackingId });
+    } catch (err) {
+      if (err.code === '23505') { // Unique violation
+        return tryInsert(attempt + 1);
+      }
+      console.error('[DB ERROR]', err);
+      res.status(400).json({ error: err.message });
+    }
   }
 
-  tryInsert(generateTrackingId());
+  tryInsert();
 });
 
 app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
   const { trackingId, checkpoint, currentStatus } = req.body;
-  db.get(`SELECT * FROM deliveries WHERE trackingId = ?`, [trackingId], async (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(404).json({ error: 'Delivery not found' });
+  
+  try {
+    const delivery = await pool.query(
+      'SELECT * FROM deliveries WHERE tracking_id = $1',
+      [trackingId]
+    );
+    
+    if (delivery.rows.length === 0) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+    
+    const row = delivery.rows[0];
     const checkpoints = JSON.parse(row.checkpoints);
     const newCheckpoint = { ...checkpoint, timestamp: new Date().toISOString() };
     checkpoints.push(newCheckpoint);
-    db.run(
-      `UPDATE deliveries SET checkpoints = ?, currentStatus = ? WHERE trackingId = ?`,
-      [JSON.stringify(checkpoints), currentStatus, trackingId],
-      async function (err2) {
-        if (err2) return res.status(500).json({ error: err2.message });
-        // Send SMS
-        const smsMessage = `Update: Your delivery (${trackingId}) is now at ${checkpoint.location}. Status: ${currentStatus}.`;
-        const smsRes = await sendSMS(row.phoneNumber, smsMessage);
-        if (!smsRes.success) {
-          return res.status(207).json({ error: 'Checkpoint updated, but SMS failed', smsError: smsRes.error });
-        }
-        res.json({ success: true });
-      }
+    
+    await pool.query(
+      'UPDATE deliveries SET checkpoints = $1, current_status = $2 WHERE tracking_id = $3',
+      [JSON.stringify(checkpoints), currentStatus, trackingId]
     );
-  });
+    
+    // Send SMS
+    const smsMessage = `Update: Your delivery (${trackingId}) is now at ${checkpoint.location}. Status: ${currentStatus}.`;
+    const smsRes = await sendSMS(row.phone_number, smsMessage);
+    
+    if (!smsRes.success) {
+      return res.status(207).json({
+        error: 'Checkpoint updated, but SMS failed',
+        smsError: smsRes.error
+      });
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Update checkpoint error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get('/deliveries', authenticateSession, (req, res) => {
-  db.all(`SELECT * FROM deliveries`, [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    // Parse JSON fields for each row
-    const deliveries = rows.map(row => ({
-      ...row,
-      checkpoints: JSON.parse(row.checkpoints),
-      driverDetails: JSON.parse(row.driverDetails),
-    }));
-    res.json(deliveries);
-  });
+app.get('/deliveries', authenticateSession, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM deliveries ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get deliveries error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Get delivery by trackingId
-app.get('/deliveries/:trackingId', (req, res) => {
-  db.get(`SELECT * FROM deliveries WHERE trackingId = ?`, [req.params.trackingId], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(404).json({ error: 'Delivery not found' });
-    row.checkpoints = JSON.parse(row.checkpoints);
-    row.driverDetails = JSON.parse(row.driverDetails);
-    res.json(row);
-  });
+app.get('/deliveries/:trackingId', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM deliveries WHERE tracking_id = $1',
+      [req.params.trackingId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Get delivery error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Add a /send-initial-sms endpoint
@@ -268,12 +278,16 @@ app.post('/send-initial-sms', async (req, res) => {
 });
 
 // Add logout endpoint
-app.post('/logout', authenticateSession, (req, res) => {
+app.post('/logout', authenticateSession, async (req, res) => {
   const sessionId = req.cookies.session_id;
-  db.run(`DELETE FROM sessions WHERE sessionId = ?`, [sessionId], () => {
+  try {
+    await pool.query('DELETE FROM sessions WHERE session_id = $1', [sessionId]);
     res.clearCookie('session_id');
     res.json({ success: true });
-  });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
