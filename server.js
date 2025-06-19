@@ -42,7 +42,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Pre-flight requests
+// Ensure only the correct preflight handler is present
 app.options('*', cors(corsOptions));
 
 // Helper: Send SMS via Africa's Talking
