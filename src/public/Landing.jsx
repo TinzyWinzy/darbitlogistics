@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
-import React from 'react';
+import React, { useContext } from 'react';
+import { AuthContext } from '../App';
 
 export default function Landing() {
+  const { isAuthenticated } = useContext(AuthContext);
+
   return (
     <div className="bg-gradient" style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #e88a3a 0%, #fffbe6 100%)' }}>
       {/* Hero Section */}
@@ -12,8 +15,17 @@ export default function Landing() {
           Reliable, real-time logistics tracking and SMS notifications for Zimbabwe and beyond. Empowering businesses and customers with transparency and speed.
         </p>
         <div className="d-flex flex-column flex-sm-row justify-content-center gap-3 mb-4 mt-4">
-          <Link to="/login" className="btn btn-lg text-white px-5 py-3" style={{ background: '#D2691E' }}>Login</Link>
-          <Link to="/track" className="btn btn-lg btn-outline-primary px-5 py-3" style={{ color: '#D2691E', borderColor: '#D2691E' }}>Track Delivery</Link>
+          {isAuthenticated ? (
+            <>
+              <Link to="/dashboard" className="btn btn-lg text-white px-5 py-3" style={{ background: '#D2691E' }}>Go to Dashboard</Link>
+              <Link to="/track" className="btn btn-lg btn-outline-primary px-5 py-3" style={{ color: '#D2691E', borderColor: '#D2691E' }}>Track Delivery</Link>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="btn btn-lg text-white px-5 py-3" style={{ background: '#D2691E' }}>Login</Link>
+              <Link to="/track" className="btn btn-lg btn-outline-primary px-5 py-3" style={{ color: '#D2691E', borderColor: '#D2691E' }}>Track Delivery</Link>
+            </>
+          )}
         </div>
       </section>
 
@@ -91,7 +103,7 @@ export default function Landing() {
       <section className="container py-5 my-5">
         <div className="card border-0 shadow-sm mx-auto text-center p-4 py-5" style={{ maxWidth: 600, background: 'rgba(255,255,255,0.95)' }}>
           <span className="material-icons fs-2 mb-3" style={{ color: '#D2691E' }}>format_quote</span>
-          <p className="fst-italic lead mb-3">“Morres made our logistics transparent and stress-free. We always know where our shipments are!”</p>
+          <p className="fst-italic lead mb-3">"Morres made our logistics transparent and stress-free. We always know where our shipments are!"</p>
           <div className="fw-semibold" style={{ color: '#a14e13' }}>— Happy Customer</div>
         </div>
       </section>

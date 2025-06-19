@@ -1,6 +1,10 @@
 import { Link } from 'react-router-dom';
+import { useContext } from 'react';
+import { AuthContext } from '../App';
 
 export default function Offerings() {
+  const { isAuthenticated } = useContext(AuthContext);
+
   return (
     <div className="container py-5">
       <section className="text-center mb-5">
@@ -32,8 +36,17 @@ export default function Offerings() {
         </div>
       </section>
       <div className="d-flex flex-column flex-sm-row justify-content-center gap-3 mt-5">
-        <Link to="/login" className="btn btn-lg text-white" style={{ background: '#D2691E' }}>Login</Link>
-        <Link to="/track" className="btn btn-lg btn-outline-primary" style={{ color: '#D2691E', borderColor: '#D2691E' }}>Track Delivery</Link>
+        {isAuthenticated ? (
+          <>
+            <Link to="/dashboard" className="btn btn-lg text-white" style={{ background: '#D2691E' }}>Go to Dashboard</Link>
+            <Link to="/track" className="btn btn-lg btn-outline-primary" style={{ color: '#D2691E', borderColor: '#D2691E' }}>Track Delivery</Link>
+          </>
+        ) : (
+          <>
+            <Link to="/login" className="btn btn-lg text-white" style={{ background: '#D2691E' }}>Login</Link>
+            <Link to="/track" className="btn btn-lg btn-outline-primary" style={{ color: '#D2691E', borderColor: '#D2691E' }}>Track Delivery</Link>
+          </>
+        )}
       </div>
     </div>
   );
