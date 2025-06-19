@@ -16,9 +16,8 @@ CREATE TABLE IF NOT EXISTS deliveries (
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL
 );
 
 -- Sessions table
@@ -49,7 +48,7 @@ CREATE TRIGGER update_deliveries_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Insert default operator user if not exists
+-- Insert a default operator user (plaintext password for dev only)
 INSERT INTO users (username, password)
-VALUES ('operator', 'password123')
+VALUES ('operator', 'changeme')
 ON CONFLICT (username) DO NOTHING; 

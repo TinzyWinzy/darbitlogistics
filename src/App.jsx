@@ -7,7 +7,7 @@ import Offerings from './public/Offerings';
 import Login from './public/Login';
 import Footer from './public/Footer';
 import './App.css'
-import { useState, createContext, useEffect } from 'react';
+import { useState, createContext, useEffect, useContext } from 'react';
 import axios from 'axios';
 
 export const AuthContext = createContext();
