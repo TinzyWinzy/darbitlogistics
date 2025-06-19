@@ -183,6 +183,10 @@ export default function OperatorDashboard() {
   };
 
   const handleUpdateCheckpoint = async (trackingId, checkpoint, currentStatus) => {
+    if (!trackingId || !checkpoint || !currentStatus) {
+      setFeedback('All fields are required.');
+      return;
+    }
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/updateCheckpoint`, { trackingId, checkpoint, currentStatus }, { withCredentials: true });
       // Refresh deliveries
@@ -240,6 +244,16 @@ export default function OperatorDashboard() {
       operator: form.operator,
       comment: form.comment,
     };
+    if (!form.location || !form.operator || !form.status) {
+      setFeedback('Location, Operator, and Status are required.');
+      setSubmitting(false);
+      return;
+    }
+    if (!form.status) {
+      setFeedback('Status is required.');
+      setSubmitting(false);
+      return;
+    }
     try {
       await handleUpdateCheckpoint(selectedId, checkpoint, form.status);
       setFeedback('Checkpoint updated successfully!');

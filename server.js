@@ -219,8 +219,11 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
 });
 
 app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
+  console.log('UpdateCheckpoint body:', req.body);
   const { trackingId, checkpoint, currentStatus } = req.body;
-  
+  if (!trackingId || !checkpoint || !currentStatus) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
   try {
     const delivery = await pool.query(
       'SELECT * FROM deliveries WHERE tracking_id = $1',
