@@ -108,37 +108,43 @@ export default function OperatorDashboard() {
     e.preventDefault();
     setCreating(true);
     setCreateFeedback('');
-    if (!createForm.customerName || !createForm.phoneNumber || !createForm.currentStatus) {
-      setCreateFeedback('All required fields must be filled.');
-      setCreating(false);
-      return;
-    }
 
-    // Validate phone number format
-    if (!validateZimPhone(createForm.phoneNumber)) {
-      setCreateFeedback('Please enter a valid Zimbabwean phone number (e.g., 07xxxxxxxx, +263xxxxxxxx)');
-      setCreating(false);
-      return;
-    }
-
-    // Format phone number to include country code if not present
+    // Format phone number first
     let formattedPhone = createForm.phoneNumber;
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '263' + formattedPhone.substring(1);
-    } else if (formattedPhone.startsWith('+')) {
-      formattedPhone = formattedPhone.substring(1);
-    } else if (formattedPhone.startsWith('7')) {
-      formattedPhone = '263' + formattedPhone;
-    }
-
-    const deliveryData = {
-      customerName: createForm.customerName,
-      phoneNumber: formattedPhone,
-      currentStatus: createForm.currentStatus,
-      checkpoints: [],
-      driverDetails: { name: createForm.driverName, vehicleReg: createForm.vehicleReg },
-    };
     try {
+      if (formattedPhone.startsWith('0')) {
+        formattedPhone = '263' + formattedPhone.substring(1);
+      } else if (formattedPhone.startsWith('+')) {
+        formattedPhone = formattedPhone.substring(1);
+      } else if (formattedPhone.startsWith('7')) {
+        formattedPhone = '263' + formattedPhone;
+      }
+
+      // Validate all required fields including formatted phone
+      if (!createForm.customerName || !formattedPhone || !createForm.currentStatus) {
+        setCreateFeedback('All required fields must be filled.');
+        setCreating(false);
+        return;
+      }
+
+      // Validate phone number format after formatting
+      if (!validateZimPhone(formattedPhone)) {
+        setCreateFeedback('Please enter a valid Zimbabwean phone number (e.g., 07xxxxxxxx, +263xxxxxxxx)');
+        setCreating(false);
+        return;
+      }
+
+      const deliveryData = {
+        customerName: createForm.customerName.trim(),
+        phoneNumber: formattedPhone,
+        currentStatus: createForm.currentStatus.trim(),
+        checkpoints: [],
+        driverDetails: {
+          name: createForm.driverName.trim(),
+          vehicleReg: createForm.vehicleReg.trim()
+        },
+      };
+
       const res = await deliveryApi.create(deliveryData);
       if (res.success && res.trackingId) {
         setShowToast(true);
@@ -159,7 +165,8 @@ export default function OperatorDashboard() {
         setCreateFeedback('Warning: ' + res.warning);
       }
     } catch (error) {
-      setCreateFeedback(error.response?.data?.error || 'Failed to create delivery');
+      console.error('Create delivery error:', error);
+      setCreateFeedback(error.response?.data?.error || 'Failed to create delivery. Please check all fields and try again.');
     }
     setCreating(false);
   };
