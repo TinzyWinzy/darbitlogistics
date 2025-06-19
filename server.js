@@ -521,15 +521,16 @@ app.post('/logout', authenticateSession, async (req, res) => {
 
 // Parent Booking Routes
 app.post('/parent-bookings', authenticateSession, async (req, res) => {
+  // Handle both camelCase and snake_case field names
   const { 
-    customerName, 
-    phoneNumber, 
-    totalTonnage, 
-    mineral_type, 
-    mineral_grade, 
-    loadingPoint, 
-    destination, 
-    deadline, 
+    customerName, customer_name,
+    phoneNumber, phone_number,
+    totalTonnage, total_tonnage,
+    mineral_type,
+    mineral_grade,
+    loadingPoint, loading_point,
+    destination,
+    deadline,
     notes,
     moisture_content,
     particle_size,
@@ -538,43 +539,83 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
     environmental_concerns
   } = req.body;
 
+  // Use the first non-null value for each field
+  const data = {
+    customerName: customerName || customer_name,
+    phoneNumber: phoneNumber || phone_number,
+    totalTonnage: totalTonnage || total_tonnage,
+    mineral_type,
+    mineral_grade,
+    loadingPoint: loadingPoint || loading_point,
+    destination,
+    deadline,
+    notes,
+    moisture_content,
+    particle_size,
+    requires_analysis,
+    special_handling_notes,
+    environmental_concerns
+  };
+
   try {
+    console.log('Received parent booking request:', data);
+
     // Generate booking code first
     const bookingCode = generateBookingCode();
+    console.log('Generated booking code:', bookingCode);
 
     // Validate required fields
-    if (!customerName || !phoneNumber || !totalTonnage || !mineral_type || !loadingPoint || !destination || !deadline) {
+    if (!data.customerName || !data.phoneNumber || !data.totalTonnage || !data.mineral_type || !data.loadingPoint || !data.destination || !data.deadline) {
+      console.log('Missing required fields:', {
+        customerName: !data.customerName,
+        phoneNumber: !data.phoneNumber,
+        totalTonnage: !data.totalTonnage,
+        mineral_type: !data.mineral_type,
+        loadingPoint: !data.loadingPoint,
+        destination: !data.destination,
+        deadline: !data.deadline
+      });
       return res.status(400).json({ error: 'Missing required fields.' });
     }
 
     // Validate phone number
-    if (!validateZimPhone(phoneNumber)) {
+    const isValidPhone = validateZimPhone(data.phoneNumber);
+    console.log('Phone validation result:', { phoneNumber: data.phoneNumber, isValid: isValidPhone });
+    if (!isValidPhone) {
       return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
     }
 
     // Validate tonnage
-    if (totalTonnage <= 0) {
+    if (data.totalTonnage <= 0) {
+      console.log('Invalid tonnage:', data.totalTonnage);
       return res.status(400).json({ error: 'Total tonnage must be greater than 0.' });
     }
 
     // Validate deadline
-    const deadlineDate = new Date(deadline);
-    if (deadlineDate <= new Date()) {
+    const deadlineDate = new Date(data.deadline);
+    const now = new Date();
+    console.log('Deadline validation:', { deadline: data.deadline, deadlineDate, now, isValid: deadlineDate > now });
+    if (deadlineDate <= now) {
       return res.status(400).json({ error: 'Deadline must be in the future.' });
     }
 
     // Validate moisture content if provided
-    if (moisture_content !== undefined && (moisture_content < 0 || moisture_content > 100)) {
+    if (data.moisture_content !== undefined && (data.moisture_content < 0 || data.moisture_content > 100)) {
+      console.log('Invalid moisture content:', data.moisture_content);
       return res.status(400).json({ error: 'Moisture content must be between 0 and 100%.' });
     }
 
     // Validate mineral type
-    if (!['Coal', 'Iron Ore', 'Copper Ore', 'Gold Ore', 'Bauxite', 'Limestone', 'Phosphate', 'Manganese', 'Other'].includes(mineral_type)) {
+    const validMineralTypes = ['Coal', 'Iron Ore', 'Copper Ore', 'Gold Ore', 'Bauxite', 'Limestone', 'Phosphate', 'Manganese', 'Other'];
+    console.log('Mineral type validation:', { mineral_type: data.mineral_type, isValid: validMineralTypes.includes(data.mineral_type) });
+    if (!validMineralTypes.includes(data.mineral_type)) {
       return res.status(400).json({ error: 'Invalid mineral type.' });
     }
 
     // Validate mineral grade if provided
-    if (mineral_grade && !['Premium', 'Standard', 'Low Grade', 'Mixed', 'Ungraded'].includes(mineral_grade)) {
+    const validGrades = ['Premium', 'Standard', 'Low Grade', 'Mixed', 'Ungraded'];
+    if (data.mineral_grade && !validGrades.includes(data.mineral_grade)) {
+      console.log('Invalid mineral grade:', data.mineral_grade);
       return res.status(400).json({ error: 'Invalid mineral grade.' });
     }
 
@@ -600,29 +641,29 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
       RETURNING *`,
       [
-        customerName, 
-        phoneNumber, 
-        totalTonnage, 
-        mineral_type, 
-        mineral_grade || 'Ungraded', 
-        loadingPoint,
-        destination, 
-        deadline, 
+        data.customerName, 
+        data.phoneNumber, 
+        data.totalTonnage, 
+        data.mineral_type, 
+        data.mineral_grade || 'Ungraded', 
+        data.loadingPoint,
+        data.destination, 
+        data.deadline, 
         bookingCode, 
-        notes || '',
-        moisture_content,
-        particle_size,
-        requires_analysis || false,
-        special_handling_notes,
-        environmental_concerns,
-        totalTonnage, // Initially, remaining_tonnage equals total_tonnage
+        data.notes || '',
+        data.moisture_content,
+        data.particle_size,
+        data.requires_analysis || false,
+        data.special_handling_notes,
+        data.environmental_concerns,
+        data.totalTonnage, // Initially, remaining_tonnage equals total_tonnage
         'Active'  // Default status
       ]
     );
 
     // Send SMS notification
-    const smsMessage = `Welcome! Your booking is created. Booking Code: ${bookingCode}. Total Tonnage: ${totalTonnage}`;
-    const smsRes = await sendSMS(phoneNumber, smsMessage);
+    const smsMessage = `Welcome! Your booking is created. Booking Code: ${bookingCode}. Total Tonnage: ${data.totalTonnage}`;
+    const smsRes = await sendSMS(data.phoneNumber, smsMessage);
 
     // Audit log
     console.log(`[AUDIT] Parent booking created by ${req.user.username} at ${new Date().toISOString()} | BookingCode: ${bookingCode}`);
