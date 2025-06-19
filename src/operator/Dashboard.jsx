@@ -2,6 +2,8 @@ import { useEffect, useState, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { deliveryApi } from '../services/api';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 
 // Spinner component
 function Spinner() {
@@ -54,7 +56,7 @@ export default function OperatorDashboard() {
     commodity: '',
     loadingPoint: '',
     destination: '',
-    deadline: '',
+    deadline: null,
     reference: '',
     notes: ''
   });
@@ -388,7 +390,7 @@ export default function OperatorDashboard() {
         commodity: parentForm.commodity.trim(),
         loadingPoint: parentForm.loadingPoint.trim(),
         destination: parentForm.destination.trim(),
-        deadline: parentForm.deadline,
+        deadline: parentForm.deadline.toISOString(), // Convert to ISO string format
         bookingCode,
         notes: parentForm.notes.trim(),
         status: 'Active',
@@ -411,7 +413,8 @@ export default function OperatorDashboard() {
           commodity: '',
           loadingPoint: '',
           destination: '',
-          deadline: '',
+          deadline: null,
+          reference: '',
           notes: ''
         });
 
@@ -615,13 +618,27 @@ export default function OperatorDashboard() {
             </div>
             <div className="col-md-3">
               <label className="form-label">Deadline *</label>
-              <input 
-                type="datetime-local" 
-                className="form-control" 
-                required 
-                value={parentForm.deadline}
-                onChange={e => setParentForm(prev => ({ ...prev, deadline: e.target.value }))}
+              <DatePicker
+                selected={parentForm.deadline}
+                onChange={(date) => setParentForm(prev => ({ ...prev, deadline: date }))}
+                showTimeSelect
+                timeFormat="HH:mm"
+                timeIntervals={15}
+                timeCaption="Time"
+                dateFormat="MMMM d, yyyy h:mm aa"
+                minDate={new Date()}
+                className="form-control"
+                placeholderText="Select deadline date and time"
+                required
                 disabled={creating}
+                customInput={
+                  <input
+                    style={{
+                      background: 'white',
+                      cursor: 'pointer'
+                    }}
+                  />
+                }
               />
             </div>
             <div className="col-12">
@@ -1062,4 +1079,11 @@ function getTimeLeft(deadline) {
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   
   return `${days}d ${hours}h`;
+}
+
+// Add this utility function near other utility functions
+function addHoursToDate(date, hours) {
+  const newDate = new Date(date);
+  newDate.setHours(newDate.getHours() + hours);
+  return newDate;
 } 
