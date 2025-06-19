@@ -51,7 +51,18 @@ export default function OperatorDashboard() {
             'Content-Type': 'application/json'
           }
         });
-        setDeliveries(res.data);
+        // Map backend snake_case to camelCase
+        const toCamel = d => ({
+          trackingId: d.tracking_id,
+          customerName: d.customer_name,
+          phoneNumber: d.phone_number,
+          currentStatus: d.current_status,
+          checkpoints: d.checkpoints,
+          driverDetails: d.driver_details,
+          createdAt: d.created_at,
+          updatedAt: d.updated_at,
+        });
+        setDeliveries(Array.isArray(res.data) ? res.data.map(toCamel) : []);
       } catch (error) {
         console.error('Fetch error:', error);
         if (error.response) {
