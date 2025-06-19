@@ -82,6 +82,38 @@ export default function OperatorDashboard() {
   const [selectedParentBooking, setSelectedParentBooking] = useState(null);
   const [showParentDetails, setShowParentDetails] = useState(false);
 
+  // Add toCamel utility function at the top level
+  const toCamel = d => ({
+    trackingId: d.tracking_id,
+    customerName: d.customer_name,
+    phoneNumber: d.phone_number,
+    currentStatus: d.current_status,
+    checkpoints: d.checkpoints,
+    driverDetails: d.driver_details,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+    bookingReference: d.booking_reference,
+    loadingPoint: d.loading_point,
+    destination: d.destination,
+    vehicleType: d.vehicle_type,
+    vehicleCapacity: d.vehicle_capacity,
+    tonnage: d.tonnage,
+    containerCount: d.container_count,
+    parentBookingId: d.parent_booking_id,
+    isCompleted: d.is_completed,
+    completionDate: d.completion_date,
+    hasWeighbridgeCert: d.has_weighbridge_cert,
+    weighbridgeRef: d.weighbridge_ref,
+    tareWeight: d.tare_weight,
+    netWeight: d.net_weight,
+    samplingRequired: d.sampling_required,
+    samplingStatus: d.sampling_status,
+    environmentalIncident: d.environmental_incident,
+    incidentDetails: d.incident_details,
+    mineral_type: d.mineral_type,
+    mineral_grade: d.mineral_grade
+  });
+
   const parentBookingToCamel = d => ({
     id: d.parent_booking_id,
     customerName: d.customer_name,
@@ -106,7 +138,7 @@ export default function OperatorDashboard() {
   const fetchDeliveries = async () => {
     try {
       const data = await deliveryApi.getAll();
-      setDeliveries(data);
+      setDeliveries(data.map(toCamel));
     } catch (error) {
       console.error('Fetch error:', error);
       setError(error.response?.data?.error || 'Failed to fetch deliveries');
@@ -159,7 +191,7 @@ export default function OperatorDashboard() {
       return (
         d.customerName.toLowerCase().includes(q) ||
         d.trackingId.toLowerCase().includes(q) ||
-        (d.bookingReference || '').toLowerCase().includes(q) ||
+        d.bookingReference.toLowerCase().includes(q) ||
         d.mineral_type.toLowerCase().includes(q) ||
         d.mineral_grade.toLowerCase().includes(q) ||
         d.destination.toLowerCase().includes(q) ||
@@ -286,9 +318,10 @@ export default function OperatorDashboard() {
           deliveryApi.getAll(),
           deliveryApi.getAllParentBookings()
         ]);
-        setDeliveries(deliveriesData);
-        setParentBookings(bookingsData);
-        updateCustomersList(bookingsData);
+        setDeliveries(deliveriesData.map(toCamel));
+        const camelCaseBookings = bookingsData.map(parentBookingToCamel);
+        setParentBookings(camelCaseBookings);
+        updateCustomersList(camelCaseBookings);
       }
     } catch (error) {
       console.error('Create delivery error:', error);
@@ -303,13 +336,13 @@ export default function OperatorDashboard() {
       return;
     }
 
-    const delivery = deliveries.find(d => d.tracking_id === trackingId);
+    const delivery = deliveries.find(d => d.trackingId === trackingId);
     if (!delivery) {
       setFeedback('Could not find the delivery to update.');
       return;
     }
 
-    if (delivery.is_completed && currentStatus !== 'Cancelled') {
+    if (delivery.isCompleted && currentStatus !== 'Cancelled') {
       setFeedback('Cannot update completed delivery unless cancelling.');
       return;
     }
@@ -332,14 +365,14 @@ export default function OperatorDashboard() {
 
       // Refresh deliveries
       const data = await deliveryApi.getAll();
-      setDeliveries(data);
+      setDeliveries(data.map(toCamel));
       setFeedback('Checkpoint updated successfully!');
       
       // Send SMS notification
-      if (delivery.current_status !== currentStatus) {
+      if (delivery.currentStatus !== currentStatus) {
         const message = `Delivery ${trackingId} status updated to: ${currentStatus}. Location: ${newCheckpoint.location}`;
         try {
-          await deliveryApi.sendInitialSms(delivery.phone_number, message);
+          await deliveryApi.sendInitialSms(delivery.phoneNumber, message);
         } catch (error) {
           console.error('Failed to send status update SMS:', error);
         }
@@ -378,7 +411,7 @@ export default function OperatorDashboard() {
     setSubmitting(true);
     setFeedback('');
     
-    const delivery = deliveries.find(d => d.tracking_id === selectedId);
+    const delivery = deliveries.find(d => d.trackingId === selectedId);
     if (!delivery) {
       setFeedback('No delivery selected.');
       setSubmitting(false);
@@ -1295,14 +1328,14 @@ export default function OperatorDashboard() {
                 Update Checkpoint
               </h2>
               {selectedId && (() => {
-                const sel = deliveries.find(d => d.tracking_id === selectedId);
+                const sel = deliveries.find(d => d.trackingId === selectedId);
                 if (!sel) return null;
                 return (
                   <div className="alert alert-info mb-3 p-2">
-                    <div><strong>Tracking ID:</strong> {sel.tracking_id}</div>
-                    <div><strong>Customer:</strong> {sel.customer_name}</div>
-                    <div><strong>Phone:</strong> {sel.phone_number}</div>
-                    <div><strong>Status:</strong> {sel.current_status}</div>
+                    <div><strong>Tracking ID:</strong> {sel.trackingId}</div>
+                    <div><strong>Customer:</strong> {sel.customerName}</div>
+                    <div><strong>Phone:</strong> {sel.phoneNumber}</div>
+                    <div><strong>Status:</strong> {sel.currentStatus}</div>
                   </div>
                 );
               })()}
@@ -1418,9 +1451,9 @@ export default function OperatorDashboard() {
                 )}
               </form>
 
-              {selectedId && deliveries.find(d => d.tracking_id === selectedId) && (
+              {selectedId && deliveries.find(d => d.trackingId === selectedId) && (
                 <div className="mt-4">
-                  {renderCheckpointHistory(deliveries.find(d => d.tracking_id === selectedId))}
+                  {renderCheckpointHistory(deliveries.find(d => d.trackingId === selectedId))}
                 </div>
               )}
             </div>
