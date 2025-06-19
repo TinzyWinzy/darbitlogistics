@@ -134,8 +134,7 @@ app.post('/login', async (req, res) => {
       secure: true,
       sameSite: 'none',
       maxAge: 1000 * 60 * 60 * 12, // 12 hours
-      path: '/',
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
+      path: '/'
     });
     
     res.json({ success: true, username });
