@@ -27,8 +27,11 @@ export default function OperatorDashboard() {
     customerName: '',
     phoneNumber: '',
     currentStatus: '',
-    driverName: '',
-    vehicleReg: '',
+    checkpoints: [],
+    driverDetails: {
+      name: '',
+      vehicleReg: ''
+    }
   });
   const [creating, setCreating] = useState(false);
   const [createFeedback, setCreateFeedback] = useState('');
@@ -121,8 +124,20 @@ export default function OperatorDashboard() {
       }
 
       // Validate all required fields including formatted phone
-      if (!createForm.customerName || !formattedPhone || !createForm.currentStatus) {
-        setCreateFeedback('All required fields must be filled.');
+      if (!createForm.customerName?.trim()) {
+        setCreateFeedback('Customer Name is required.');
+        setCreating(false);
+        return;
+      }
+
+      if (!formattedPhone) {
+        setCreateFeedback('Phone Number is required.');
+        setCreating(false);
+        return;
+      }
+
+      if (!createForm.currentStatus?.trim()) {
+        setCreateFeedback('Initial Status is required.');
         setCreating(false);
         return;
       }
@@ -140,10 +155,12 @@ export default function OperatorDashboard() {
         currentStatus: createForm.currentStatus.trim(),
         checkpoints: [],
         driverDetails: {
-          name: createForm.driverName.trim(),
-          vehicleReg: createForm.vehicleReg.trim()
-        },
+          name: createForm.driverDetails.name?.trim() || '',
+          vehicleReg: createForm.driverDetails.vehicleReg?.trim() || ''
+        }
       };
+
+      console.log('Submitting delivery data:', deliveryData); // Debug log
 
       const res = await deliveryApi.create(deliveryData);
       if (res.success && res.trackingId) {
@@ -166,8 +183,11 @@ export default function OperatorDashboard() {
           customerName: '',
           phoneNumber: '',
           currentStatus: '',
-          driverName: '',
-          vehicleReg: ''
+          checkpoints: [],
+          driverDetails: {
+            name: '',
+            vehicleReg: '',
+          },
         });
 
         // Clear any previous feedback
@@ -285,27 +305,91 @@ export default function OperatorDashboard() {
           </h2>
           <form onSubmit={handleCreateDelivery} className="row g-3 align-items-end" autoComplete="off">
             <div className="col-md-3">
-              <label className="form-label">Customer Name</label>
-              <input ref={customerNameRef} type="text" className="form-control" required value={createForm.customerName} onChange={e => setCreateForm(f => ({ ...f, customerName: e.target.value }))} disabled={creating} tabIndex={1} />
+              <label className="form-label">Customer Name *</label>
+              <input 
+                ref={customerNameRef} 
+                type="text" 
+                className="form-control" 
+                required 
+                placeholder="Enter customer name"
+                value={createForm.customerName} 
+                onChange={e => setCreateForm(prev => ({ ...prev, customerName: e.target.value }))} 
+                disabled={creating} 
+                tabIndex={1} 
+              />
             </div>
             <div className="col-md-3">
-              <label className="form-label">Phone Number</label>
-              <input type="text" className="form-control" required value={createForm.phoneNumber} onChange={e => setCreateForm(f => ({ ...f, phoneNumber: e.target.value }))} disabled={creating} tabIndex={2} />
+              <label className="form-label">Phone Number *</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                required 
+                placeholder="e.g., 0771234567"
+                value={createForm.phoneNumber} 
+                onChange={e => setCreateForm(prev => ({ ...prev, phoneNumber: e.target.value }))} 
+                disabled={creating} 
+                tabIndex={2} 
+              />
             </div>
             <div className="col-md-2">
-              <label className="form-label">Initial Status</label>
-              <input type="text" className="form-control" required value={createForm.currentStatus} onChange={e => setCreateForm(f => ({ ...f, currentStatus: e.target.value }))} disabled={creating} tabIndex={3} />
+              <label className="form-label">Initial Status *</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                required 
+                placeholder="e.g., Pending"
+                value={createForm.currentStatus} 
+                onChange={e => setCreateForm(prev => ({ ...prev, currentStatus: e.target.value }))} 
+                disabled={creating} 
+                tabIndex={3} 
+              />
             </div>
             <div className="col-md-2">
               <label className="form-label">Driver Name</label>
-              <input type="text" className="form-control" value={createForm.driverName} onChange={e => setCreateForm(f => ({ ...f, driverName: e.target.value }))} disabled={creating} tabIndex={4} />
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Optional"
+                value={createForm.driverDetails.name} 
+                onChange={e => setCreateForm(prev => ({
+                  ...prev,
+                  driverDetails: {
+                    ...prev.driverDetails,
+                    name: e.target.value
+                  }
+                }))} 
+                disabled={creating} 
+                tabIndex={4} 
+              />
             </div>
             <div className="col-md-2">
               <label className="form-label">Vehicle Reg</label>
-              <input type="text" className="form-control" value={createForm.vehicleReg} onChange={e => setCreateForm(f => ({ ...f, vehicleReg: e.target.value }))} disabled={creating} tabIndex={5} />
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Optional"
+                value={createForm.driverDetails.vehicleReg} 
+                onChange={e => setCreateForm(prev => ({
+                  ...prev,
+                  driverDetails: {
+                    ...prev.driverDetails,
+                    vehicleReg: e.target.value
+                  }
+                }))} 
+                disabled={creating} 
+                tabIndex={5} 
+              />
             </div>
             <div className="col-12 col-md-auto">
-              <button type="submit" className="btn btn-primary fw-bold" style={{ background: '#D2691E', border: 'none' }} disabled={creating} tabIndex={6}>Create</button>
+              <button 
+                type="submit" 
+                className="btn btn-primary fw-bold" 
+                style={{ background: '#D2691E', border: 'none' }} 
+                disabled={creating || !createForm.customerName?.trim() || !createForm.phoneNumber?.trim() || !createForm.currentStatus?.trim()} 
+                tabIndex={6}
+              >
+                {creating ? 'Creating...' : 'Create'}
+              </button>
             </div>
           </form>
           {createFeedback && <div className={`mt-3 alert alert-danger`}>{createFeedback}</div>}

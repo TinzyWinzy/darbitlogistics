@@ -41,8 +41,8 @@ export const toSnake = d => ({
   customer_name: d.customerName,
   phone_number: d.phoneNumber,
   current_status: d.currentStatus,
-  checkpoints: d.checkpoints,
-  driver_details: d.driverDetails,
+  checkpoints: d.checkpoints || [],
+  driver_details: d.driverDetails || { name: '', vehicleReg: '' }
 });
 
 // API endpoints
@@ -61,7 +61,10 @@ export const deliveryApi = {
 
   // Create new delivery
   create: async (delivery) => {
-    const res = await api.post('/deliveries', toSnake(delivery));
+    console.log('Sending delivery data:', delivery); // Debug log
+    const snakeData = toSnake(delivery);
+    console.log('Transformed data:', snakeData); // Debug log
+    const res = await api.post('/deliveries', snakeData);
     return res.data;
   },
 
