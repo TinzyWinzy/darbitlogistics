@@ -40,6 +40,18 @@ export default function OperatorDashboard() {
   const [showSmsPreview, setShowSmsPreview] = useState(false);
   const [smsPreview, setSmsPreview] = useState('');
 
+  // Add toCamel utility function at the top level
+  const toCamel = d => ({
+    trackingId: d.tracking_id,
+    customerName: d.customer_name,
+    phoneNumber: d.phone_number,
+    currentStatus: d.current_status,
+    checkpoints: d.checkpoints,
+    driverDetails: d.driver_details,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  });
+
   useEffect(() => {
     const fetchDeliveries = async () => {
       try {
@@ -50,17 +62,6 @@ export default function OperatorDashboard() {
           headers: {
             'Content-Type': 'application/json'
           }
-        });
-        // Map backend snake_case to camelCase
-        const toCamel = d => ({
-          trackingId: d.tracking_id,
-          customerName: d.customer_name,
-          phoneNumber: d.phone_number,
-          currentStatus: d.current_status,
-          checkpoints: d.checkpoints,
-          driverDetails: d.driver_details,
-          createdAt: d.created_at,
-          updatedAt: d.updated_at,
         });
         setDeliveries(Array.isArray(res.data) ? res.data.map(toCamel) : []);
       } catch (error) {
@@ -146,9 +147,9 @@ export default function OperatorDashboard() {
         setShowSmsPreview(true);
         setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${res.data.trackingId}. Status: ${createForm.currentStatus}`);
         setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
-        // Refresh deliveries
+        // Refresh deliveries with mapping
         const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
-        setDeliveries(res2.data);
+        setDeliveries(Array.isArray(res2.data) ? res2.data.map(toCamel) : []);
         setTimeout(() => {
           setShowToast(false);
         }, 3500);
@@ -160,9 +161,9 @@ export default function OperatorDashboard() {
         setToastMsg('Delivery created!');
         setShowSmsPreview(false);
         setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
-        // Refresh deliveries
+        // Refresh deliveries with mapping
         const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
-        setDeliveries(res2.data);
+        setDeliveries(Array.isArray(res2.data) ? res2.data.map(toCamel) : []);
         setTimeout(() => {
           setShowToast(false);
         }, 3500);
@@ -189,9 +190,9 @@ export default function OperatorDashboard() {
     }
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/updateCheckpoint`, { trackingId, checkpoint, currentStatus }, { withCredentials: true });
-      // Refresh deliveries
+      // Refresh deliveries with mapping
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
-      setDeliveries(res.data);
+      setDeliveries(Array.isArray(res.data) ? res.data.map(toCamel) : []);
     } catch (error) {
       if (error.response && (error.response.status === 401 || error.response.status === 403)) {
         navigate('/login');
