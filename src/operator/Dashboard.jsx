@@ -148,21 +148,50 @@ export default function OperatorDashboard() {
       const res = await deliveryApi.create(deliveryData);
       if (res.success && res.trackingId) {
         setShowToast(true);
-        setToastMsg('Delivery created! Tracking ID: ' + res.trackingId);
-        setShowSmsPreview(true);
-        setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${res.trackingId}. Status: ${createForm.currentStatus}`);
-        setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
-        // Refresh deliveries
+        // Update toast message to include warning if SMS failed
+        if (res.warning) {
+          setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId} (Note: SMS notification pending)`);
+        } else {
+          setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId}`);
+        }
+        
+        // Show SMS preview only if SMS hasn't been sent
+        if (res.warning && res.warning.includes('SMS failed')) {
+          setShowSmsPreview(true);
+          setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${res.trackingId}. Status: ${createForm.currentStatus}`);
+        }
+
+        // Reset form
+        setCreateForm({
+          customerName: '',
+          phoneNumber: '',
+          currentStatus: '',
+          driverName: '',
+          vehicleReg: ''
+        });
+
+        // Clear any previous feedback
+        setCreateFeedback('');
+
+        // Refresh deliveries list
         const data = await deliveryApi.getAll();
         setDeliveries(data);
+
+        // Auto-hide toast after delay
         setTimeout(() => {
           setShowToast(false);
         }, 3500);
+
+        // Focus back on customer name field
         setTimeout(() => {
           customerNameRef.current && customerNameRef.current.focus();
         }, 100);
+
       } else if (res.warning) {
-        setCreateFeedback('Warning: ' + res.warning);
+        // Show warning in feedback area if it's not just about SMS
+        if (!res.warning.includes('SMS failed')) {
+          setCreateFeedback('Warning: ' + res.warning);
+        }
       }
     } catch (error) {
       console.error('Create delivery error:', error);
@@ -196,13 +225,14 @@ export default function OperatorDashboard() {
   const handleSendInitialSMS = async (trackingId, phone, status) => {
     setShowSmsPreview(false);
     setShowToast(true);
-    setToastMsg('Sending SMS...');
+    setToastMsg('Sending SMS notification...');
     const message = `Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${status}`;
     try {
       await deliveryApi.sendInitialSms(phone, message);
-      setToastMsg('Initial SMS sent!');
-    } catch {
-      setToastMsg('Failed to send SMS');
+      setToastMsg('SMS notification sent successfully!');
+    } catch (error) {
+      setToastMsg('SMS notification failed. You can try resending later.');
+      console.error('SMS send error:', error);
     }
     setTimeout(() => setShowToast(false), 2500);
   };
