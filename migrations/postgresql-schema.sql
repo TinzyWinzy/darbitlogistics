@@ -132,6 +132,14 @@ BEGIN
     END IF;
 END $$;
 
+-- Clean up legacy columns that may exist in older database versions
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parent_bookings' AND column_name = 'commodity') THEN
+        ALTER TABLE parent_bookings DROP COLUMN commodity;
+    END IF;
+END $$;
+
 -- Deliveries table
 CREATE TABLE IF NOT EXISTS deliveries (
     tracking_id TEXT PRIMARY KEY,
