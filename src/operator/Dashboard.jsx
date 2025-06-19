@@ -21,7 +21,16 @@ export default function OperatorDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState('');
-  const [form, setForm] = useState({ location: '', operator: '', comment: '', status: '' });
+  const [form, setForm] = useState({
+    location: '',
+    operator: '',
+    comment: '',
+    status: '',
+    coordinates: '',
+    timestamp: new Date(),
+    hasIssue: false,
+    issueDetails: ''
+  });
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [search, setSearch] = useState('');
@@ -105,27 +114,53 @@ export default function OperatorDashboard() {
     mineral_grade: d.mineral_grade
   });
 
+  // Add fetchDeliveries function
+  const fetchDeliveries = async () => {
+    try {
+      const data = await deliveryApi.getAll();
+      setDeliveries(data);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      setError(error.response?.data?.error || 'Failed to fetch deliveries');
+      setDeliveries([]);
+      throw error;
+    }
+  };
+
+  // Add fetchParentBookings function
+  const fetchParentBookings = async () => {
+    try {
+      const data = await deliveryApi.getAllParentBookings();
+      setParentBookings(data);
+      updateCustomersList(data);
+    } catch (error) {
+      console.error('Failed to fetch parent bookings:', error);
+      setError(error.response?.data?.error || 'Failed to fetch parent bookings');
+    }
+  };
+
   useEffect(() => {
-    const fetchDeliveries = async () => {
-      try {
+    const fetchData = async () => {
+      if (isAuthenticated) {
         setLoading(true);
         setError(null);
-        const data = await deliveryApi.getAll();
-        setDeliveries(data);
-      } catch (error) {
-        console.error('Fetch error:', error);
-        setError(error.response?.data?.error || 'Failed to fetch deliveries');
-        setDeliveries([]);
-      } finally {
-        setLoading(false);
+        try {
+          await Promise.all([
+            fetchDeliveries(),
+            fetchParentBookings()
+          ]);
+        } catch (error) {
+          console.error('Error fetching data:', error);
+          setError(error.response?.data?.error || 'Failed to fetch data');
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        navigate('/login');
       }
     };
 
-    if (isAuthenticated) {
-      fetchDeliveries();
-    } else {
-      navigate('/login');
-    }
+    fetchData();
   }, [navigate, isAuthenticated, setIsAuthenticated]);
 
   const filteredDeliveries = deliveries
@@ -278,13 +313,42 @@ export default function OperatorDashboard() {
       setFeedback('All fields are required.');
       return;
     }
+
+    // Validate status transition
+    const delivery = deliveries.find(d => d.trackingId === trackingId);
+    if (delivery && delivery.isCompleted && currentStatus !== 'Cancelled') {
+      setFeedback('Cannot update completed delivery unless cancelling.');
+      return;
+    }
+
     try {
-      await deliveryApi.updateCheckpoint(trackingId, checkpoint, currentStatus);
+      setSubmitting(true);
+      await deliveryApi.updateCheckpoint(trackingId, {
+        ...checkpoint,
+        timestamp: checkpoint.timestamp.toISOString(),
+        coordinates: checkpoint.coordinates || null,
+        hasIssue: checkpoint.hasIssue || false,
+        issueDetails: checkpoint.hasIssue ? checkpoint.issueDetails : ''
+      }, currentStatus);
+
       // Refresh deliveries
       const data = await deliveryApi.getAll();
       setDeliveries(data);
+      setFeedback('Checkpoint updated successfully!');
+      
+      // Send SMS notification if status changed
+      if (delivery && delivery.currentStatus !== currentStatus) {
+        const message = `Delivery ${trackingId} status updated to: ${currentStatus}. Location: ${checkpoint.location}`;
+        try {
+          await deliveryApi.sendInitialSms(delivery.phoneNumber, message);
+        } catch (error) {
+          console.error('Failed to send status update SMS:', error);
+        }
+      }
     } catch (error) {
       setFeedback(error.response?.data?.error || 'Failed to update checkpoint');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -314,31 +378,43 @@ export default function OperatorDashboard() {
     e.preventDefault();
     setSubmitting(true);
     setFeedback('');
+    
     const delivery = deliveries.find(d => d.trackingId === selectedId);
     if (!delivery) {
       setFeedback('No delivery selected.');
       setSubmitting(false);
       return;
     }
-    const checkpoint = {
-      location: form.location,
-      operator: form.operator,
-      comment: form.comment,
-    };
+
     if (!form.location || !form.operator || !form.status) {
       setFeedback('Location, Operator, and Status are required.');
       setSubmitting(false);
       return;
     }
-    if (!form.status) {
-      setFeedback('Status is required.');
-      setSubmitting(false);
-      return;
-    }
+
+    const checkpoint = {
+      location: form.location.trim(),
+      operator: form.operator.trim(),
+      comment: form.comment.trim(),
+      timestamp: form.timestamp,
+      coordinates: form.coordinates.trim(),
+      hasIssue: form.hasIssue,
+      issueDetails: form.hasIssue ? form.issueDetails.trim() : ''
+    };
+
     try {
       await handleUpdateCheckpoint(selectedId, checkpoint, form.status);
-      setFeedback('Checkpoint updated successfully!');
-      setForm({ location: '', operator: '', comment: '', status: '' });
+      // Reset form
+      setForm({
+        location: '',
+        operator: '',
+        comment: '',
+        status: '',
+        coordinates: '',
+        timestamp: new Date(),
+        hasIssue: false,
+        issueDetails: ''
+      });
       setSelectedId('');
     } catch (err) {
       setFeedback('Network error: ' + err.message);
@@ -514,9 +590,28 @@ export default function OperatorDashboard() {
 
   // Update customer bookings when a customer is selected
   const handleCustomerSelect = (customerId) => {
+    const selectedCustomer = customers.find(c => c.id === customerId);
+    if (!selectedCustomer) {
+      setSelectedCustomerBookings([]);
+      setCreateForm(prev => ({
+        ...prev,
+        customerId: '',
+        selectedBookingId: '',
+        tonnage: '',
+        containerCount: '',
+        vehicleType: 'Standard Truck',
+        vehicleCapacity: 30.00
+      }));
+      return;
+    }
+
     const customerBookings = parentBookings.filter(
-      booking => booking.customerName === customers.find(c => c.id === customerId)?.name
+      booking => 
+        booking.customerName === selectedCustomer.name && 
+        booking.status === 'Active' &&
+        booking.remainingTonnage > 0
     );
+
     setSelectedCustomerBookings(customerBookings);
     setCreateForm(prev => ({
       ...prev,
@@ -525,7 +620,11 @@ export default function OperatorDashboard() {
       tonnage: '',
       containerCount: '',
       vehicleType: 'Standard Truck',
-      vehicleCapacity: 30.00
+      vehicleCapacity: 30.00,
+      driverDetails: {
+        name: '',
+        vehicleReg: ''
+      }
     }));
   };
 
@@ -533,13 +632,18 @@ export default function OperatorDashboard() {
   const handleBookingSelect = (bookingId) => {
     const selectedBooking = parentBookings.find(b => b.id === bookingId);
     if (selectedBooking) {
+      const selectedCustomer = customers.find(c => c.name === selectedBooking.customerName);
       setCreateForm(prev => ({
         ...prev,
         selectedBookingId: bookingId,
         loadingPoint: selectedBooking.loadingPoint,
         destination: selectedBooking.destination,
         mineral_type: selectedBooking.mineral_type,
-        mineral_grade: selectedBooking.mineral_grade
+        mineral_grade: selectedBooking.mineral_grade,
+        currentStatus: 'Pending',
+        driverDetails: {
+          ...prev.driverDetails
+        }
       }));
     }
   };
@@ -550,6 +654,52 @@ export default function OperatorDashboard() {
       updateCustomersList(parentBookings);
     }
   }, [parentBookings]);
+
+  // Add delivery status options
+  const statusOptions = [
+    'Pending',
+    'At Mine',
+    'In Transit',
+    'At Border',
+    'At Port',
+    'At Port of Destination',
+    'At Warehouse',
+    'Delivered',
+    'Cancelled'
+  ];
+
+  // Function to render checkpoint history
+  const renderCheckpointHistory = (delivery) => {
+    if (!delivery.checkpoints || delivery.checkpoints.length === 0) {
+      return <p className="text-muted">No checkpoints recorded yet.</p>;
+    }
+
+    return (
+      <div className="checkpoint-history">
+        <h6 className="mb-3">Checkpoint History</h6>
+        <div className="timeline">
+          {delivery.checkpoints.map((cp, index) => (
+            <div key={index} className="checkpoint-item mb-3">
+              <div className="d-flex justify-content-between">
+                <strong>{cp.location}</strong>
+                <small className="text-muted">
+                  {new Date(cp.timestamp).toLocaleString()}
+                </small>
+              </div>
+              <div>Status: <span className="badge bg-info">{cp.status}</span></div>
+              <div>Operator: {cp.operator}</div>
+              {cp.comment && <div className="text-muted">{cp.comment}</div>}
+              {cp.hasIssue && (
+                <div className="alert alert-warning mt-1 mb-0 py-1 px-2">
+                  <small><strong>Issue:</strong> {cp.issueDetails}</small>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="container py-5">
@@ -1047,48 +1197,123 @@ export default function OperatorDashboard() {
                   </div>
                 );
               })()}
-              <form onSubmit={handleSubmit}>
-                <div className="mb-3">
-                  <label className="form-label">Location</label>
-                  <div className="mb-2 d-flex gap-2 flex-wrap">
-                    {[
-                      { label: 'Mine', status: 'At Mine' },
-                      { label: 'Border', status: 'At Border' },
-                      { label: 'Port', status: 'At Port' },
-                      { label: 'Port of Destination', status: 'At Port of Destination' },
-                      { label: 'Warehouse', status: 'At Warehouse' },
-                    ].map(({ label, status }) => (
-                      <button
-                        type="button"
-                        key={label}
-                        className="btn btn-sm btn-outline-primary fw-bold"
-                        style={{ color: '#D2691E', borderColor: '#D2691E' }}
-                        onClick={() => {
-                          setForm(f => ({ ...f, location: label, status }));
-                        }}
-                        disabled={submitting || loading}
-                      >
-                        {label}
-                      </button>
+              <form onSubmit={handleSubmit} className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">Location *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={form.location}
+                    onChange={e => setForm(prev => ({ ...prev, location: e.target.value }))}
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+                
+                <div className="col-md-6">
+                  <label className="form-label">Operator *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={form.operator}
+                    onChange={e => setForm(prev => ({ ...prev, operator: e.target.value }))}
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Status *</label>
+                  <select
+                    className="form-select"
+                    value={form.status}
+                    onChange={e => setForm(prev => ({ ...prev, status: e.target.value }))}
+                    required
+                    disabled={submitting}
+                  >
+                    <option value="">Select status...</option>
+                    {statusOptions.map(status => (
+                      <option key={status} value={status}>{status}</option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">GPS Coordinates</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={form.coordinates}
+                    onChange={e => setForm(prev => ({ ...prev, coordinates: e.target.value }))}
+                    placeholder="e.g., -17.824858, 31.053028"
+                    disabled={submitting}
+                  />
+                </div>
+
+                <div className="col-12">
+                  <label className="form-label">Comments</label>
+                  <textarea
+                    className="form-control"
+                    value={form.comment}
+                    onChange={e => setForm(prev => ({ ...prev, comment: e.target.value }))}
+                    rows="2"
+                    disabled={submitting}
+                  />
+                </div>
+
+                <div className="col-12">
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      id="hasIssue"
+                      checked={form.hasIssue}
+                      onChange={e => setForm(prev => ({ ...prev, hasIssue: e.target.checked }))}
+                      disabled={submitting}
+                    />
+                    <label className="form-check-label" htmlFor="hasIssue">
+                      Report an issue at this checkpoint
+                    </label>
                   </div>
-                  <input type="text" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} className="form-control" required disabled={submitting || loading} />
                 </div>
-                <div className="mb-3">
-                  <label className="form-label">Operator</label>
-                  <input type="text" value={form.operator} onChange={e => setForm(f => ({ ...f, operator: e.target.value }))} className="form-control" required disabled={submitting || loading} />
+
+                {form.hasIssue && (
+                  <div className="col-12">
+                    <label className="form-label">Issue Details *</label>
+                    <textarea
+                      className="form-control"
+                      value={form.issueDetails}
+                      onChange={e => setForm(prev => ({ ...prev, issueDetails: e.target.value }))}
+                      rows="2"
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                )}
+
+                <div className="col-12">
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={submitting}
+                    style={{ background: '#D2691E', border: 'none' }}
+                  >
+                    {submitting ? 'Updating...' : 'Update Checkpoint'}
+                  </button>
                 </div>
-                <div className="mb-3">
-                  <label className="form-label">Comment</label>
-                  <input type="text" value={form.comment} onChange={e => setForm(f => ({ ...f, comment: e.target.value }))} className="form-control" disabled={submitting || loading} />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label">Status</label>
-                  <input type="text" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="form-control" disabled={submitting || loading} />
-                </div>
-                <button type="submit" disabled={submitting || !selectedId || loading} className="btn w-100 text-white fw-bold" style={{ background: '#D2691E' }}>{submitting ? <span><Spinner /> Updating...</span> : 'Update Checkpoint'}</button>
+
+                {feedback && (
+                  <div className={`col-12 alert ${feedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
+                    {feedback}
+                  </div>
+                )}
               </form>
-              {feedback && <div className={`mt-3 alert ${feedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>{feedback}</div>}
+
+              {selectedId && deliveries.find(d => d.trackingId === selectedId) && (
+                <div className="mt-4">
+                  {renderCheckpointHistory(deliveries.find(d => d.trackingId === selectedId))}
+                </div>
+              )}
             </div>
           </div>
         </div>

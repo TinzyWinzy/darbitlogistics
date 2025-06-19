@@ -112,7 +112,16 @@ export const deliveryApi = {
     try {
       const res = await api.post('/updateCheckpoint', {
         trackingId,
-        checkpoint,
+        checkpoint: {
+          location: checkpoint.location,
+          operator: checkpoint.operator,
+          comment: checkpoint.comment || '',
+          timestamp: checkpoint.timestamp,
+          coordinates: checkpoint.coordinates || null,
+          hasIssue: checkpoint.hasIssue || false,
+          issueDetails: checkpoint.issueDetails || '',
+          status: currentStatus
+        },
         currentStatus
       });
       return res.data;

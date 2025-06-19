@@ -51,6 +51,23 @@ BEGIN
     END IF;
 END$$;
 
+-- Create ENUM for checkpoint type
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'checkpoint_type') THEN
+        CREATE TYPE checkpoint_type AS ENUM (
+            'Location Update',
+            'Status Change',
+            'Issue Report',
+            'Weight Update',
+            'Sample Collection',
+            'Documentation',
+            'Environmental Check',
+            'Other'
+        );
+    END IF;
+END$$;
+
 -- Parent Bookings table
 CREATE TABLE IF NOT EXISTS parent_bookings (
     id TEXT PRIMARY KEY DEFAULT 'PB-' || substr(md5(random()::text), 1, 8),
@@ -143,7 +160,24 @@ CREATE TABLE IF NOT EXISTS deliveries (
     completion_date TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT valid_weights CHECK (net_weight IS NULL OR (tare_weight IS NOT NULL AND net_weight >= 0))
+    CONSTRAINT valid_weights CHECK (net_weight IS NULL OR (tare_weight IS NOT NULL AND net_weight >= 0)),
+    CONSTRAINT valid_checkpoint_format CHECK (
+        jsonb_typeof(checkpoints) = 'array' AND
+        (
+            SELECT bool_and(
+                jsonb_typeof(checkpoint->'location') = 'string' AND
+                jsonb_typeof(checkpoint->'operator') = 'string' AND
+                jsonb_typeof(checkpoint->'status') = 'string' AND
+                jsonb_typeof(checkpoint->'timestamp') = 'string'
+            )
+            FROM jsonb_array_elements(checkpoints) checkpoint
+        )
+    ),
+    CONSTRAINT valid_driver_details CHECK (
+        jsonb_typeof(driver_details) = 'object' AND
+        driver_details ? 'name' AND
+        driver_details ? 'vehicleReg'
+    )
 );
 
 -- Add missing columns to deliveries if they don't exist
@@ -378,7 +412,20 @@ SELECT
     EXTRACT(EPOCH FROM (pb.deadline - CURRENT_TIMESTAMP)) as seconds_until_deadline,
     pb.remaining_tonnage,
     pb.created_at,
-    pb.updated_at
+    pb.updated_at,
+    (
+        SELECT COUNT(*) 
+        FROM deliveries d2 
+        WHERE d2.parent_booking_id = pb.id 
+        AND d2.environmental_incident = true
+    ) as environmental_incidents_count,
+    (
+        SELECT COUNT(*) 
+        FROM deliveries d3 
+        WHERE d3.parent_booking_id = pb.id 
+        AND d3.sampling_required = true 
+        AND d3.sampling_status = 'Pending'
+    ) as pending_samples_count
 FROM parent_bookings pb
 LEFT JOIN deliveries d ON pb.id = d.parent_booking_id
 GROUP BY pb.id, pb.customer_name, pb.total_tonnage, pb.deadline, pb.mineral_type, 
@@ -388,4 +435,140 @@ GROUP BY pb.id, pb.customer_name, pb.total_tonnage, pb.deadline, pb.mineral_type
 -- Insert a default operator user if not exists
 INSERT INTO users (username, password, role)
 VALUES ('operator', 'changeme', 'operator')
-ON CONFLICT (username) DO NOTHING; 
+ON CONFLICT (username) DO NOTHING;
+
+-- Create checkpoint_logs table for better audit trail
+CREATE TABLE IF NOT EXISTS checkpoint_logs (
+    id SERIAL PRIMARY KEY,
+    delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
+    checkpoint_type checkpoint_type NOT NULL,
+    location TEXT NOT NULL,
+    operator TEXT NOT NULL,
+    status delivery_status NOT NULL,
+    coordinates TEXT,
+    comment TEXT,
+    has_issue BOOLEAN DEFAULT false,
+    issue_details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+-- Create environmental_incidents table
+CREATE TABLE IF NOT EXISTS environmental_incidents (
+    id SERIAL PRIMARY KEY,
+    delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
+    incident_type TEXT NOT NULL,
+    description TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
+    reported_by TEXT NOT NULL,
+    location TEXT NOT NULL,
+    coordinates TEXT,
+    reported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    resolution_notes TEXT,
+    status TEXT NOT NULL DEFAULT 'Open' CHECK (status IN ('Open', 'In Progress', 'Resolved', 'Closed')),
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+-- Create sampling_records table
+CREATE TABLE IF NOT EXISTS sampling_records (
+    id SERIAL PRIMARY KEY,
+    delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
+    sample_code TEXT UNIQUE NOT NULL,
+    collected_by TEXT NOT NULL,
+    collection_location TEXT NOT NULL,
+    collection_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    sample_type TEXT NOT NULL,
+    quantity DECIMAL(10,2),
+    unit TEXT,
+    lab_reference TEXT,
+    analysis_status TEXT DEFAULT 'Pending' CHECK (analysis_status IN ('Pending', 'In Progress', 'Completed', 'Rejected')),
+    results JSONB DEFAULT '{}'::jsonb,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Function to validate checkpoint data
+CREATE OR REPLACE FUNCTION validate_checkpoint_data()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Validate checkpoint structure
+    IF NOT (
+        NEW.checkpoints @> '[{"location": "", "operator": "", "status": "", "timestamp": ""}]'::jsonb
+    ) THEN
+        RAISE EXCEPTION 'Invalid checkpoint structure';
+    END IF;
+
+    -- Validate status transitions
+    IF TG_OP = 'UPDATE' THEN
+        -- Get the latest status from checkpoints
+        IF jsonb_array_length(NEW.checkpoints) > 0 THEN
+            NEW.current_status = (NEW.checkpoints->-1->>'status')::delivery_status;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for checkpoint validation
+DROP TRIGGER IF EXISTS validate_checkpoint_trigger ON deliveries;
+CREATE TRIGGER validate_checkpoint_trigger
+    BEFORE INSERT OR UPDATE OF checkpoints ON deliveries
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_checkpoint_data();
+
+-- Function to log checkpoints to checkpoint_logs
+CREATE OR REPLACE FUNCTION log_checkpoint()
+RETURNS TRIGGER AS $$
+DECLARE
+    new_checkpoint jsonb;
+BEGIN
+    IF TG_OP = 'UPDATE' AND OLD.checkpoints IS DISTINCT FROM NEW.checkpoints THEN
+        -- Get the latest checkpoint
+        new_checkpoint := NEW.checkpoints->-1;
+        
+        -- Insert into checkpoint_logs
+        INSERT INTO checkpoint_logs (
+            delivery_tracking_id,
+            checkpoint_type,
+            location,
+            operator,
+            status,
+            coordinates,
+            comment,
+            has_issue,
+            issue_details,
+            metadata
+        ) VALUES (
+            NEW.tracking_id,
+            COALESCE((new_checkpoint->>'type')::checkpoint_type, 'Location Update'),
+            new_checkpoint->>'location',
+            new_checkpoint->>'operator',
+            (new_checkpoint->>'status')::delivery_status,
+            new_checkpoint->>'coordinates',
+            new_checkpoint->>'comment',
+            (new_checkpoint->>'hasIssue')::boolean,
+            new_checkpoint->>'issueDetails',
+            new_checkpoint
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for checkpoint logging
+DROP TRIGGER IF EXISTS log_checkpoint_trigger ON deliveries;
+CREATE TRIGGER log_checkpoint_trigger
+    AFTER UPDATE OF checkpoints ON deliveries
+    FOR EACH ROW
+    EXECUTE FUNCTION log_checkpoint();
+
+-- Update existing indexes and add new ones
+CREATE INDEX IF NOT EXISTS idx_checkpoint_logs_delivery ON checkpoint_logs(delivery_tracking_id);
+CREATE INDEX IF NOT EXISTS idx_checkpoint_logs_created ON checkpoint_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_environmental_incidents_delivery ON environmental_incidents(delivery_tracking_id);
+CREATE INDEX IF NOT EXISTS idx_environmental_incidents_status ON environmental_incidents(status);
+CREATE INDEX IF NOT EXISTS idx_sampling_records_delivery ON sampling_records(delivery_tracking_id);
+CREATE INDEX IF NOT EXISTS idx_sampling_records_status ON sampling_records(analysis_status); 

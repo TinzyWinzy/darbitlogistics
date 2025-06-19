@@ -322,13 +322,22 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
 app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
   console.log('UpdateCheckpoint body:', req.body);
   const { trackingId, checkpoint, currentStatus } = req.body;
+  
+  // Validate required fields
   if (!trackingId || !checkpoint || !currentStatus) {
     return res.status(400).json({ error: 'Missing required fields.' });
   }
-  
+
+  if (!checkpoint.location || !checkpoint.operator) {
+    return res.status(400).json({ error: 'Location and operator are required for checkpoint.' });
+  }
+
   try {
+    // Get delivery and validate status transition
     const delivery = await pool.query(
-      'SELECT * FROM deliveries WHERE tracking_id = $1',
+      'SELECT d.*, pb.status as parent_status FROM deliveries d ' +
+      'LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id ' +
+      'WHERE d.tracking_id = $1',
       [trackingId]
     );
     
@@ -337,7 +346,22 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     }
     
     const row = delivery.rows[0];
-    // Defensive parsing of checkpoints
+
+    // Check if parent booking is active
+    if (row.parent_status !== 'Active') {
+      return res.status(400).json({ 
+        error: 'Cannot update delivery - parent booking is not active' 
+      });
+    }
+
+    // Check if delivery is already completed
+    if (row.is_completed && currentStatus !== 'Cancelled') {
+      return res.status(400).json({ 
+        error: 'Cannot update completed delivery unless cancelling' 
+      });
+    }
+
+    // Parse existing checkpoints with error handling
     let checkpoints = [];
     try {
       checkpoints = row.checkpoints ? JSON.parse(row.checkpoints) : [];
@@ -347,26 +371,95 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
       checkpoints = [];
     }
     
-    const newCheckpoint = { ...checkpoint, timestamp: new Date().toISOString() };
+    // Prepare new checkpoint with all fields
+    const newCheckpoint = {
+      location: checkpoint.location.trim(),
+      operator: checkpoint.operator.trim(),
+      status: currentStatus,
+      timestamp: checkpoint.timestamp || new Date().toISOString(),
+      coordinates: checkpoint.coordinates ? checkpoint.coordinates.trim() : null,
+      comment: checkpoint.comment ? checkpoint.comment.trim() : '',
+      hasIssue: checkpoint.hasIssue || false,
+      issueDetails: checkpoint.hasIssue ? checkpoint.issueDetails.trim() : ''
+    };
+
+    // Add the new checkpoint
     checkpoints.push(newCheckpoint);
-    
+
+    // Determine if delivery is completed based on status
+    const isCompleted = currentStatus === 'Delivered';
+    const completionDate = isCompleted ? new Date().toISOString() : null;
+
+    // Update delivery with new checkpoint and status
     await pool.query(
-      'UPDATE deliveries SET checkpoints = $1, current_status = $2 WHERE tracking_id = $3',
-      [JSON.stringify(checkpoints), currentStatus, trackingId]
+      `UPDATE deliveries 
+       SET checkpoints = $1, 
+           current_status = $2,
+           is_completed = $3,
+           completion_date = $4,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE tracking_id = $5`,
+      [JSON.stringify(checkpoints), currentStatus, isCompleted, completionDate, trackingId]
     );
+
+    // If delivery is completed, update parent booking
+    if (isCompleted) {
+      await pool.query(
+        `UPDATE parent_bookings 
+         SET completed_tonnage = completed_tonnage + $1,
+             remaining_tonnage = remaining_tonnage - $1
+         WHERE id = $2`,
+        [row.tonnage, row.parent_booking_id]
+      );
+
+      // Check if parent booking is complete
+      const parentBooking = await pool.query(
+        'SELECT * FROM parent_bookings WHERE id = $1',
+        [row.parent_booking_id]
+      );
+
+      if (parentBooking.rows[0].remaining_tonnage <= 0) {
+        await pool.query(
+          'UPDATE parent_bookings SET status = $1 WHERE id = $2',
+          ['Completed', row.parent_booking_id]
+        );
+      }
+    }
     
-    // Send SMS
-    const smsMessage = `Update: Your delivery (${trackingId}) is now at ${checkpoint.location}. Status: ${currentStatus}.`;
+    // Prepare SMS message with enhanced information
+    let smsMessage = `Update: Your delivery (${trackingId}) is now at ${checkpoint.location}. Status: ${currentStatus}.`;
+    
+    // Add completion information if delivery is completed
+    if (isCompleted) {
+      smsMessage += ' Delivery completed successfully!';
+    }
+    
+    // Add issue information if there's an issue
+    if (checkpoint.hasIssue) {
+      smsMessage += ` Note: ${checkpoint.issueDetails}`;
+    }
+
+    // Send SMS notification
     const smsRes = await sendSMS(row.phone_number, smsMessage);
+    
+    // Audit log
+    console.log(`[AUDIT] Checkpoint updated for ${trackingId} by ${req.user.username} at ${new Date().toISOString()} | Status: ${currentStatus}`);
     
     if (!smsRes.success) {
       return res.status(207).json({
-        error: 'Checkpoint updated, but SMS failed',
-        smsError: smsRes.error
+        success: true,
+        warning: 'Checkpoint updated, but SMS failed',
+        smsError: smsRes.error,
+        checkpoint: newCheckpoint
       });
     }
     
-    res.json({ success: true });
+    res.json({ 
+      success: true,
+      checkpoint: newCheckpoint,
+      isCompleted,
+      completionDate
+    });
   } catch (err) {
     console.error('Update checkpoint error:', err);
     res.status(500).json({ error: err.message });
