@@ -23,21 +23,18 @@ export default function OperatorDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [search, setSearch] = useState('');
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomerBookings, setSelectedCustomerBookings] = useState([]);
   const [createForm, setCreateForm] = useState({
-    customerName: '',
-    phoneNumber: '',
+    customerId: '',
+    selectedBookingId: '',
     currentStatus: '',
-    bookingReference: '',
-    loadingPoint: '',
-    commodity: '',
-    containerCount: '',
-    tonnage: '',
-    destination: '',
-    checkpoints: [],
     driverDetails: {
       name: '',
       vehicleReg: ''
-    }
+    },
+    containerCount: '',
+    tonnage: ''
   });
   const [creating, setCreating] = useState(false);
   const [createFeedback, setCreateFeedback] = useState('');
@@ -57,7 +54,9 @@ export default function OperatorDashboard() {
     commodity: '',
     loadingPoint: '',
     destination: '',
-    deadline: ''
+    deadline: '',
+    reference: '',
+    notes: ''
   });
   const [progressFilter, setProgressFilter] = useState('all');
   const [progressSort, setProgressSort] = useState('deadline');
@@ -143,50 +142,23 @@ export default function OperatorDashboard() {
     setCreating(true);
     setCreateFeedback('');
 
-    // Format phone number first
-    let formattedPhone = createForm.phoneNumber;
     try {
-      if (formattedPhone.startsWith('0')) {
-        formattedPhone = '263' + formattedPhone.substring(1);
-      } else if (formattedPhone.startsWith('+')) {
-        formattedPhone = formattedPhone.substring(1);
-      } else if (formattedPhone.startsWith('7')) {
-        formattedPhone = '263' + formattedPhone;
-      }
-
-      // Validate required fields
-      if (!createForm.customerName?.trim()) {
-        setCreateFeedback('Customer Name is required.');
+      if (!createForm.customerId) {
+        setCreateFeedback('Please select a customer.');
         setCreating(false);
         return;
       }
 
-      if (!formattedPhone) {
-        setCreateFeedback('Phone Number is required.');
+      if (!createForm.selectedBookingId) {
+        setCreateFeedback('Please select a booking.');
         setCreating(false);
         return;
       }
 
-      if (!createForm.bookingReference?.trim()) {
-        setCreateFeedback('Booking Reference is required.');
-        setCreating(false);
-        return;
-      }
-
-      if (!createForm.loadingPoint?.trim()) {
-        setCreateFeedback('Loading Point is required.');
-        setCreating(false);
-        return;
-      }
-
-      if (!createForm.commodity?.trim()) {
-        setCreateFeedback('Commodity is required.');
-        setCreating(false);
-        return;
-      }
-
-      if (!createForm.containerCount || createForm.containerCount < 1) {
-        setCreateFeedback('Container Count must be at least 1.');
+      const selectedBooking = parentBookings.find(b => b.id === createForm.selectedBookingId);
+      
+      if (!selectedBooking) {
+        setCreateFeedback('Invalid booking selection.');
         setCreating(false);
         return;
       }
@@ -197,104 +169,79 @@ export default function OperatorDashboard() {
         return;
       }
 
-      if (!createForm.destination?.trim()) {
-        setCreateFeedback('Destination is required.');
+      if (selectedBooking.remainingTonnage < createForm.tonnage) {
+        setCreateFeedback(`Insufficient remaining tonnage. Available: ${selectedBooking.remainingTonnage} tons`);
         setCreating(false);
         return;
       }
 
-      if (!createForm.currentStatus?.trim()) {
-        setCreateFeedback('Initial Status is required.');
+      if (!createForm.containerCount || createForm.containerCount < 1) {
+        setCreateFeedback('Container Count must be at least 1.');
         setCreating(false);
         return;
       }
 
-      // Validate phone number format
-      if (!validateZimPhone(formattedPhone)) {
-        setCreateFeedback('Please enter a valid Zimbabwean phone number (e.g., 07xxxxxxxx, +263xxxxxxxx)');
+      if (!createForm.driverDetails.name?.trim()) {
+        setCreateFeedback('Driver Name is required.');
+        setCreating(false);
+        return;
+      }
+
+      if (!createForm.driverDetails.vehicleReg?.trim()) {
+        setCreateFeedback('Vehicle Registration is required.');
         setCreating(false);
         return;
       }
 
       const deliveryData = {
-        customerName: createForm.customerName.trim(),
-        phoneNumber: formattedPhone,
-        currentStatus: createForm.currentStatus.trim(),
-        bookingReference: createForm.bookingReference.trim(),
-        loadingPoint: createForm.loadingPoint.trim(),
-        commodity: createForm.commodity.trim(),
+        parentBookingId: selectedBooking.id,
+        bookingCode: selectedBooking.bookingCode,
+        customerName: selectedBooking.customerName,
+        phoneNumber: selectedBooking.phoneNumber,
+        currentStatus: createForm.currentStatus || 'Pending',
+        loadingPoint: selectedBooking.loadingPoint,
+        commodity: selectedBooking.commodity,
         containerCount: parseInt(createForm.containerCount),
         tonnage: parseFloat(createForm.tonnage),
-        destination: createForm.destination.trim(),
+        destination: selectedBooking.destination,
         checkpoints: [],
         driverDetails: {
-          name: createForm.driverDetails.name?.trim() || '',
-          vehicleReg: createForm.driverDetails.vehicleReg?.trim() || ''
+          name: createForm.driverDetails.name.trim(),
+          vehicleReg: createForm.driverDetails.vehicleReg.trim()
         }
       };
 
-      console.log('Submitting delivery data:', deliveryData);
-
       const res = await deliveryApi.create(deliveryData);
-      
-      if (!res) {
-        throw new Error('No response from server');
-      }
-
-      if (res.error) {
-        throw new Error(res.error);
-      }
 
       if (res.success && res.trackingId) {
         setShowToast(true);
-        if (res.warning) {
-          setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId} (Note: SMS notification pending)`);
-        } else {
-          setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId}`);
-        }
+        setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId}`);
         
-        if (res.warning && res.warning.includes('SMS failed')) {
-          setShowSmsPreview(true);
-          setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${res.trackingId}. Status: ${createForm.currentStatus}`);
-        }
-
-        // Reset form with proper structure
+        // Reset form
         setCreateForm({
-          customerName: '',
-          phoneNumber: '',
+          customerId: '',
+          selectedBookingId: '',
           currentStatus: '',
-          bookingReference: '',
-          loadingPoint: '',
-          commodity: '',
           containerCount: '',
           tonnage: '',
-          destination: '',
-          checkpoints: [],
           driverDetails: {
             name: '',
             vehicleReg: ''
           }
         });
 
-        setCreateFeedback('');
-        const data = await deliveryApi.getAll();
-        setDeliveries(data);
-        setTimeout(() => {
-          setShowToast(false);
-        }, 3500);
-        setTimeout(() => {
-          customerNameRef.current && customerNameRef.current.focus();
-        }, 100);
-      } else {
-        throw new Error('Failed to create delivery - no tracking ID received');
+        // Refresh data
+        const [deliveriesData, bookingsData] = await Promise.all([
+          deliveryApi.getAll(),
+          deliveryApi.getAllParentBookings()
+        ]);
+        setDeliveries(deliveriesData);
+        setParentBookings(bookingsData);
+        updateCustomersList(bookingsData);
       }
     } catch (error) {
       console.error('Create delivery error:', error);
-      setCreateFeedback(
-        error.response?.data?.error || 
-        error.message || 
-        'Failed to create delivery. Please check all fields and try again.'
-      );
+      setCreateFeedback(error.message || 'Failed to create delivery');
     }
     setCreating(false);
   };
@@ -378,9 +325,31 @@ export default function OperatorDashboard() {
     setCreateFeedback('');
 
     try {
+      // Format phone number first
+      let formattedPhone = parentForm.phoneNumber;
+      if (formattedPhone.startsWith('0')) {
+        formattedPhone = '263' + formattedPhone.substring(1);
+      } else if (formattedPhone.startsWith('+')) {
+        formattedPhone = formattedPhone.substring(1);
+      } else if (formattedPhone.startsWith('7')) {
+        formattedPhone = '263' + formattedPhone;
+      }
+
       // Validate required fields
       if (!parentForm.customerName?.trim()) {
         setCreateFeedback('Customer Name is required.');
+        setCreating(false);
+        return;
+      }
+
+      if (!formattedPhone) {
+        setCreateFeedback('Phone Number is required.');
+        setCreating(false);
+        return;
+      }
+
+      if (!validateZimPhone(formattedPhone)) {
+        setCreateFeedback('Please enter a valid Zimbabwean phone number.');
         setCreating(false);
         return;
       }
@@ -397,6 +366,12 @@ export default function OperatorDashboard() {
         return;
       }
 
+      if (!parentForm.reference?.trim()) {
+        setCreateFeedback('Booking reference is required.');
+        setCreating(false);
+        return;
+      }
+
       const deadline = new Date(parentForm.deadline);
       if (deadline <= new Date()) {
         setCreateFeedback('Deadline must be in the future.');
@@ -404,6 +379,8 @@ export default function OperatorDashboard() {
         return;
       }
 
+      const bookingCode = generateBookingCode();
+      
       const parentBookingData = {
         customerName: parentForm.customerName.trim(),
         phoneNumber: formattedPhone,
@@ -411,14 +388,20 @@ export default function OperatorDashboard() {
         commodity: parentForm.commodity.trim(),
         loadingPoint: parentForm.loadingPoint.trim(),
         destination: parentForm.destination.trim(),
-        deadline: parentForm.deadline
+        deadline: parentForm.deadline,
+        bookingCode,
+        notes: parentForm.notes.trim(),
+        status: 'Active',
+        remainingTonnage: parseFloat(parentForm.totalTonnage),
+        completedTonnage: 0,
+        deliveries: []
       };
 
       const res = await deliveryApi.createParentBooking(parentBookingData);
       
       if (res.success) {
         setShowToast(true);
-        setToastMsg(`Parent booking created successfully! ID: ${res.id}`);
+        setToastMsg(`Parent booking created successfully! Booking Code: ${bookingCode}`);
         
         // Reset form
         setParentForm({
@@ -428,12 +411,14 @@ export default function OperatorDashboard() {
           commodity: '',
           loadingPoint: '',
           destination: '',
-          deadline: ''
+          deadline: '',
+          notes: ''
         });
 
-        // Refresh parent bookings
+        // Refresh parent bookings and update customers list
         const data = await deliveryApi.getAllParentBookings();
         setParentBookings(data);
+        updateCustomersList(data);
       }
     } catch (error) {
       console.error('Create parent booking error:', error);
@@ -478,6 +463,65 @@ export default function OperatorDashboard() {
       return progressSortOrder === 'asc' ? comparison : -comparison;
     });
 
+  // Function to generate a unique booking code
+  const generateBookingCode = () => {
+    const prefix = 'MB'; // MB for Morres Booking
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `${prefix}${timestamp}${random}`;
+  };
+
+  // Function to fetch unique customers from parent bookings
+  const updateCustomersList = (bookings) => {
+    const uniqueCustomers = bookings.reduce((acc, booking) => {
+      if (!acc.find(c => c.name === booking.customerName)) {
+        acc.push({
+          id: booking.id,
+          name: booking.customerName,
+          phone: booking.phoneNumber
+        });
+      }
+      return acc;
+    }, []);
+    setCustomers(uniqueCustomers);
+  };
+
+  // Update customer bookings when a customer is selected
+  const handleCustomerSelect = (customerId) => {
+    const customerBookings = parentBookings.filter(
+      booking => booking.customerName === customers.find(c => c.id === customerId)?.name
+    );
+    setSelectedCustomerBookings(customerBookings);
+    setCreateForm(prev => ({
+      ...prev,
+      customerId,
+      selectedBookingId: '',
+      tonnage: '',
+      containerCount: ''
+    }));
+  };
+
+  // Update form when a booking is selected
+  const handleBookingSelect = (bookingId) => {
+    const selectedBooking = parentBookings.find(b => b.id === bookingId);
+    if (selectedBooking) {
+      setCreateForm(prev => ({
+        ...prev,
+        selectedBookingId: bookingId,
+        loadingPoint: selectedBooking.loadingPoint,
+        destination: selectedBooking.destination,
+        commodity: selectedBooking.commodity
+      }));
+    }
+  };
+
+  // Add useEffect to initialize customers list
+  useEffect(() => {
+    if (parentBookings.length > 0) {
+      updateCustomersList(parentBookings);
+    }
+  }, [parentBookings]);
+
   return (
     <div className="container py-5">
       <h1 className="display-6 fw-bold mb-4" style={{ color: '#D2691E' }}>Operator Dashboard</h1>
@@ -512,7 +556,18 @@ export default function OperatorDashboard() {
                 disabled={creating}
               />
             </div>
-            <div className="col-md-2">
+            <div className="col-md-3">
+              <label className="form-label">Booking Reference *</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                required 
+                value={parentForm.reference}
+                onChange={e => setParentForm(prev => ({ ...prev, reference: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+            <div className="col-md-3">
               <label className="form-label">Total Tonnage *</label>
               <input 
                 type="number" 
@@ -522,17 +577,6 @@ export default function OperatorDashboard() {
                 step="0.01"
                 value={parentForm.totalTonnage}
                 onChange={e => setParentForm(prev => ({ ...prev, totalTonnage: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-            <div className="col-md-4">
-              <label className="form-label">Deadline *</label>
-              <input 
-                type="datetime-local" 
-                className="form-control" 
-                required 
-                value={parentForm.deadline}
-                onChange={e => setParentForm(prev => ({ ...prev, deadline: e.target.value }))}
                 disabled={creating}
               />
             </div>
@@ -569,7 +613,28 @@ export default function OperatorDashboard() {
                 disabled={creating}
               />
             </div>
-            <div className="col-12 col-md-auto">
+            <div className="col-md-3">
+              <label className="form-label">Deadline *</label>
+              <input 
+                type="datetime-local" 
+                className="form-control" 
+                required 
+                value={parentForm.deadline}
+                onChange={e => setParentForm(prev => ({ ...prev, deadline: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+            <div className="col-12">
+              <label className="form-label">Notes</label>
+              <textarea 
+                className="form-control" 
+                rows="2"
+                value={parentForm.notes}
+                onChange={e => setParentForm(prev => ({ ...prev, notes: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+            <div className="col-12">
               <button 
                 type="submit" 
                 className="btn btn-primary fw-bold" 
@@ -580,6 +645,11 @@ export default function OperatorDashboard() {
               </button>
             </div>
           </form>
+          {createFeedback && (
+            <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
+              {createFeedback}
+            </div>
+          )}
         </div>
       </div>
 
@@ -704,7 +774,7 @@ export default function OperatorDashboard() {
         </div>
       )}
 
-      {/* Create Delivery Form */}
+      {/* Modified Create Delivery Form */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body">
           <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
@@ -712,87 +782,56 @@ export default function OperatorDashboard() {
             Create New Delivery
           </h2>
           <form onSubmit={handleCreateDelivery} className="row g-3 align-items-end" autoComplete="off">
-            <div className="col-md-3">
-              <label className="form-label">Customer Name *</label>
-              <input 
-                ref={customerNameRef} 
-                type="text" 
-                className="form-control" 
-                required 
-                placeholder="Enter customer name"
-                value={createForm.customerName} 
-                onChange={e => setCreateForm(prev => ({ ...prev, customerName: e.target.value }))} 
-                disabled={creating} 
-                tabIndex={1} 
-              />
+            <div className="col-md-4">
+              <label className="form-label">Select Customer *</label>
+              <select 
+                className="form-select"
+                value={createForm.customerId}
+                onChange={(e) => handleCustomerSelect(e.target.value)}
+                disabled={creating}
+                required
+              >
+                <option value="">Choose customer...</option>
+                {customers.map(customer => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name} ({customer.phone})
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="col-md-3">
-              <label className="form-label">Phone Number *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                placeholder="e.g., 0771234567"
-                value={createForm.phoneNumber} 
-                onChange={e => setCreateForm(prev => ({ ...prev, phoneNumber: e.target.value }))} 
-                disabled={creating} 
-                tabIndex={2} 
-              />
+
+            <div className="col-md-4">
+              <label className="form-label">Select Booking *</label>
+              <select 
+                className="form-select"
+                value={createForm.selectedBookingId}
+                onChange={(e) => handleBookingSelect(e.target.value)}
+                disabled={creating || !createForm.customerId}
+                required
+              >
+                <option value="">Choose booking...</option>
+                {selectedCustomerBookings.map(booking => (
+                  <option key={booking.id} value={booking.id}>
+                    {booking.bookingCode} - {booking.commodity} ({booking.remainingTonnage} tons remaining)
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="col-md-3">
-              <label className="form-label">Booking Reference *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                placeholder="Enter booking reference"
-                value={createForm.bookingReference} 
-                onChange={e => setCreateForm(prev => ({ ...prev, bookingReference: e.target.value }))} 
-                disabled={creating} 
-                tabIndex={3} 
-              />
-            </div>
-            <div className="col-md-3">
-              <label className="form-label">Loading Point *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                placeholder="Enter loading point"
-                value={createForm.loadingPoint} 
-                onChange={e => setCreateForm(prev => ({ ...prev, loadingPoint: e.target.value }))} 
-                disabled={creating} 
-                tabIndex={4} 
-              />
-            </div>
-            <div className="col-md-3">
-              <label className="form-label">Commodity *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                placeholder="Enter commodity type"
-                value={createForm.commodity} 
-                onChange={e => setCreateForm(prev => ({ ...prev, commodity: e.target.value }))} 
-                disabled={creating} 
-                tabIndex={5} 
-              />
-            </div>
-            <div className="col-md-2">
+
+            <div className="col-md-4">
               <label className="form-label">Container Count *</label>
               <input 
                 type="number" 
                 className="form-control" 
                 required 
                 min="1"
-                placeholder="Number of containers"
-                value={createForm.containerCount} 
-                onChange={e => setCreateForm(prev => ({ ...prev, containerCount: e.target.value }))} 
-                disabled={creating} 
-                tabIndex={6} 
+                value={createForm.containerCount}
+                onChange={e => setCreateForm(prev => ({ ...prev, containerCount: e.target.value }))}
+                disabled={creating || !createForm.selectedBookingId}
               />
             </div>
-            <div className="col-md-2">
+
+            <div className="col-md-4">
               <label className="form-label">Tonnage *</label>
               <input 
                 type="number" 
@@ -800,113 +839,68 @@ export default function OperatorDashboard() {
                 required 
                 min="0.01"
                 step="0.01"
-                placeholder="Weight in tons"
-                value={createForm.tonnage} 
-                onChange={e => setCreateForm(prev => ({ ...prev, tonnage: e.target.value }))} 
-                disabled={creating} 
-                tabIndex={7} 
+                value={createForm.tonnage}
+                onChange={e => setCreateForm(prev => ({ ...prev, tonnage: e.target.value }))}
+                disabled={creating || !createForm.selectedBookingId}
               />
             </div>
-            <div className="col-md-3">
-              <label className="form-label">Destination *</label>
+
+            <div className="col-md-4">
+              <label className="form-label">Driver Name *</label>
               <input 
                 type="text" 
                 className="form-control" 
-                required 
-                placeholder="Enter destination"
-                value={createForm.destination} 
-                onChange={e => setCreateForm(prev => ({ ...prev, destination: e.target.value }))} 
-                disabled={creating} 
-                tabIndex={8} 
+                required
+                value={createForm.driverDetails.name}
+                onChange={e => setCreateForm(prev => ({
+                  ...prev,
+                  driverDetails: { ...prev.driverDetails, name: e.target.value }
+                }))}
+                disabled={creating || !createForm.selectedBookingId}
               />
             </div>
-            <div className="col-md-2">
-              <label className="form-label">Initial Status *</label>
+
+            <div className="col-md-4">
+              <label className="form-label">Vehicle Registration *</label>
               <input 
                 type="text" 
                 className="form-control" 
-                required 
+                required
+                value={createForm.driverDetails.vehicleReg}
+                onChange={e => setCreateForm(prev => ({
+                  ...prev,
+                  driverDetails: { ...prev.driverDetails, vehicleReg: e.target.value }
+                }))}
+                disabled={creating || !createForm.selectedBookingId}
+              />
+            </div>
+
+            <div className="col-md-4">
+              <label className="form-label">Initial Status</label>
+              <input 
+                type="text" 
+                className="form-control" 
                 placeholder="e.g., Pending"
-                value={createForm.currentStatus} 
-                onChange={e => setCreateForm(prev => ({ ...prev, currentStatus: e.target.value }))} 
-                disabled={creating} 
-                tabIndex={9} 
+                value={createForm.currentStatus}
+                onChange={e => setCreateForm(prev => ({ ...prev, currentStatus: e.target.value }))}
+                disabled={creating || !createForm.selectedBookingId}
               />
             </div>
-            <div className="col-md-2">
-              <label className="form-label">Driver Name</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="Optional"
-                value={createForm.driverDetails.name} 
-                onChange={e => setCreateForm(prev => ({
-                  ...prev,
-                  driverDetails: {
-                    ...prev.driverDetails,
-                    name: e.target.value
-                  }
-                }))} 
-                disabled={creating} 
-                tabIndex={10} 
-              />
-            </div>
-            <div className="col-md-2">
-              <label className="form-label">Vehicle Reg</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="Optional"
-                value={createForm.driverDetails.vehicleReg} 
-                onChange={e => setCreateForm(prev => ({
-                  ...prev,
-                  driverDetails: {
-                    ...prev.driverDetails,
-                    vehicleReg: e.target.value
-                  }
-                }))} 
-                disabled={creating} 
-                tabIndex={11} 
-              />
-            </div>
-            <div className="col-12 col-md-auto">
+
+            <div className="col-12">
               <button 
                 type="submit" 
                 className="btn btn-primary fw-bold" 
                 style={{ background: '#D2691E', border: 'none' }} 
-                disabled={creating || !createForm.customerName?.trim() || !createForm.phoneNumber?.trim() || 
-                         !createForm.bookingReference?.trim() || !createForm.loadingPoint?.trim() || 
-                         !createForm.commodity?.trim() || !createForm.containerCount || 
-                         !createForm.tonnage || !createForm.destination?.trim() || 
-                         !createForm.currentStatus?.trim()} 
-                tabIndex={12}
+                disabled={creating || !createForm.selectedBookingId}
               >
-                {creating ? 'Creating...' : 'Create'}
+                {creating ? 'Creating...' : 'Create Delivery'}
               </button>
             </div>
           </form>
-          {createFeedback && <div className={`mt-3 alert alert-danger`}>{createFeedback}</div>}
-          {showToast && (
-            <div className="toast show position-fixed bottom-0 end-0 m-4" style={{ zIndex: 9999, minWidth: 250, background: '#fffbe6', border: '1px solid #D2691E' }}>
-              <div className="toast-body d-flex align-items-center justify-content-between">
-                <span>{toastMsg}
-                  {toastMsg.includes('Tracking ID:') && (
-                    <button className="btn btn-sm btn-outline-secondary ms-2" style={{ fontSize: 12 }} onClick={() => {
-                      const id = toastMsg.split('Tracking ID: ')[1];
-                      navigator.clipboard.writeText(id);
-                    }}>Copy</button>
-                  )}
-                </span>
-                <button type="button" className="btn-close ms-2" aria-label="Close" onClick={() => setShowToast(false)}></button>
-              </div>
-            </div>
-          )}
-          {showSmsPreview && (
-            <div className="alert alert-info mt-3">
-              <div className="mb-2">Preview SMS to customer:</div>
-              <div className="mb-2"><code>{smsPreview}</code></div>
-              <button className="btn btn-sm btn-success me-2" onClick={() => handleSendInitialSMS(toastMsg.split('Tracking ID: ')[1], createForm.phoneNumber, createForm.currentStatus)}>Send SMS</button>
-              <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowSmsPreview(false)}>Cancel</button>
+          {createFeedback && (
+            <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
+              {createFeedback}
             </div>
           )}
         </div>

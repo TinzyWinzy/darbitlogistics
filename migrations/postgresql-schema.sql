@@ -11,14 +11,33 @@ CREATE TABLE IF NOT EXISTS parent_bookings (
     loading_point TEXT NOT NULL,
     destination TEXT NOT NULL,
     deadline TIMESTAMP WITH TIME ZONE NOT NULL,
+    booking_code TEXT UNIQUE,
+    notes TEXT,
+    status TEXT DEFAULT 'Active',
+    remaining_tonnage DECIMAL(10,2),
+    completed_tonnage DECIMAL(10,2) DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Add parent_booking_id to deliveries if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'deliveries' 
+        AND column_name = 'parent_booking_id'
+    ) THEN
+        ALTER TABLE deliveries 
+        ADD COLUMN parent_booking_id TEXT REFERENCES parent_bookings(id);
+    END IF;
+END $$;
+
 -- Deliveries table (now as child bookings)
 CREATE TABLE IF NOT EXISTS deliveries (
     tracking_id TEXT PRIMARY KEY,
-    parent_booking_id TEXT NOT NULL REFERENCES parent_bookings(id),
+    parent_booking_id TEXT REFERENCES parent_bookings(id),
     customer_name TEXT NOT NULL,
     phone_number TEXT NOT NULL,
     current_status TEXT NOT NULL,
@@ -40,7 +59,7 @@ CREATE TABLE IF NOT EXISTS deliveries (
 -- Create an index for faster parent booking lookups
 CREATE INDEX IF NOT EXISTS idx_deliveries_parent_booking ON deliveries(parent_booking_id);
 
--- Create a view for progress tracking
+-- Create or replace the view for progress tracking
 CREATE OR REPLACE VIEW booking_progress AS
 SELECT 
     pb.id as parent_booking_id,
@@ -50,6 +69,9 @@ SELECT
     pb.commodity,
     pb.loading_point,
     pb.destination,
+    COALESCE(pb.booking_code, '') as booking_code,
+    pb.notes,
+    pb.status,
     COALESCE(SUM(CASE WHEN d.is_completed THEN d.tonnage ELSE 0 END), 0) as completed_tonnage,
     COALESCE(SUM(d.tonnage), 0) as allocated_tonnage,
     COALESCE(COUNT(d.tracking_id), 0) as total_deliveries,
@@ -61,7 +83,7 @@ SELECT
     EXTRACT(EPOCH FROM (pb.deadline - CURRENT_TIMESTAMP)) as seconds_until_deadline
 FROM parent_bookings pb
 LEFT JOIN deliveries d ON pb.id = d.parent_booking_id
-GROUP BY pb.id, pb.customer_name, pb.total_tonnage, pb.deadline;
+GROUP BY pb.id, pb.customer_name, pb.total_tonnage, pb.deadline, pb.commodity, pb.loading_point, pb.destination, pb.booking_code, pb.notes, pb.status;
 
 -- Function to update delivery completion
 CREATE OR REPLACE FUNCTION update_delivery_completion()
