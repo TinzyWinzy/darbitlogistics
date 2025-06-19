@@ -123,7 +123,7 @@ export default function OperatorDashboard() {
         formattedPhone = '263' + formattedPhone;
       }
 
-      // Validate all required fields including formatted phone
+      // Validate required fields
       if (!createForm.customerName?.trim()) {
         setCreateFeedback('Customer Name is required.');
         setCreating(false);
@@ -142,7 +142,7 @@ export default function OperatorDashboard() {
         return;
       }
 
-      // Validate phone number format after formatting
+      // Validate phone number format
       if (!validateZimPhone(formattedPhone)) {
         setCreateFeedback('Please enter a valid Zimbabwean phone number (e.g., 07xxxxxxxx, +263xxxxxxxx)');
         setCreating(false);
@@ -153,32 +153,39 @@ export default function OperatorDashboard() {
         customerName: createForm.customerName.trim(),
         phoneNumber: formattedPhone,
         currentStatus: createForm.currentStatus.trim(),
-        checkpoints: [],
+        checkpoints: [],  // Always send empty array for new deliveries
         driverDetails: {
           name: createForm.driverDetails.name?.trim() || '',
           vehicleReg: createForm.driverDetails.vehicleReg?.trim() || ''
         }
       };
 
-      console.log('Submitting delivery data:', deliveryData); // Debug log
+      console.log('Submitting delivery data:', deliveryData);
 
       const res = await deliveryApi.create(deliveryData);
+      
+      if (!res) {
+        throw new Error('No response from server');
+      }
+
+      if (res.error) {
+        throw new Error(res.error);
+      }
+
       if (res.success && res.trackingId) {
         setShowToast(true);
-        // Update toast message to include warning if SMS failed
         if (res.warning) {
           setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId} (Note: SMS notification pending)`);
         } else {
           setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId}`);
         }
         
-        // Show SMS preview only if SMS hasn't been sent
         if (res.warning && res.warning.includes('SMS failed')) {
           setShowSmsPreview(true);
           setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${res.trackingId}. Status: ${createForm.currentStatus}`);
         }
 
-        // Reset form
+        // Reset form with proper structure
         setCreateForm({
           customerName: '',
           phoneNumber: '',
@@ -186,36 +193,29 @@ export default function OperatorDashboard() {
           checkpoints: [],
           driverDetails: {
             name: '',
-            vehicleReg: '',
-          },
+            vehicleReg: ''
+          }
         });
 
-        // Clear any previous feedback
         setCreateFeedback('');
-
-        // Refresh deliveries list
         const data = await deliveryApi.getAll();
         setDeliveries(data);
-
-        // Auto-hide toast after delay
         setTimeout(() => {
           setShowToast(false);
         }, 3500);
-
-        // Focus back on customer name field
         setTimeout(() => {
           customerNameRef.current && customerNameRef.current.focus();
         }, 100);
-
-      } else if (res.warning) {
-        // Show warning in feedback area if it's not just about SMS
-        if (!res.warning.includes('SMS failed')) {
-          setCreateFeedback('Warning: ' + res.warning);
-        }
+      } else {
+        throw new Error('Failed to create delivery - no tracking ID received');
       }
     } catch (error) {
       console.error('Create delivery error:', error);
-      setCreateFeedback(error.response?.data?.error || 'Failed to create delivery. Please check all fields and try again.');
+      setCreateFeedback(
+        error.response?.data?.error || 
+        error.message || 
+        'Failed to create delivery. Please check all fields and try again.'
+      );
     }
     setCreating(false);
   };

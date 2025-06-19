@@ -37,7 +37,6 @@ export const toCamel = d => ({
 });
 
 export const toSnake = d => ({
-  tracking_id: d.trackingId,
   customer_name: d.customerName,
   phone_number: d.phoneNumber,
   current_status: d.currentStatus,
@@ -61,9 +60,9 @@ export const deliveryApi = {
 
   // Create new delivery
   create: async (delivery) => {
-    console.log('Sending delivery data:', delivery); // Debug log
+    console.log('Sending delivery data:', delivery);
     const snakeData = toSnake(delivery);
-    console.log('Transformed data:', snakeData); // Debug log
+    console.log('Transformed data:', snakeData);
     const res = await api.post('/deliveries', snakeData);
     return res.data;
   },
