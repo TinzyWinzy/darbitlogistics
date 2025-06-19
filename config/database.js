@@ -5,13 +5,14 @@ dotenv.config();
 
 // For Render deployment, use the internal connection string if available
 const connectionString = process.env.DATABASE_URL || process.env.RENDER_DATABASE_URL;
+const isProduction = process.env.NODE_ENV === 'production';
 
 const pool = connectionString 
   ? new pg.Pool({
       connectionString,
-      ssl: {
+      ssl: isProduction ? {
         rejectUnauthorized: false
-      }
+      } : false
     })
   : new pg.Pool({
       user: process.env.PGUSER || 'postgres',
@@ -19,13 +20,13 @@ const pool = connectionString
       database: process.env.PGDATABASE || 'morres',
       password: process.env.PGPASSWORD || 'postgres',
       port: parseInt(process.env.PGPORT || '5432'),
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      ssl: isProduction ? { rejectUnauthorized: false } : false
     });
 
 // Handle pool errors
 pool.on('error', (err, client) => {
   console.error('Unexpected error on idle client', err);
-  if (process.env.NODE_ENV === 'production') {
+  if (isProduction) {
     console.error('Database connection error in production - attempting to reconnect...');
   }
 });
@@ -53,7 +54,7 @@ const testConnection = async () => {
       retries -= 1;
       if (retries === 0) {
         console.error('Could not connect to database after 5 attempts');
-        if (process.env.NODE_ENV === 'production') {
+        if (isProduction) {
           console.error('Fatal error in production - check database configuration');
           process.exit(1);
         }

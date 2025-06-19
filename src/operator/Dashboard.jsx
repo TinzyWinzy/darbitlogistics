@@ -36,7 +36,9 @@ export default function OperatorDashboard() {
       vehicleReg: ''
     },
     containerCount: '',
-    tonnage: ''
+    tonnage: '',
+    vehicleType: 'Standard Truck',
+    vehicleCapacity: 30.00
   });
   const [creating, setCreating] = useState(false);
   const [createFeedback, setCreateFeedback] = useState('');
@@ -53,11 +55,16 @@ export default function OperatorDashboard() {
     customerName: '',
     phoneNumber: '',
     totalTonnage: '',
-    commodity: '',
+    mineral_type: 'Other',
+    mineral_grade: 'Ungraded',
+    moisture_content: '',
+    particle_size: '',
     loadingPoint: '',
     destination: '',
     deadline: null,
-    reference: '',
+    requires_analysis: false,
+    special_handling_notes: '',
+    environmental_concerns: '',
     notes: ''
   });
   const [progressFilter, setProgressFilter] = useState('all');
@@ -77,11 +84,25 @@ export default function OperatorDashboard() {
     createdAt: d.created_at,
     updatedAt: d.updated_at,
     bookingReference: d.booking_reference,
-    commodity: d.commodity,
-    destination: d.destination,
     loadingPoint: d.loading_point,
-    containerCount: d.container_count,
+    destination: d.destination,
+    vehicleType: d.vehicle_type,
+    vehicleCapacity: d.vehicle_capacity,
     tonnage: d.tonnage,
+    containerCount: d.container_count,
+    parentBookingId: d.parent_booking_id,
+    isCompleted: d.is_completed,
+    completionDate: d.completion_date,
+    hasWeighbridgeCert: d.has_weighbridge_cert,
+    weighbridgeRef: d.weighbridge_ref,
+    tareWeight: d.tare_weight,
+    netWeight: d.net_weight,
+    samplingRequired: d.sampling_required,
+    samplingStatus: d.sampling_status,
+    environmentalIncident: d.environmental_incident,
+    incidentDetails: d.incident_details,
+    mineral_type: d.mineral_type,
+    mineral_grade: d.mineral_grade
   });
 
   useEffect(() => {
@@ -115,7 +136,8 @@ export default function OperatorDashboard() {
         d.customerName.toLowerCase().includes(q) ||
         d.trackingId.toLowerCase().includes(q) ||
         d.bookingReference.toLowerCase().includes(q) ||
-        d.commodity.toLowerCase().includes(q) ||
+        d.mineral_type.toLowerCase().includes(q) ||
+        d.mineral_grade.toLowerCase().includes(q) ||
         d.destination.toLowerCase().includes(q) ||
         (d.currentStatus || '').toLowerCase().includes(q)
       );
@@ -197,16 +219,17 @@ export default function OperatorDashboard() {
 
       const deliveryData = {
         parentBookingId: selectedBooking.id,
-        bookingCode: selectedBooking.bookingCode,
         customerName: selectedBooking.customerName,
         phoneNumber: selectedBooking.phoneNumber,
         currentStatus: createForm.currentStatus || 'Pending',
         loadingPoint: selectedBooking.loadingPoint,
-        commodity: selectedBooking.commodity,
+        destination: selectedBooking.destination,
+        mineral_type: selectedBooking.mineral_type,
+        mineral_grade: selectedBooking.mineral_grade,
         containerCount: parseInt(createForm.containerCount),
         tonnage: parseFloat(createForm.tonnage),
-        destination: selectedBooking.destination,
-        checkpoints: [],
+        vehicleType: createForm.vehicleType || 'Standard Truck',
+        vehicleCapacity: parseFloat(createForm.vehicleCapacity) || 30.00,
         driverDetails: {
           name: createForm.driverDetails.name.trim(),
           vehicleReg: createForm.driverDetails.vehicleReg.trim()
@@ -215,7 +238,7 @@ export default function OperatorDashboard() {
 
       const res = await deliveryApi.create(deliveryData);
 
-      if (res.success && res.trackingId) {
+      if (res.success) {
         setShowToast(true);
         setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId}`);
         
@@ -226,6 +249,8 @@ export default function OperatorDashboard() {
           currentStatus: '',
           containerCount: '',
           tonnage: '',
+          vehicleType: 'Standard Truck',
+          vehicleCapacity: 30.00,
           driverDetails: {
             name: '',
             vehicleReg: ''
@@ -243,7 +268,7 @@ export default function OperatorDashboard() {
       }
     } catch (error) {
       console.error('Create delivery error:', error);
-      setCreateFeedback(error.message || 'Failed to create delivery');
+      setCreateFeedback(error.response?.data?.error || 'Failed to create delivery');
     }
     setCreating(false);
   };
@@ -368,12 +393,6 @@ export default function OperatorDashboard() {
         return;
       }
 
-      if (!parentForm.reference?.trim()) {
-        setCreateFeedback('Booking reference is required.');
-        setCreating(false);
-        return;
-      }
-
       const deadline = new Date(parentForm.deadline);
       if (deadline <= new Date()) {
         setCreateFeedback('Deadline must be in the future.');
@@ -381,40 +400,44 @@ export default function OperatorDashboard() {
         return;
       }
 
-      const bookingCode = generateBookingCode();
-      
       const parentBookingData = {
         customerName: parentForm.customerName.trim(),
         phoneNumber: formattedPhone,
         totalTonnage: parseFloat(parentForm.totalTonnage),
-        commodity: parentForm.commodity.trim(),
+        mineral_type: parentForm.mineral_type.trim(),
+        mineral_grade: parentForm.mineral_grade.trim(),
+        moisture_content: parentForm.moisture_content,
+        particle_size: parentForm.particle_size,
         loadingPoint: parentForm.loadingPoint.trim(),
         destination: parentForm.destination.trim(),
-        deadline: parentForm.deadline.toISOString(), // Convert to ISO string format
-        bookingCode,
-        notes: parentForm.notes.trim(),
-        status: 'Active',
-        remainingTonnage: parseFloat(parentForm.totalTonnage),
-        completedTonnage: 0,
-        deliveries: []
+        deadline: parentForm.deadline.toISOString(),
+        requires_analysis: parentForm.requires_analysis || false,
+        special_handling_notes: parentForm.special_handling_notes?.trim(),
+        environmental_concerns: parentForm.environmental_concerns?.trim(),
+        notes: parentForm.notes?.trim()
       };
 
       const res = await deliveryApi.createParentBooking(parentBookingData);
       
       if (res.success) {
         setShowToast(true);
-        setToastMsg(`Parent booking created successfully! Booking Code: ${bookingCode}`);
+        setToastMsg(`Parent booking created successfully! Booking Code: ${res.booking.booking_code}`);
         
         // Reset form
         setParentForm({
           customerName: '',
           phoneNumber: '',
           totalTonnage: '',
-          commodity: '',
+          mineral_type: 'Other',
+          mineral_grade: 'Ungraded',
+          moisture_content: '',
+          particle_size: '',
           loadingPoint: '',
           destination: '',
           deadline: null,
-          reference: '',
+          requires_analysis: false,
+          special_handling_notes: '',
+          environmental_concerns: '',
           notes: ''
         });
 
@@ -425,7 +448,7 @@ export default function OperatorDashboard() {
       }
     } catch (error) {
       console.error('Create parent booking error:', error);
-      setCreateFeedback(error.message || 'Failed to create parent booking');
+      setCreateFeedback(error.response?.data?.error || 'Failed to create parent booking');
     }
     setCreating(false);
   };
@@ -500,7 +523,9 @@ export default function OperatorDashboard() {
       customerId,
       selectedBookingId: '',
       tonnage: '',
-      containerCount: ''
+      containerCount: '',
+      vehicleType: 'Standard Truck',
+      vehicleCapacity: 30.00
     }));
   };
 
@@ -513,7 +538,8 @@ export default function OperatorDashboard() {
         selectedBookingId: bookingId,
         loadingPoint: selectedBooking.loadingPoint,
         destination: selectedBooking.destination,
-        commodity: selectedBooking.commodity
+        mineral_type: selectedBooking.mineral_type,
+        mineral_grade: selectedBooking.mineral_grade
       }));
     }
   };
@@ -560,17 +586,6 @@ export default function OperatorDashboard() {
               />
             </div>
             <div className="col-md-3">
-              <label className="form-label">Booking Reference *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                value={parentForm.reference}
-                onChange={e => setParentForm(prev => ({ ...prev, reference: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-            <div className="col-md-3">
               <label className="form-label">Total Tonnage *</label>
               <input 
                 type="number" 
@@ -584,15 +599,40 @@ export default function OperatorDashboard() {
               />
             </div>
             <div className="col-md-3">
-              <label className="form-label">Commodity *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                value={parentForm.commodity}
-                onChange={e => setParentForm(prev => ({ ...prev, commodity: e.target.value }))}
+              <label className="form-label">Mineral Type *</label>
+              <select
+                className="form-control"
+                required
+                value={parentForm.mineral_type}
+                onChange={e => setParentForm(prev => ({ ...prev, mineral_type: e.target.value }))}
                 disabled={creating}
-              />
+              >
+                <option value="Coal">Coal</option>
+                <option value="Iron Ore">Iron Ore</option>
+                <option value="Copper Ore">Copper Ore</option>
+                <option value="Gold Ore">Gold Ore</option>
+                <option value="Bauxite">Bauxite</option>
+                <option value="Limestone">Limestone</option>
+                <option value="Phosphate">Phosphate</option>
+                <option value="Manganese">Manganese</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="col-md-3">
+              <label className="form-label">Mineral Grade *</label>
+              <select
+                className="form-control"
+                required
+                value={parentForm.mineral_grade}
+                onChange={e => setParentForm(prev => ({ ...prev, mineral_grade: e.target.value }))}
+                disabled={creating}
+              >
+                <option value="Premium">Premium</option>
+                <option value="Standard">Standard</option>
+                <option value="Low Grade">Low Grade</option>
+                <option value="Mixed">Mixed</option>
+                <option value="Ungraded">Ungraded</option>
+              </select>
             </div>
             <div className="col-md-3">
               <label className="form-label">Loading Point *</label>
@@ -829,7 +869,7 @@ export default function OperatorDashboard() {
                 <option value="">Choose booking...</option>
                 {selectedCustomerBookings.map(booking => (
                   <option key={booking.id} value={booking.id}>
-                    {booking.bookingCode} - {booking.commodity} ({booking.remainingTonnage} tons remaining)
+                    {booking.bookingCode} - {booking.mineral_type} ({booking.mineral_grade}) - {booking.remainingTonnage} tons remaining
                   </option>
                 ))}
               </select>

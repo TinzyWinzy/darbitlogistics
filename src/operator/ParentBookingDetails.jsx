@@ -103,9 +103,10 @@ export default function ParentBookingDetails({ booking, onClose }) {
                 </div>
                 <div className="col-md-6">
                   <h6>Shipping Details</h6>
-                  <p className="mb-1">From: {booking.loadingPoint}</p>
+                  <p className="mb-1">From: {booking.loading_point}</p>
                   <p className="mb-1">To: {booking.destination}</p>
-                  <p className="mb-1">Commodity: {booking.commodity}</p>
+                  <p className="mb-1">Mineral Type: {booking.mineral_type}</p>
+                  <p className="mb-1">Mineral Grade: {booking.mineral_grade}</p>
                   <p className="mb-1">Deadline: {new Date(booking.deadline).toLocaleString()}</p>
                 </div>
               </div>

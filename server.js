@@ -162,60 +162,161 @@ function generateTrackingId() {
   return letters + digits;
 }
 
+// Function to generate a unique booking code
+function generateBookingCode() {
+  const prefix = 'MB'; // MB for Morres Booking
+  const timestamp = Date.now().toString().slice(-6);
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `${prefix}${timestamp}${random}`;
+}
+
+// Helper: Generate unique booking reference
+function generateBookingReference() {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const random = Math.floor(1000 + Math.random() * 9000); // 4 digit number
+  return `REF-${year}${month}-${random}`;
+}
+
 // Improved delivery creation route
 app.post('/deliveries', authenticateSession, async (req, res) => {
-  let { customer_name, phone_number, current_status, checkpoints = [], driver_details = {} } = req.body;
+  let { 
+    customer_name, 
+    phone_number, 
+    current_status = 'Pending',
+    parent_booking_id,
+    tonnage,
+    container_count,
+    vehicle_type = 'Standard Truck',
+    vehicle_capacity = 30.00,
+    loading_point,
+    destination,
+    checkpoints = [], 
+    driver_details = {} 
+  } = req.body;
 
   // 1. Validate input
-  if (!customer_name || !phone_number || !current_status) {
-    return res.status(400).json({ error: 'Missing required fields.' });
-  }
-  if (!validateZimPhone(phone_number)) {
-    return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
-  }
-
-  // 2. Generate unique trackingId and try insert
-  async function tryInsert(attempt = 0) {
-    if (attempt >= 5) {
-      return res.status(500).json({ error: 'Failed to generate unique tracking ID' });
+  try {
+    if (!customer_name || !phone_number || !parent_booking_id || !tonnage || !container_count) {
+      return res.status(400).json({ error: 'Missing required fields.' });
     }
 
-    const tracking_id = generateTrackingId();
-    
-    try {
-      await pool.query(
-        `INSERT INTO deliveries (tracking_id, customer_name, phone_number, current_status, checkpoints, driver_details)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [tracking_id, customer_name, phone_number, current_status, JSON.stringify(checkpoints), JSON.stringify(driver_details)]
-      );
+    if (!validateZimPhone(phone_number)) {
+      return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
+    }
 
-      // 3. Send SMS to customer
-      const smsMessage = `Welcome! Your delivery is created. Tracking ID: ${tracking_id}. Status: ${current_status}`;
-      const smsRes = await sendSMS(phone_number, smsMessage);
+    if (tonnage <= 0) {
+      return res.status(400).json({ error: 'Tonnage must be greater than 0.' });
+    }
 
-      // 4. Audit log
-      console.log(`[AUDIT] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${tracking_id}`);
+    if (container_count < 1) {
+      return res.status(400).json({ error: 'Container count must be at least 1.' });
+    }
 
-      if (!smsRes.success) {
-        return res.status(207).json({
-          success: true,
-          warning: 'Delivery created, but SMS failed',
+    if (!driver_details.name || !driver_details.vehicleReg) {
+      return res.status(400).json({ error: 'Driver name and vehicle registration are required.' });
+    }
+
+    // 2. Verify parent booking exists and has sufficient remaining tonnage
+    const parentBooking = await pool.query(
+      'SELECT * FROM parent_bookings WHERE id = $1',
+      [parent_booking_id]
+    );
+
+    if (parentBooking.rows.length === 0) {
+      return res.status(404).json({ error: 'Parent booking not found.' });
+    }
+
+    const booking = parentBooking.rows[0];
+    if (booking.remaining_tonnage < tonnage) {
+      return res.status(400).json({ 
+        error: `Insufficient remaining tonnage. Available: ${booking.remaining_tonnage} tons` 
+      });
+    }
+
+    // 3. Generate unique trackingId and try insert
+    async function tryInsert(attempt = 0) {
+      if (attempt >= 5) {
+        return res.status(500).json({ error: 'Failed to generate unique tracking ID' });
+      }
+
+      const tracking_id = generateTrackingId();
+      const booking_reference = generateBookingReference();
+      
+      try {
+        const result = await pool.query(
+          `INSERT INTO deliveries (
+            tracking_id, 
+            customer_name, 
+            phone_number, 
+            current_status, 
+            parent_booking_id,
+            tonnage,
+            container_count,
+            vehicle_type,
+            vehicle_capacity,
+            loading_point,
+            destination,
+            booking_reference,
+            checkpoints, 
+            driver_details
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          RETURNING *`,
+          [
+            tracking_id, 
+            customer_name, 
+            phone_number, 
+            current_status, 
+            parent_booking_id,
+            tonnage,
+            container_count,
+            vehicle_type,
+            vehicle_capacity,
+            loading_point || booking.loading_point,
+            destination || booking.destination,
+            booking_reference,
+            JSON.stringify(checkpoints), 
+            JSON.stringify(driver_details)
+          ]
+        );
+
+        // 4. Send SMS to customer
+        const smsMessage = `Welcome! Your delivery is created. Tracking ID: ${tracking_id}. Status: ${current_status}`;
+        const smsRes = await sendSMS(phone_number, smsMessage);
+
+        // 5. Audit log
+        console.log(`[AUDIT] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${tracking_id}`);
+
+        if (!smsRes.success) {
+          return res.status(207).json({
+            success: true,
+            warning: 'Delivery created, but SMS failed',
+            trackingId: tracking_id,
+            delivery: result.rows[0],
+            smsError: smsRes.error
+          });
+        }
+
+        res.json({ 
+          success: true, 
           trackingId: tracking_id,
-          smsError: smsRes.error
+          delivery: result.rows[0]
         });
+      } catch (err) {
+        if (err.code === '23505') { // Unique violation
+          return tryInsert(attempt + 1);
+        }
+        console.error('[DB ERROR]', err);
+        res.status(400).json({ error: err.message });
       }
-
-      res.json({ success: true, trackingId: tracking_id });
-    } catch (err) {
-      if (err.code === '23505') { // Unique violation
-        return tryInsert(attempt + 1);
-      }
-      console.error('[DB ERROR]', err);
-      res.status(400).json({ error: err.message });
     }
-  }
 
-  tryInsert();
+    tryInsert();
+  } catch (err) {
+    console.error('Delivery creation error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
@@ -322,6 +423,146 @@ app.post('/logout', authenticateSession, async (req, res) => {
   } catch (err) {
     console.error('Logout error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Parent Booking Routes
+app.post('/parent-bookings', authenticateSession, async (req, res) => {
+  const { 
+    customerName, 
+    phoneNumber, 
+    totalTonnage, 
+    mineral_type, 
+    mineral_grade, 
+    loadingPoint, 
+    destination, 
+    deadline, 
+    notes,
+    moisture_content,
+    particle_size,
+    requires_analysis,
+    special_handling_notes,
+    environmental_concerns
+  } = req.body;
+
+  try {
+    // Validate required fields
+    if (!customerName || !phoneNumber || !totalTonnage || !mineral_type || !loadingPoint || !destination || !deadline) {
+      return res.status(400).json({ error: 'Missing required fields.' });
+    }
+
+    // Validate phone number
+    if (!validateZimPhone(phoneNumber)) {
+      return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
+    }
+
+    // Validate tonnage
+    if (totalTonnage <= 0) {
+      return res.status(400).json({ error: 'Total tonnage must be greater than 0.' });
+    }
+
+    // Validate deadline
+    const deadlineDate = new Date(deadline);
+    if (deadlineDate <= new Date()) {
+      return res.status(400).json({ error: 'Deadline must be in the future.' });
+    }
+
+    // Generate booking code
+    const bookingCode = generateBookingCode();
+
+    const result = await pool.query(
+      `INSERT INTO parent_bookings (
+        customer_name, 
+        phone_number, 
+        total_tonnage, 
+        mineral_type, 
+        mineral_grade, 
+        loading_point, 
+        destination, 
+        deadline, 
+        booking_code, 
+        notes,
+        moisture_content,
+        particle_size,
+        requires_analysis,
+        special_handling_notes,
+        environmental_concerns,
+        remaining_tonnage
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+      RETURNING *`,
+      [
+        customerName, 
+        phoneNumber, 
+        totalTonnage, 
+        mineral_type, 
+        mineral_grade || 'Ungraded', 
+        loadingPoint,
+        destination, 
+        deadline, 
+        bookingCode, 
+        notes || '',
+        moisture_content,
+        particle_size,
+        requires_analysis || false,
+        special_handling_notes,
+        environmental_concerns,
+        totalTonnage // Initially, remaining_tonnage equals total_tonnage
+      ]
+    );
+
+    // Send SMS notification
+    const smsMessage = `Welcome! Your booking is created. Booking Code: ${bookingCode}. Total Tonnage: ${totalTonnage}`;
+    const smsRes = await sendSMS(phoneNumber, smsMessage);
+
+    // Audit log
+    console.log(`[AUDIT] Parent booking created by ${req.user.username} at ${new Date().toISOString()} | BookingCode: ${bookingCode}`);
+
+    if (!smsRes.success) {
+      return res.status(207).json({
+        success: true,
+        warning: 'Booking created, but SMS failed',
+        booking: result.rows[0],
+        smsError: smsRes.error
+      });
+    }
+
+    res.json({ success: true, booking: result.rows[0] });
+  } catch (err) {
+    console.error('Create parent booking error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/parent-bookings', authenticateSession, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM booking_progress ORDER BY deadline ASC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get parent bookings error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/parent-bookings/:id', authenticateSession, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM booking_progress WHERE parent_booking_id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Parent booking not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Get parent booking error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/parent-bookings/:id/deliveries', authenticateSession, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM deliveries WHERE parent_booking_id = $1', [req.params.id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get parent booking deliveries error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

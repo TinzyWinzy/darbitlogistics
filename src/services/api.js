@@ -34,12 +34,37 @@ export const toCamel = d => ({
   driverDetails: d.driver_details,
   createdAt: d.created_at,
   updatedAt: d.updated_at,
+  bookingReference: d.booking_reference,
+  loadingPoint: d.loading_point,
+  destination: d.destination,
+  vehicleType: d.vehicle_type,
+  vehicleCapacity: d.vehicle_capacity,
+  tonnage: d.tonnage,
+  containerCount: d.container_count,
+  parentBookingId: d.parent_booking_id,
+  isCompleted: d.is_completed,
+  completionDate: d.completion_date,
+  hasWeighbridgeCert: d.has_weighbridge_cert,
+  weighbridgeRef: d.weighbridge_ref,
+  tareWeight: d.tare_weight,
+  netWeight: d.net_weight,
+  samplingRequired: d.sampling_required,
+  samplingStatus: d.sampling_status,
+  environmentalIncident: d.environmental_incident,
+  incidentDetails: d.incident_details
 });
 
 export const toSnake = d => ({
   customer_name: d.customerName,
   phone_number: d.phoneNumber,
   current_status: d.currentStatus,
+  parent_booking_id: d.parentBookingId,
+  tonnage: d.tonnage,
+  container_count: d.containerCount,
+  vehicle_type: d.vehicleType || 'Standard Truck',
+  vehicle_capacity: d.vehicleCapacity || 30.00,
+  loading_point: d.loadingPoint,
+  destination: d.destination,
   checkpoints: d.checkpoints || [],
   driver_details: d.driverDetails || { name: '', vehicleReg: '' }
 });
@@ -48,100 +73,165 @@ export const toSnake = d => ({
 export const deliveryApi = {
   // Get all deliveries
   getAll: async () => {
-    const res = await api.get('/deliveries');
-    return Array.isArray(res.data) ? res.data.map(toCamel) : [];
+    try {
+      const res = await api.get('/deliveries');
+      return Array.isArray(res.data) ? res.data.map(toCamel) : [];
+    } catch (error) {
+      console.error('Failed to fetch deliveries:', error);
+      throw error;
+    }
   },
 
   // Get delivery by tracking ID
   getById: async (trackingId) => {
-    const res = await api.get(`/deliveries/${trackingId}`);
-    return toCamel(res.data);
+    try {
+      const res = await api.get(`/deliveries/${trackingId}`);
+      return toCamel(res.data);
+    } catch (error) {
+      console.error(`Failed to fetch delivery ${trackingId}:`, error);
+      throw error;
+    }
   },
 
   // Create new delivery
   create: async (delivery) => {
-    console.log('Sending delivery data:', delivery);
-    const snakeData = toSnake(delivery);
-    console.log('Transformed data:', snakeData);
-    const res = await api.post('/deliveries', snakeData);
-    return res.data;
+    try {
+      console.log('Creating delivery:', delivery);
+      const snakeData = toSnake(delivery);
+      console.log('Transformed data:', snakeData);
+      const res = await api.post('/deliveries', snakeData);
+      return res.data;
+    } catch (error) {
+      console.error('Failed to create delivery:', error);
+      throw error;
+    }
   },
 
   // Update checkpoint
   updateCheckpoint: async (trackingId, checkpoint, currentStatus) => {
-    const res = await api.post('/updateCheckpoint', {
-      trackingId,
-      checkpoint,
-      currentStatus
-    });
-    return res.data;
+    try {
+      const res = await api.post('/updateCheckpoint', {
+        trackingId,
+        checkpoint,
+        currentStatus
+      });
+      return res.data;
+    } catch (error) {
+      console.error('Failed to update checkpoint:', error);
+      throw error;
+    }
   },
 
   // Send initial SMS
   sendInitialSms: async (to, message) => {
-    const res = await api.post('/send-initial-sms', { to, message });
-    return res.data;
+    try {
+      const res = await api.post('/send-initial-sms', { to, message });
+      return res.data;
+    } catch (error) {
+      console.error('Failed to send SMS:', error);
+      throw error;
+    }
   },
 
+  // Parent Booking Methods
   async getParentBooking(id) {
-    const response = await fetch(`${API_URL}/parent-bookings/${id}`);
-    if (!response.ok) throw new Error('Failed to fetch parent booking');
-    return response.json();
+    try {
+      const res = await api.get(`/parent-bookings/${id}`);
+      return res.data;
+    } catch (error) {
+      console.error(`Failed to fetch parent booking ${id}:`, error);
+      throw error;
+    }
   },
 
   async getDeliveriesByParentId(parentId) {
-    const response = await fetch(`${API_URL}/parent-bookings/${parentId}/deliveries`);
-    if (!response.ok) throw new Error('Failed to fetch deliveries');
-    return response.json();
-  },
-
-  async getMilestoneNotifications(parentId) {
-    const response = await fetch(`${API_URL}/parent-bookings/${parentId}/notifications`);
-    if (!response.ok) throw new Error('Failed to fetch notifications');
-    return response.json();
+    try {
+      const res = await api.get(`/parent-bookings/${parentId}/deliveries`);
+      return res.data;
+    } catch (error) {
+      console.error(`Failed to fetch deliveries for parent booking ${parentId}:`, error);
+      throw error;
+    }
   },
 
   async createParentBooking(data) {
-    const response = await fetch(`${API_URL}/parent-bookings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error('Failed to create parent booking');
-    return response.json();
-  },
-
-  async updateMilestoneNotifications(parentId, milestoneData) {
-    const response = await fetch(`${API_URL}/parent-bookings/${parentId}/notifications`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(milestoneData),
-    });
-    if (!response.ok) throw new Error('Failed to update milestone notifications');
-    return response.json();
+    try {
+      const res = await api.post('/parent-bookings', {
+        customerName: data.customerName,
+        phoneNumber: data.phoneNumber,
+        totalTonnage: data.totalTonnage,
+        mineral_type: data.mineral_type,
+        mineral_grade: data.mineral_grade,
+        moisture_content: data.moisture_content,
+        particle_size: data.particle_size,
+        loading_point: data.loadingPoint,
+        destination: data.destination,
+        deadline: data.deadline,
+        requires_analysis: data.requires_analysis,
+        special_handling_notes: data.special_handling_notes,
+        environmental_concerns: data.environmental_concerns,
+        notes: data.notes
+      });
+      return res.data;
+    } catch (error) {
+      console.error('Failed to create parent booking:', error);
+      throw error;
+    }
   },
 
   async getAllParentBookings(filters = {}) {
-    const queryParams = new URLSearchParams(filters).toString();
-    const response = await fetch(`${API_URL}/parent-bookings?${queryParams}`);
-    if (!response.ok) throw new Error('Failed to fetch parent bookings');
-    return response.json();
+    try {
+      const queryParams = new URLSearchParams(filters).toString();
+      const res = await api.get(`/parent-bookings?${queryParams}`);
+      return res.data;
+    } catch (error) {
+      console.error('Failed to fetch parent bookings:', error);
+      throw error;
+    }
   },
+
+  // Update parent booking status
+  async updateParentBookingStatus(id, status) {
+    try {
+      const res = await api.patch(`/parent-bookings/${id}/status`, { status });
+      return res.data;
+    } catch (error) {
+      console.error(`Failed to update parent booking ${id} status:`, error);
+      throw error;
+    }
+  },
+
+  // Get booking progress
+  async getBookingProgress(id) {
+    try {
+      const res = await api.get(`/parent-bookings/${id}/progress`);
+      return res.data;
+    } catch (error) {
+      console.error(`Failed to fetch progress for booking ${id}:`, error);
+      throw error;
+    }
+  }
 };
 
 export const authApi = {
   login: async (username, password) => {
-    const res = await api.post('/login', { username, password });
-    return res.data;
+    try {
+      const res = await api.post('/login', { username, password });
+      return res.data;
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
   },
 
   logout: async () => {
-    const res = await api.post('/logout');
-    return res.data;
+    try {
+      const res = await api.post('/logout');
+      return res.data;
+    } catch (error) {
+      console.error('Logout failed:', error);
+      throw error;
+    }
   }
 };
 
