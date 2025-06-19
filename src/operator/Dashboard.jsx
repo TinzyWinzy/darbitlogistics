@@ -33,7 +33,7 @@ export default function OperatorDashboard() {
   const [creating, setCreating] = useState(false);
   const [createFeedback, setCreateFeedback] = useState('');
   const navigate = useNavigate();
-  const { setIsAuthenticated } = useContext(AuthContext);
+  const { setIsAuthenticated, isAuthenticated } = useContext(AuthContext);
   const customerNameRef = useRef();
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
@@ -43,17 +43,44 @@ export default function OperatorDashboard() {
   useEffect(() => {
     const fetchDeliveries = async () => {
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
+        setLoading(true);
+        setError(null);
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
         setDeliveries(res.data);
       } catch (error) {
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-          navigate('/login');
+        console.error('Fetch error:', error);
+        if (error.response) {
+          // Server responded with error
+          if (error.response.status === 401 || error.response.status === 403) {
+            setIsAuthenticated(false);
+            navigate('/login');
+          } else {
+            setError(`Server error: ${error.response.data?.error || 'Unknown error'}`);
+          }
+        } else if (error.request) {
+          // Request made but no response
+          setError('No response from server. Please check your connection.');
+        } else {
+          // Request setup error
+          setError(`Error: ${error.message}`);
         }
+        setDeliveries([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    fetchDeliveries();
-  }, [navigate]);
+
+    if (isAuthenticated) {
+      fetchDeliveries();
+    } else {
+      navigate('/login');
+    }
+  }, [navigate, isAuthenticated, setIsAuthenticated]);
 
   const filteredDeliveries = deliveries
     .filter(d => d.trackingId) // Only include deliveries with a valid trackingId

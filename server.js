@@ -16,27 +16,34 @@ app.use(cookieParser());
 
 const allowedOrigins = [
   'https://morres-logistics.vercel.app',
-  'http://localhost:5173'
+  'http://localhost:5173',
+  'http://localhost:3000'
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (like mobile apps, curl, postman)
+    if (!origin) {
       return callback(null, true);
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
     } else {
-      return callback(new Error('Not allowed by CORS'));
+      console.log('Blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['set-cookie'],
 };
 
 app.use(cors(corsOptions));
 
-// Explicitly handle preflight requests for all routes
-app.options('/*any', cors(corsOptions));
+// Pre-flight requests
+app.options('*', cors(corsOptions));
 
 // Helper: Send SMS via Africa's Talking
 async function sendSMS(to, message) {
@@ -62,10 +69,14 @@ async function sendSMS(to, message) {
   }
 }
 
-// Session middleware
+// Session middleware with updated error handling
 async function authenticateSession(req, res, next) {
   const sessionId = req.cookies.session_id;
-  if (!sessionId) return res.status(401).json({ error: 'Missing session cookie' });
+  
+  if (!sessionId) {
+    console.log('No session cookie found');
+    return res.status(401).json({ error: 'Missing session cookie' });
+  }
   
   try {
     const result = await pool.query(
@@ -74,6 +85,7 @@ async function authenticateSession(req, res, next) {
     );
     
     if (result.rows.length === 0) {
+      console.log('Invalid or expired session');
       await pool.query('DELETE FROM sessions WHERE session_id = $1', [sessionId]);
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
@@ -82,13 +94,21 @@ async function authenticateSession(req, res, next) {
     next();
   } catch (err) {
     console.error('Session auth error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    // Send more detailed error in development
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? err.message 
+      : 'Internal server error';
+    res.status(500).json({ error: errorMessage });
   }
 }
 
-// Operator login endpoint (sets session cookie)
+// Updated login endpoint with proper cookie settings
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
   
   try {
     const result = await pool.query(
@@ -108,11 +128,14 @@ app.post('/login', async (req, res) => {
       [sessionId, username, expiresAt]
     );
     
+    // Updated cookie settings for cross-origin
     res.cookie('session_id', sessionId, {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
-      maxAge: 1000 * 60 * 60 * 12
+      maxAge: 1000 * 60 * 60 * 12, // 12 hours
+      path: '/',
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
     });
     
     res.json({ success: true, username });
