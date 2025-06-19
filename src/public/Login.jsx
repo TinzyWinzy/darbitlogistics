@@ -1,112 +1,95 @@
 import { useState, useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
-import axios from 'axios';
+import { authApi } from '../services/api';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { setIsAuthenticated } = useContext(AuthContext);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    if (!username || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+    
     setLoading(true);
+    setError('');
     
     try {
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/login`,
-        { username: email, password },
-        {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      
-      if (res.data.success) {
+      const data = await authApi.login(username, password);
+      if (data.success) {
         setIsAuthenticated(true);
         navigate('/dashboard');
-      } else {
-        setError(res.data.error || 'Invalid credentials');
       }
-    } catch (err) {
-      console.error('Login error:', err);
-      if (err.response) {
-        // Server responded with error
-        setError(err.response.data?.error || 'Login failed');
-      } else if (err.request) {
-        // Request made but no response
-        setError('No response from server. Please try again.');
-      } else {
-        // Request setup error
-        setError('Error setting up request. Please try again.');
-      }
+    } catch (error) {
+      setError(error.response?.data?.error || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="container d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '60vh' }}>
-      <div className="card shadow-sm border-0 p-4 w-100" style={{ maxWidth: 400, background: 'rgba(255,255,255,0.97)' }}>
-        <div className="text-center mb-3">
-          <span className="material-icons fs-1 mb-2" style={{ color: '#D2691E' }}>login</span>
-          <h1 className="h3 fw-bold mb-3" style={{ color: '#a14e13' }}>Operator Login</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Sign in to your account
+          </h2>
         </div>
-        <form className="w-100" onSubmit={handleLogin}>
-          <div className="mb-3">
-            <label htmlFor="email" className="form-label fw-semibold">Username</label>
-            <input 
-              id="email" 
-              type="text" 
-              className="form-control" 
-              placeholder="operator" 
-              required 
-              value={email} 
-              onChange={e => setEmail(e.target.value)}
-              disabled={loading}
-            />
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm -space-y-px">
+            <div>
+              <label htmlFor="username" className="sr-only">
+                Username
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="mb-3">
-            <label htmlFor="password" className="form-label fw-semibold">Password</label>
-            <input 
-              id="password" 
-              type="password" 
-              className="form-control" 
-              placeholder="••••••••" 
-              required 
-              value={password} 
-              onChange={e => setPassword(e.target.value)}
+
+          {error && (
+            <div className="text-red-500 text-sm text-center">{error}</div>
+          )}
+
+          <div>
+            <button
+              type="submit"
               disabled={loading}
-            />
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
           </div>
-          <button 
-            type="submit" 
-            className="btn w-100 text-white fw-bold" 
-            style={{ background: '#D2691E' }}
-            disabled={loading}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
         </form>
-        {error && (
-          <div className="alert alert-danger mt-3">
-            <small className="d-block"><strong>Error:</strong> {error}</small>
-            {error.includes('CORS') && (
-              <small className="d-block mt-1">
-                If this persists, please clear your browser cookies and try again.
-              </small>
-            )}
-          </div>
-        )}
-        <div className="text-center mt-4">
-          <Link to="/" className="text-decoration-underline" style={{ color: '#D2691E' }}>&larr; Back to Home</Link>
-        </div>
       </div>
     </div>
   );

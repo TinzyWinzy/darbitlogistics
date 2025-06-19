@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { deliveryApi } from '../services/api';
 
 // Spinner component
 function Spinner() {
@@ -14,108 +15,138 @@ function Spinner() {
 export default function TrackDelivery() {
   const [trackingId, setTrackingId] = useState('');
   const [delivery, setDelivery] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  async function handleSearch(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!trackingId.trim()) {
+      setError('Please enter a tracking ID');
+      return;
+    }
+
     setLoading(true);
     setError('');
     setDelivery(null);
+
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/deliveries/${trackingId}`);
-      if (!res.ok) {
-        setError('Delivery not found.');
-      } else {
-        const data = await res.json();
-        setDelivery(data);
-      }
-    } catch (err) {
-      setError('Network error: ' + err.message);
+      const data = await deliveryApi.getById(trackingId);
+      setDelivery(data);
+    } catch (error) {
+      setError(error.response?.data?.error || 'Failed to find delivery');
+      setDelivery(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   return (
-    <div className="container py-5">
-      <h1 className="display-6 fw-bold mb-4 text-center" style={{ color: '#D2691E' }}>Track Your Delivery</h1>
-      <div className="row justify-content-center mb-4">
-        <div className="col-12 col-md-8 col-lg-6">
-          <div className="card shadow-sm border-0 p-4">
-            <h2 className="h5 fw-bold mb-3 text-center" style={{ color: '#a14e13' }}>
-              <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>search</span>
-              Enter Tracking ID
-            </h2>
-            <form onSubmit={handleSearch} className="mb-3">
-              <div className="input-group">
-                <span className="input-group-text bg-white" style={{ color: '#D2691E' }}>
-                  <span className="material-icons">search</span>
-                </span>
-                <input
-                  type="text"
-                  value={trackingId}
-                  onChange={e => setTrackingId(e.target.value)}
-                  placeholder="Tracking ID"
-                  className="form-control"
-                  required
-                  disabled={loading}
-                />
-                <button type="submit" className="btn text-white fw-bold" style={{ background: '#D2691E' }} disabled={loading}>Search</button>
-              </div>
-            </form>
-            {loading && <Spinner />}
-            {error && <div className="alert alert-danger">Error: {error}</div>}
-          </div>
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Track Your Delivery</h1>
+          <p className="mt-2 text-gray-600">Enter your tracking ID to see delivery status and updates</p>
         </div>
-      </div>
-      {delivery && (
-        <div className="row justify-content-center mb-4">
-          <div className="col-12 col-md-8 col-lg-6">
-            <div className="card shadow-sm border-0 mb-4">
-              <div className="card-body">
-                <h2 className="h5 fw-bold mb-2" style={{ color: '#a14e13' }}>
-                  <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>local_shipping</span>
-                  Current Status
-                </h2>
-                <div className="d-flex align-items-center mb-2">
-                  <span className="material-icons me-2" style={{ color: '#D2691E' }}>flag</span>
-                  <span className="fw-bold me-2" style={{ color: '#D2691E' }}>{delivery.currentStatus}</span>
-                  <span className="badge rounded-pill" style={{ background: '#D2691E', color: '#fff' }}>{delivery.currentStatus}</span>
+
+        <form onSubmit={handleSubmit} className="mb-8">
+          <div className="flex gap-4">
+            <input
+              type="text"
+              value={trackingId}
+              onChange={(e) => setTrackingId(e.target.value.toUpperCase())}
+              placeholder="Enter tracking ID (e.g., ABC1234)"
+              className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              maxLength="7"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {loading ? 'Tracking...' : 'Track'}
+            </button>
+          </div>
+        </form>
+
+        {error && (
+          <div className="rounded-md bg-red-50 p-4 mb-8">
+            <div className="text-sm text-red-700">{error}</div>
+          </div>
+        )}
+
+        {delivery && (
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="border-b pb-4 mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Delivery Details</h2>
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Tracking ID</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{delivery.trackingId}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Customer</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{delivery.customerName}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Current Status</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{delivery.currentStatus}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Created</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{formatDate(delivery.createdAt)}</dd>
+                  </div>
                 </div>
-                <div className="text-muted small mb-1">Last updated: {delivery.checkpoints?.length ? new Date(delivery.checkpoints[delivery.checkpoints.length-1].timestamp).toLocaleString() : 'N/A'}</div>
               </div>
-            </div>
-            <div className="card shadow-sm border-0">
-              <div className="card-body">
-                <h2 className="h6 fw-bold mb-3" style={{ color: '#a14e13' }}>
-                  <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>timeline</span>
-                  Checkpoint Timeline
-                </h2>
-                {delivery.checkpoints && delivery.checkpoints.length > 0 ? (
-                  <ul className="list-group">
-                    {delivery.checkpoints.map((cp, idx) => (
-                      <li key={idx} className="list-group-item d-flex align-items-start gap-2">
-                        <span className="material-icons align-middle mt-1" style={{ color: '#D2691E' }}>place</span>
-                        <div>
-                          <div className="fw-semibold" style={{ color: '#D2691E' }}>{cp.location}</div>
-                          <div className="text-muted small">{new Date(cp.timestamp).toLocaleString()}</div>
-                          <div className="text-muted small">Operator: {cp.operator}</div>
-                          {cp.comment && <div className="text-muted small">Comment: {cp.comment}</div>}
+
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Checkpoints</h3>
+                <div className="mt-4 flow-root">
+                  <ul className="-mb-8">
+                    {delivery.checkpoints.map((checkpoint, idx) => (
+                      <li key={checkpoint.timestamp}>
+                        <div className="relative pb-8">
+                          {idx !== delivery.checkpoints.length - 1 && (
+                            <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true" />
+                          )}
+                          <div className="relative flex space-x-3">
+                            <div>
+                              <span className="h-8 w-8 rounded-full bg-indigo-500 flex items-center justify-center ring-8 ring-white">
+                                <span className="text-white text-sm">{idx + 1}</span>
+                              </span>
+                            </div>
+                            <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                              <div>
+                                <p className="text-sm text-gray-900">
+                                  {checkpoint.location} - {checkpoint.comment}
+                                </p>
+                                <p className="text-sm text-gray-500">By {checkpoint.operator}</p>
+                              </div>
+                              <div className="whitespace-nowrap text-right text-sm text-gray-500">
+                                {formatDate(checkpoint.timestamp)}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <div className="alert alert-warning mt-2">No checkpoints yet.</div>
-                )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-      {!loading && !error && !delivery && (
-        <div className="text-center text-muted mt-5">Enter a tracking ID to view delivery status.</div>
-      )}
+        )}
+      </div>
     </div>
   );
 } 

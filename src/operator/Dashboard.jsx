@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
-import axios from 'axios';
+import { deliveryApi } from '../services/api';
 
 // Spinner component
 function Spinner() {
@@ -57,30 +57,11 @@ export default function OperatorDashboard() {
       try {
         setLoading(true);
         setError(null);
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        setDeliveries(Array.isArray(res.data) ? res.data.map(toCamel) : []);
+        const data = await deliveryApi.getAll();
+        setDeliveries(data);
       } catch (error) {
         console.error('Fetch error:', error);
-        if (error.response) {
-          // Server responded with error
-          if (error.response.status === 401 || error.response.status === 403) {
-            setIsAuthenticated(false);
-            navigate('/login');
-          } else {
-            setError(`Server error: ${error.response.data?.error || 'Unknown error'}`);
-          }
-        } else if (error.request) {
-          // Request made but no response
-          setError('No response from server. Please check your connection.');
-        } else {
-          // Request setup error
-          setError(`Error: ${error.message}`);
-        }
+        setError(error.response?.data?.error || 'Failed to fetch deliveries');
         setDeliveries([]);
       } finally {
         setLoading(false);
@@ -140,45 +121,27 @@ export default function OperatorDashboard() {
       driverDetails: { name: createForm.driverName, vehicleReg: createForm.vehicleReg },
     };
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/deliveries`, deliveryData, { withCredentials: true });
-      if (res.data.success && res.data.trackingId) {
+      const res = await deliveryApi.create(deliveryData);
+      if (res.success && res.trackingId) {
         setShowToast(true);
-        setToastMsg('Delivery created! Tracking ID: ' + res.data.trackingId);
+        setToastMsg('Delivery created! Tracking ID: ' + res.trackingId);
         setShowSmsPreview(true);
-        setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${res.data.trackingId}. Status: ${createForm.currentStatus}`);
+        setSmsPreview(`Welcome! Your delivery is created. Tracking ID: ${res.trackingId}. Status: ${createForm.currentStatus}`);
         setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
-        // Refresh deliveries with mapping
-        const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
-        setDeliveries(Array.isArray(res2.data) ? res2.data.map(toCamel) : []);
+        // Refresh deliveries
+        const data = await deliveryApi.getAll();
+        setDeliveries(data);
         setTimeout(() => {
           setShowToast(false);
         }, 3500);
         setTimeout(() => {
           customerNameRef.current && customerNameRef.current.focus();
         }, 100);
-      } else if (res.data.success) {
-        setShowToast(true);
-        setToastMsg('Delivery created!');
-        setShowSmsPreview(false);
-        setCreateForm({ customerName: '', phoneNumber: '', currentStatus: '', driverName: '', vehicleReg: '' });
-        // Refresh deliveries with mapping
-        const res2 = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
-        setDeliveries(Array.isArray(res2.data) ? res2.data.map(toCamel) : []);
-        setTimeout(() => {
-          setShowToast(false);
-        }, 3500);
-        setTimeout(() => {
-          customerNameRef.current && customerNameRef.current.focus();
-        }, 100);
-      } else if (res.data.warning) {
-        setCreateFeedback('Warning: ' + res.data.warning);
+      } else if (res.warning) {
+        setCreateFeedback('Warning: ' + res.warning);
       }
     } catch (error) {
-      if (error.response && error.response.data && error.response.data.error) {
-        setCreateFeedback('Error: ' + error.response.data.error);
-      } else {
-        setCreateFeedback('Network error: ' + (error.message || 'Unknown error'));
-      }
+      setCreateFeedback(error.response?.data?.error || 'Failed to create delivery');
     }
     setCreating(false);
   };
@@ -189,46 +152,35 @@ export default function OperatorDashboard() {
       return;
     }
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/updateCheckpoint`, { trackingId, checkpoint, currentStatus }, { withCredentials: true });
-      // Refresh deliveries with mapping
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, { withCredentials: true });
-      setDeliveries(Array.isArray(res.data) ? res.data.map(toCamel) : []);
+      await deliveryApi.updateCheckpoint(trackingId, checkpoint, currentStatus);
+      // Refresh deliveries
+      const data = await deliveryApi.getAll();
+      setDeliveries(data);
     } catch (error) {
-      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-        navigate('/login');
-      }
+      setFeedback(error.response?.data?.error || 'Failed to update checkpoint');
     }
   };
 
   const handleLogout = async () => {
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/logout`, {}, { withCredentials: true });
+      await deliveryApi.logout();
     } catch {}
     navigate('/login');
   };
 
-  async function handleSendInitialSMS(trackingId, phone, status) {
+  const handleSendInitialSMS = async (trackingId, phone, status) => {
     setShowSmsPreview(false);
     setShowToast(true);
     setToastMsg('Sending SMS...');
     const message = `Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${status}`;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/send-initial-sms`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: phone, message }),
-      });
-      if (!res.ok) {
-        setToastMsg('Failed to send SMS');
-      } else {
-        setToastMsg('Initial SMS sent!');
-      }
-      setTimeout(() => setShowToast(false), 2500);
+      await deliveryApi.sendInitialSms(phone, message);
+      setToastMsg('Initial SMS sent!');
     } catch {
-      setToastMsg('Network error sending SMS');
-      setTimeout(() => setShowToast(false), 2500);
+      setToastMsg('Failed to send SMS');
     }
-  }
+    setTimeout(() => setShowToast(false), 2500);
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
