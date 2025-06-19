@@ -200,12 +200,12 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
         return res.status(207).json({
           success: true,
           warning: 'Delivery created, but SMS failed',
-          tracking_id,
+          trackingId: tracking_id,
           smsError: smsRes.error
         });
       }
 
-      res.json({ success: true, tracking_id });
+      res.json({ success: true, trackingId: tracking_id });
     } catch (err) {
       if (err.code === '23505') { // Unique violation
         return tryInsert(attempt + 1);
