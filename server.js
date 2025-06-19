@@ -164,13 +164,13 @@ function generateTrackingId() {
 
 // Improved delivery creation route
 app.post('/deliveries', authenticateSession, async (req, res) => {
-  let { customerName, phoneNumber, currentStatus, checkpoints = [], driverDetails = {} } = req.body;
+  let { customer_name, phone_number, current_status, checkpoints = [], driver_details = {} } = req.body;
 
   // 1. Validate input
-  if (!customerName || !phoneNumber || !currentStatus) {
+  if (!customer_name || !phone_number || !current_status) {
     return res.status(400).json({ error: 'Missing required fields.' });
   }
-  if (!validateZimPhone(phoneNumber)) {
+  if (!validateZimPhone(phone_number)) {
     return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
   }
 
@@ -180,32 +180,32 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
       return res.status(500).json({ error: 'Failed to generate unique tracking ID' });
     }
 
-    const trackingId = generateTrackingId();
+    const tracking_id = generateTrackingId();
     
     try {
       await pool.query(
         `INSERT INTO deliveries (tracking_id, customer_name, phone_number, current_status, checkpoints, driver_details)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [trackingId, customerName, phoneNumber, currentStatus, JSON.stringify(checkpoints), JSON.stringify(driverDetails)]
+        [tracking_id, customer_name, phone_number, current_status, JSON.stringify(checkpoints), JSON.stringify(driver_details)]
       );
 
       // 3. Send SMS to customer
-      const smsMessage = `Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${currentStatus}`;
-      const smsRes = await sendSMS(phoneNumber, smsMessage);
+      const smsMessage = `Welcome! Your delivery is created. Tracking ID: ${tracking_id}. Status: ${current_status}`;
+      const smsRes = await sendSMS(phone_number, smsMessage);
 
       // 4. Audit log
-      console.log(`[AUDIT] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${trackingId}`);
+      console.log(`[AUDIT] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${tracking_id}`);
 
       if (!smsRes.success) {
         return res.status(207).json({
           success: true,
           warning: 'Delivery created, but SMS failed',
-          trackingId,
+          tracking_id,
           smsError: smsRes.error
         });
       }
 
-      res.json({ success: true, trackingId });
+      res.json({ success: true, tracking_id });
     } catch (err) {
       if (err.code === '23505') { // Unique violation
         return tryInsert(attempt + 1);

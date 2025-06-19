@@ -42,7 +42,8 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Add trigger for deliveries
+-- Add trigger for deliveries with IF NOT EXISTS
+DROP TRIGGER IF EXISTS update_deliveries_updated_at ON deliveries;
 CREATE TRIGGER update_deliveries_updated_at
     BEFORE UPDATE ON deliveries
     FOR EACH ROW
