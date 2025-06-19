@@ -1267,10 +1267,10 @@ export default function OperatorDashboard() {
                             </span>
                             <span className="text-muted small ms-2">({delivery.trackingId})</span>
                           </div>
-                          <div className="text-muted small">Booking Ref: {delivery.bookingReference}</div>
-                          <div className="text-muted small">
-                            {delivery.containerCount} container(s) | {delivery.tonnage} tons | {delivery.commodity}
-                          </div>
+                            <div className="text-muted small">Booking Ref: {delivery.bookingCode}</div>
+                            <div className="text-muted small">
+                              {delivery.containerCount} container(s) | {delivery.tonnage} tons | {delivery.mineral_type} ({delivery.mineral_grade})
+                            </div>
                           <div className="text-muted small">
                             From: {delivery.loadingPoint} → To: {delivery.destination}
                           </div>
