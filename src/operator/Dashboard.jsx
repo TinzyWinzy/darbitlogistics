@@ -463,6 +463,18 @@ export default function OperatorDashboard() {
         return;
       }
 
+      if (!parentForm.loadingPoint?.trim()) {
+        setCreateFeedback('Loading Point is required.');
+        setCreating(false);
+        return;
+      }
+
+      if (!parentForm.destination?.trim()) {
+        setCreateFeedback('Destination is required.');
+        setCreating(false);
+        return;
+      }
+
       if (!parentForm.deadline) {
         setCreateFeedback('Deadline is required.');
         setCreating(false);
@@ -476,22 +488,31 @@ export default function OperatorDashboard() {
         return;
       }
 
+      // Validate mineral type
+      if (!parentForm.mineral_type?.trim()) {
+        setCreateFeedback('Mineral Type is required.');
+        setCreating(false);
+        return;
+      }
+
       const parentBookingData = {
         customerName: parentForm.customerName.trim(),
         phoneNumber: formattedPhone,
         totalTonnage: parseFloat(parentForm.totalTonnage),
         mineral_type: parentForm.mineral_type.trim(),
-        mineral_grade: parentForm.mineral_grade.trim(),
-        moisture_content: parentForm.moisture_content,
-        particle_size: parentForm.particle_size,
+        mineral_grade: parentForm.mineral_grade?.trim() || 'Ungraded',
+        moisture_content: parentForm.moisture_content ? parseFloat(parentForm.moisture_content) : null,
+        particle_size: parentForm.particle_size?.trim() || null,
         loadingPoint: parentForm.loadingPoint.trim(),
         destination: parentForm.destination.trim(),
-        deadline: parentForm.deadline.toISOString(),
-        requires_analysis: parentForm.requires_analysis || false,
-        special_handling_notes: parentForm.special_handling_notes?.trim(),
-        environmental_concerns: parentForm.environmental_concerns?.trim(),
-        notes: parentForm.notes?.trim()
+        deadline: deadline.toISOString(),
+        requires_analysis: Boolean(parentForm.requires_analysis),
+        special_handling_notes: parentForm.special_handling_notes?.trim() || null,
+        environmental_concerns: parentForm.environmental_concerns?.trim() || null,
+        notes: parentForm.notes?.trim() || null
       };
+
+      console.log('Sending parent booking data:', parentBookingData);
 
       const res = await deliveryApi.createParentBooking(parentBookingData);
       
@@ -724,17 +745,20 @@ export default function OperatorDashboard() {
                 disabled={creating}
               />
             </div>
+            
             <div className="col-md-3">
               <label className="form-label">Phone Number *</label>
               <input 
                 type="text" 
                 className="form-control" 
                 required 
+                placeholder="e.g. 0771234567"
                 value={parentForm.phoneNumber}
                 onChange={e => setParentForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
                 disabled={creating}
               />
             </div>
+            
             <div className="col-md-3">
               <label className="form-label">Total Tonnage *</label>
               <input 
@@ -748,15 +772,17 @@ export default function OperatorDashboard() {
                 disabled={creating}
               />
             </div>
+
             <div className="col-md-3">
               <label className="form-label">Mineral Type *</label>
-              <select
-                className="form-control"
+              <select 
+                className="form-select"
                 required
                 value={parentForm.mineral_type}
                 onChange={e => setParentForm(prev => ({ ...prev, mineral_type: e.target.value }))}
                 disabled={creating}
               >
+                <option value="">Select type...</option>
                 <option value="Coal">Coal</option>
                 <option value="Iron Ore">Iron Ore</option>
                 <option value="Copper Ore">Copper Ore</option>
@@ -768,70 +794,125 @@ export default function OperatorDashboard() {
                 <option value="Other">Other</option>
               </select>
             </div>
+
             <div className="col-md-3">
-              <label className="form-label">Mineral Grade *</label>
-              <select
-                className="form-control"
-                required
+              <label className="form-label">Mineral Grade</label>
+              <select 
+                className="form-select"
                 value={parentForm.mineral_grade}
                 onChange={e => setParentForm(prev => ({ ...prev, mineral_grade: e.target.value }))}
                 disabled={creating}
               >
+                <option value="Ungraded">Ungraded</option>
                 <option value="Premium">Premium</option>
                 <option value="Standard">Standard</option>
                 <option value="Low Grade">Low Grade</option>
                 <option value="Mixed">Mixed</option>
-                <option value="Ungraded">Ungraded</option>
               </select>
             </div>
+
             <div className="col-md-3">
               <label className="form-label">Loading Point *</label>
               <input 
                 type="text" 
                 className="form-control" 
-                required 
+                required
                 value={parentForm.loadingPoint}
                 onChange={e => setParentForm(prev => ({ ...prev, loadingPoint: e.target.value }))}
                 disabled={creating}
               />
             </div>
+
             <div className="col-md-3">
               <label className="form-label">Destination *</label>
               <input 
                 type="text" 
                 className="form-control" 
-                required 
+                required
                 value={parentForm.destination}
                 onChange={e => setParentForm(prev => ({ ...prev, destination: e.target.value }))}
                 disabled={creating}
               />
             </div>
+
             <div className="col-md-3">
               <label className="form-label">Deadline *</label>
-              <DatePicker
-                selected={parentForm.deadline}
-                onChange={(date) => setParentForm(prev => ({ ...prev, deadline: date }))}
-                showTimeSelect
-                timeFormat="HH:mm"
-                timeIntervals={15}
-                timeCaption="Time"
-                dateFormat="MMMM d, yyyy h:mm aa"
-                minDate={new Date()}
-                className="form-control"
-                placeholderText="Select deadline date and time"
+              <input 
+                type="datetime-local" 
+                className="form-control" 
                 required
+                min={new Date().toISOString().slice(0, 16)}
+                value={parentForm.deadline || ''}
+                onChange={e => setParentForm(prev => ({ ...prev, deadline: e.target.value }))}
                 disabled={creating}
-                customInput={
-                  <input
-                    style={{
-                      background: 'white',
-                      cursor: 'pointer'
-                    }}
-                  />
-                }
               />
             </div>
-            <div className="col-12">
+
+            <div className="col-md-3">
+              <label className="form-label">Moisture Content (%)</label>
+              <input 
+                type="number" 
+                className="form-control" 
+                min="0"
+                max="100"
+                step="0.01"
+                value={parentForm.moisture_content}
+                onChange={e => setParentForm(prev => ({ ...prev, moisture_content: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+
+            <div className="col-md-3">
+              <label className="form-label">Particle Size</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="e.g. 0-50mm"
+                value={parentForm.particle_size}
+                onChange={e => setParentForm(prev => ({ ...prev, particle_size: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+
+            <div className="col-md-12">
+              <div className="form-check">
+                <input 
+                  type="checkbox" 
+                  className="form-check-input" 
+                  id="requires_analysis"
+                  checked={parentForm.requires_analysis}
+                  onChange={e => setParentForm(prev => ({ ...prev, requires_analysis: e.target.checked }))}
+                  disabled={creating}
+                />
+                <label className="form-check-label" htmlFor="requires_analysis">
+                  Requires Analysis
+                </label>
+              </div>
+            </div>
+
+            <div className="col-md-12">
+              <label className="form-label">Special Handling Notes</label>
+              <textarea 
+                className="form-control" 
+                rows="2"
+                value={parentForm.special_handling_notes}
+                onChange={e => setParentForm(prev => ({ ...prev, special_handling_notes: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+
+            <div className="col-md-12">
+              <label className="form-label">Environmental Concerns</label>
+              <textarea 
+                className="form-control" 
+                rows="2"
+                value={parentForm.environmental_concerns}
+                onChange={e => setParentForm(prev => ({ ...prev, environmental_concerns: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+
+            <div className="col-md-12">
               <label className="form-label">Notes</label>
               <textarea 
                 className="form-control" 
@@ -841,6 +922,7 @@ export default function OperatorDashboard() {
                 disabled={creating}
               />
             </div>
+
             <div className="col-12">
               <button 
                 type="submit" 
