@@ -82,36 +82,24 @@ export default function OperatorDashboard() {
   const [selectedParentBooking, setSelectedParentBooking] = useState(null);
   const [showParentDetails, setShowParentDetails] = useState(false);
 
-  // Add toCamel utility function at the top level
-  const toCamel = d => ({
-    trackingId: d.tracking_id,
+  const parentBookingToCamel = d => ({
+    id: d.parent_booking_id,
     customerName: d.customer_name,
     phoneNumber: d.phone_number,
-    currentStatus: d.current_status,
-    checkpoints: d.checkpoints,
-    driverDetails: d.driver_details,
-    createdAt: d.created_at,
-    updatedAt: d.updated_at,
-    bookingReference: d.booking_reference,
+    totalTonnage: d.total_tonnage,
+    mineral_type: d.mineral_type,
+    mineral_grade: d.mineral_grade,
     loadingPoint: d.loading_point,
     destination: d.destination,
-    vehicleType: d.vehicle_type,
-    vehicleCapacity: d.vehicle_capacity,
-    tonnage: d.tonnage,
-    containerCount: d.container_count,
-    parentBookingId: d.parent_booking_id,
-    isCompleted: d.is_completed,
-    completionDate: d.completion_date,
-    hasWeighbridgeCert: d.has_weighbridge_cert,
-    weighbridgeRef: d.weighbridge_ref,
-    tareWeight: d.tare_weight,
-    netWeight: d.net_weight,
-    samplingRequired: d.sampling_required,
-    samplingStatus: d.sampling_status,
-    environmentalIncident: d.environmental_incident,
-    incidentDetails: d.incident_details,
-    mineral_type: d.mineral_type,
-    mineral_grade: d.mineral_grade
+    deadline: d.deadline,
+    bookingCode: d.booking_code,
+    status: d.status,
+    remainingTonnage: d.remaining_tonnage,
+    completionPercentage: d.completion_percentage,
+    completedTonnage: d.completed_tonnage,
+    totalDeliveries: d.total_deliveries,
+    completedDeliveries: d.completed_deliveries,
+    notes: d.notes,
   });
 
   // Add fetchDeliveries function
@@ -131,8 +119,9 @@ export default function OperatorDashboard() {
   const fetchParentBookings = async () => {
     try {
       const data = await deliveryApi.getAllParentBookings();
-      setParentBookings(data);
-      updateCustomersList(data);
+      const camelCaseData = data.map(parentBookingToCamel);
+      setParentBookings(camelCaseData);
+      updateCustomersList(camelCaseData);
     } catch (error) {
       console.error('Failed to fetch parent bookings:', error);
       setError(error.response?.data?.error || 'Failed to fetch parent bookings');
@@ -170,7 +159,7 @@ export default function OperatorDashboard() {
       return (
         d.customerName.toLowerCase().includes(q) ||
         d.trackingId.toLowerCase().includes(q) ||
-        d.bookingReference.toLowerCase().includes(q) ||
+        (d.bookingReference || '').toLowerCase().includes(q) ||
         d.mineral_type.toLowerCase().includes(q) ||
         d.mineral_grade.toLowerCase().includes(q) ||
         d.destination.toLowerCase().includes(q) ||
@@ -554,11 +543,11 @@ export default function OperatorDashboard() {
     .filter(booking => {
       switch (progressFilter) {
         case 'completed':
-          return booking.completion_percentage === 100;
+          return booking.completionPercentage === 100;
         case 'in-progress':
-          return booking.completion_percentage > 0 && booking.completion_percentage < 100;
+          return booking.completionPercentage > 0 && booking.completionPercentage < 100;
         case 'not-started':
-          return booking.completion_percentage === 0;
+          return booking.completionPercentage === 0;
         case 'overdue':
           return new Date(booking.deadline) < new Date();
         default:
@@ -572,10 +561,10 @@ export default function OperatorDashboard() {
           comparison = new Date(a.deadline) - new Date(b.deadline);
           break;
         case 'progress':
-          comparison = a.completion_percentage - b.completion_percentage;
+          comparison = a.completionPercentage - b.completionPercentage;
           break;
         case 'tonnage':
-          comparison = a.total_tonnage - b.total_tonnage;
+          comparison = a.totalTonnage - b.totalTonnage;
           break;
         case 'customer':
           comparison = a.customerName.localeCompare(b.customerName);
@@ -1020,26 +1009,26 @@ export default function OperatorDashboard() {
                             className="progress-bar" 
                             role="progressbar"
                             style={{ 
-                              width: `${booking.completion_percentage}%`,
+                              width: `${booking.completionPercentage}%`,
                               backgroundColor: '#D2691E'
                             }}
-                            aria-valuenow={booking.completion_percentage}
+                            aria-valuenow={booking.completionPercentage}
                             aria-valuemin="0"
                             aria-valuemax="100"
                           >
-                            {booking.completion_percentage}%
+                            {booking.completionPercentage}%
                           </div>
                         </div>
 
                         <div className="row g-2 text-muted small">
                           <div className="col-md-4">
-                            <strong>Total Tonnage:</strong> {booking.total_tonnage} tons
+                            <strong>Total Tonnage:</strong> {booking.totalTonnage} tons
                           </div>
                           <div className="col-md-4">
-                            <strong>Completed:</strong> {booking.completed_tonnage} tons
+                            <strong>Completed:</strong> {booking.completedTonnage} tons
                           </div>
                           <div className="col-md-4">
-                            <strong>Deliveries:</strong> {booking.completed_deliveries}/{booking.total_deliveries}
+                            <strong>Deliveries:</strong> {booking.completedDeliveries}/{booking.totalDeliveries}
                           </div>
                         </div>
                       </div>
@@ -1267,7 +1256,7 @@ export default function OperatorDashboard() {
                             </span>
                             <span className="text-muted small ms-2">({delivery.trackingId})</span>
                           </div>
-                            <div className="text-muted small">Booking Ref: {delivery.bookingCode}</div>
+                            <div className="text-muted small">Booking Ref: {delivery.bookingReference}</div>
                             <div className="text-muted small">
                               {delivery.containerCount} container(s) | {delivery.tonnage} tons | {delivery.mineral_type} ({delivery.mineral_grade})
                             </div>

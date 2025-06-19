@@ -404,6 +404,7 @@ CREATE OR REPLACE VIEW booking_progress AS
 SELECT 
     pb.id as parent_booking_id,
     pb.customer_name,
+    pb.phone_number,
     pb.total_tonnage,
     pb.deadline,
     pb.mineral_type,
@@ -440,7 +441,7 @@ SELECT
     ) as pending_samples_count
 FROM parent_bookings pb
 LEFT JOIN deliveries d ON pb.id = d.parent_booking_id
-GROUP BY pb.id, pb.customer_name, pb.total_tonnage, pb.deadline, pb.mineral_type, 
+GROUP BY pb.id, pb.customer_name, pb.phone_number, pb.total_tonnage, pb.deadline, pb.mineral_type, 
          pb.mineral_grade, pb.loading_point, pb.destination, pb.booking_code, 
          pb.notes, pb.status, pb.remaining_tonnage, pb.created_at, pb.updated_at;
 
