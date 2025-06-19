@@ -224,6 +224,7 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
   if (!trackingId || !checkpoint || !currentStatus) {
     return res.status(400).json({ error: 'Missing required fields.' });
   }
+  
   try {
     const delivery = await pool.query(
       'SELECT * FROM deliveries WHERE tracking_id = $1',
@@ -235,7 +236,16 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     }
     
     const row = delivery.rows[0];
-    const checkpoints = JSON.parse(row.checkpoints);
+    // Defensive parsing of checkpoints
+    let checkpoints = [];
+    try {
+      checkpoints = row.checkpoints ? JSON.parse(row.checkpoints) : [];
+      if (!Array.isArray(checkpoints)) checkpoints = [];
+    } catch (parseError) {
+      console.error('Failed to parse checkpoints:', parseError);
+      checkpoints = [];
+    }
+    
     const newCheckpoint = { ...checkpoint, timestamp: new Date().toISOString() };
     checkpoints.push(newCheckpoint);
     
