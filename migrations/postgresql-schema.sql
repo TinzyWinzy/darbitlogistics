@@ -500,17 +500,27 @@ CREATE TABLE IF NOT EXISTS sampling_records (
 -- Function to validate checkpoint data
 CREATE OR REPLACE FUNCTION validate_checkpoint_data()
 RETURNS TRIGGER AS $$
+DECLARE
+    checkpoint jsonb;
 BEGIN
-    -- Validate checkpoint structure
-    IF NOT (
-        NEW.checkpoints @> '[{"location": "", "operator": "", "status": "", "timestamp": ""}]'::jsonb
-    ) THEN
-        RAISE EXCEPTION 'Invalid checkpoint structure';
+    -- Validate checkpoint structure only if checkpoints are being provided
+    IF jsonb_array_length(NEW.checkpoints) > 0 THEN
+        -- Iterate over each checkpoint and validate its structure
+        FOR checkpoint IN SELECT * FROM jsonb_array_elements(NEW.checkpoints)
+        LOOP
+            IF NOT (
+                checkpoint ? 'location' AND
+                checkpoint ? 'operator' AND
+                checkpoint ? 'status' AND
+                checkpoint ? 'timestamp'
+            ) THEN
+                RAISE EXCEPTION 'Invalid checkpoint structure: Each checkpoint must have location, operator, status, and timestamp.';
+            END IF;
+        END LOOP;
     END IF;
 
-    -- Validate status transitions
+    -- Update current_status from the latest checkpoint
     IF TG_OP = 'UPDATE' THEN
-        -- Get the latest status from checkpoints
         IF jsonb_array_length(NEW.checkpoints) > 0 THEN
             NEW.current_status = (NEW.checkpoints->-1->>'status')::delivery_status;
         END IF;

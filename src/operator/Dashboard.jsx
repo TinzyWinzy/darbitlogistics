@@ -297,39 +297,49 @@ export default function OperatorDashboard() {
     setCreating(false);
   };
 
-  const handleUpdateCheckpoint = async (trackingId, checkpoint, currentStatus) => {
-    if (!trackingId || !checkpoint || !currentStatus) {
+  const handleUpdateCheckpoint = async (trackingId, newCheckpoint, currentStatus) => {
+    if (!trackingId || !newCheckpoint || !currentStatus) {
       setFeedback('All fields are required.');
       return;
     }
 
-    // Validate status transition
-    const delivery = deliveries.find(d => d.trackingId === trackingId);
-    if (delivery && delivery.isCompleted && currentStatus !== 'Cancelled') {
-      setFeedback('Cannot update completed delivery unless cancelling.');
+    const delivery = deliveries.find(d => d.tracking_id === trackingId);
+    if (!delivery) {
+      setFeedback('Could not find the delivery to update.');
       return;
     }
 
+    if (delivery.is_completed && currentStatus !== 'Cancelled') {
+      setFeedback('Cannot update completed delivery unless cancelling.');
+      return;
+    }
+    
+    // Create the full new checkpoint object
+    const updatedCheckpoint = {
+      ...newCheckpoint,
+      timestamp: newCheckpoint.timestamp.toISOString(),
+      coordinates: newCheckpoint.coordinates || null,
+      hasIssue: newCheckpoint.hasIssue || false,
+      issueDetails: newCheckpoint.hasIssue ? newCheckpoint.issueDetails : ''
+    };
+
+    // Combine old and new checkpoints
+    const updatedCheckpoints = [...(delivery.checkpoints || []), updatedCheckpoint];
+
     try {
       setSubmitting(true);
-      await deliveryApi.updateCheckpoint(trackingId, {
-        ...checkpoint,
-        timestamp: checkpoint.timestamp.toISOString(),
-        coordinates: checkpoint.coordinates || null,
-        hasIssue: checkpoint.hasIssue || false,
-        issueDetails: checkpoint.hasIssue ? checkpoint.issueDetails : ''
-      }, currentStatus);
+      await deliveryApi.updateCheckpoint(trackingId, updatedCheckpoints, currentStatus);
 
       // Refresh deliveries
       const data = await deliveryApi.getAll();
       setDeliveries(data);
       setFeedback('Checkpoint updated successfully!');
       
-      // Send SMS notification if status changed
-      if (delivery && delivery.currentStatus !== currentStatus) {
-        const message = `Delivery ${trackingId} status updated to: ${currentStatus}. Location: ${checkpoint.location}`;
+      // Send SMS notification
+      if (delivery.current_status !== currentStatus) {
+        const message = `Delivery ${trackingId} status updated to: ${currentStatus}. Location: ${newCheckpoint.location}`;
         try {
-          await deliveryApi.sendInitialSms(delivery.phoneNumber, message);
+          await deliveryApi.sendInitialSms(delivery.phone_number, message);
         } catch (error) {
           console.error('Failed to send status update SMS:', error);
         }
@@ -368,7 +378,7 @@ export default function OperatorDashboard() {
     setSubmitting(true);
     setFeedback('');
     
-    const delivery = deliveries.find(d => d.trackingId === selectedId);
+    const delivery = deliveries.find(d => d.tracking_id === selectedId);
     if (!delivery) {
       setFeedback('No delivery selected.');
       setSubmitting(false);
@@ -680,7 +690,8 @@ export default function OperatorDashboard() {
 
   // Function to render checkpoint history
   const renderCheckpointHistory = (delivery) => {
-    if (!delivery.checkpoints || delivery.checkpoints.length === 0) {
+    const checkpoints = delivery.checkpoints || [];
+    if (checkpoints.length === 0) {
       return <p className="text-muted">No checkpoints recorded yet.</p>;
     }
 
@@ -688,7 +699,7 @@ export default function OperatorDashboard() {
       <div className="checkpoint-history">
         <h6 className="mb-3">Checkpoint History</h6>
         <div className="timeline">
-          {delivery.checkpoints.map((cp, index) => (
+          {checkpoints.map((cp, index) => (
             <div key={index} className="checkpoint-item mb-3">
               <div className="d-flex justify-content-between">
                 <strong>{cp.location}</strong>
@@ -1284,14 +1295,14 @@ export default function OperatorDashboard() {
                 Update Checkpoint
               </h2>
               {selectedId && (() => {
-                const sel = deliveries.find(d => d.trackingId === selectedId);
+                const sel = deliveries.find(d => d.tracking_id === selectedId);
                 if (!sel) return null;
                 return (
                   <div className="alert alert-info mb-3 p-2">
-                    <div><strong>Tracking ID:</strong> {sel.trackingId}</div>
-                    <div><strong>Customer:</strong> {sel.customerName}</div>
-                    <div><strong>Phone:</strong> {sel.phoneNumber}</div>
-                    <div><strong>Status:</strong> {sel.currentStatus}</div>
+                    <div><strong>Tracking ID:</strong> {sel.tracking_id}</div>
+                    <div><strong>Customer:</strong> {sel.customer_name}</div>
+                    <div><strong>Phone:</strong> {sel.phone_number}</div>
+                    <div><strong>Status:</strong> {sel.current_status}</div>
                   </div>
                 );
               })()}
@@ -1407,9 +1418,9 @@ export default function OperatorDashboard() {
                 )}
               </form>
 
-              {selectedId && deliveries.find(d => d.trackingId === selectedId) && (
+              {selectedId && deliveries.find(d => d.tracking_id === selectedId) && (
                 <div className="mt-4">
-                  {renderCheckpointHistory(deliveries.find(d => d.trackingId === selectedId))}
+                  {renderCheckpointHistory(deliveries.find(d => d.tracking_id === selectedId))}
                 </div>
               )}
             </div>

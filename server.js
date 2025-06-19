@@ -321,31 +321,27 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
 
 app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
   console.log('UpdateCheckpoint body:', req.body);
-  const { trackingId, checkpoint, currentStatus } = req.body;
+  const { trackingId, checkpoints, currentStatus } = req.body;
   
   // Validate required fields
-  if (!trackingId || !checkpoint || !currentStatus) {
+  if (!trackingId || !checkpoints || !currentStatus) {
     return res.status(400).json({ error: 'Missing required fields.' });
-  }
-
-  if (!checkpoint.location || !checkpoint.operator) {
-    return res.status(400).json({ error: 'Location and operator are required for checkpoint.' });
   }
 
   try {
     // Get delivery and validate status transition
-    const delivery = await pool.query(
+    const deliveryResult = await pool.query(
       'SELECT d.*, pb.status as parent_status FROM deliveries d ' +
       'LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id ' +
       'WHERE d.tracking_id = $1',
       [trackingId]
     );
     
-    if (delivery.rows.length === 0) {
+    if (deliveryResult.rows.length === 0) {
       return res.status(404).json({ error: 'Delivery not found' });
     }
     
-    const row = delivery.rows[0];
+    const row = deliveryResult.rows[0];
 
     // Check if parent booking is active
     if (row.parent_status !== 'Active') {
@@ -361,36 +357,11 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
       });
     }
 
-    // Parse existing checkpoints with error handling
-    let checkpoints = [];
-    try {
-      checkpoints = row.checkpoints ? JSON.parse(row.checkpoints) : [];
-      if (!Array.isArray(checkpoints)) checkpoints = [];
-    } catch (parseError) {
-      console.error('Failed to parse checkpoints:', parseError);
-      checkpoints = [];
-    }
-    
-    // Prepare new checkpoint with all fields
-    const newCheckpoint = {
-      location: checkpoint.location.trim(),
-      operator: checkpoint.operator.trim(),
-      status: currentStatus,
-      timestamp: checkpoint.timestamp || new Date().toISOString(),
-      coordinates: checkpoint.coordinates ? checkpoint.coordinates.trim() : null,
-      comment: checkpoint.comment ? checkpoint.comment.trim() : '',
-      hasIssue: checkpoint.hasIssue || false,
-      issueDetails: checkpoint.hasIssue ? checkpoint.issueDetails.trim() : ''
-    };
-
-    // Add the new checkpoint
-    checkpoints.push(newCheckpoint);
-
     // Determine if delivery is completed based on status
     const isCompleted = currentStatus === 'Delivered';
     const completionDate = isCompleted ? new Date().toISOString() : null;
 
-    // Update delivery with new checkpoint and status
+    // Update delivery with the full new checkpoints array and status
     await pool.query(
       `UPDATE deliveries 
        SET checkpoints = $1, 
@@ -403,7 +374,7 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     );
 
     // If delivery is completed, update parent booking
-    if (isCompleted) {
+    if (isCompleted && !row.is_completed) { // Only update tonnage once
       await pool.query(
         `UPDATE parent_bookings 
          SET completed_tonnage = completed_tonnage + $1,
@@ -426,8 +397,11 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
       }
     }
     
+    // Get the latest checkpoint for SMS notification
+    const latestCheckpoint = checkpoints[checkpoints.length - 1];
+
     // Prepare SMS message with enhanced information
-    let smsMessage = `Update: Your delivery (${trackingId}) is now at ${checkpoint.location}. Status: ${currentStatus}.`;
+    let smsMessage = `Update: Your delivery (${trackingId}) is now at ${latestCheckpoint.location}. Status: ${currentStatus}.`;
     
     // Add completion information if delivery is completed
     if (isCompleted) {
@@ -435,8 +409,8 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     }
     
     // Add issue information if there's an issue
-    if (checkpoint.hasIssue) {
-      smsMessage += ` Note: ${checkpoint.issueDetails}`;
+    if (latestCheckpoint.hasIssue) {
+      smsMessage += ` Note: ${latestCheckpoint.issueDetails}`;
     }
 
     // Send SMS notification
@@ -450,13 +424,13 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
         success: true,
         warning: 'Checkpoint updated, but SMS failed',
         smsError: smsRes.error,
-        checkpoint: newCheckpoint
+        checkpoints: checkpoints
       });
     }
     
     res.json({ 
       success: true,
-      checkpoint: newCheckpoint,
+      checkpoints: checkpoints,
       isCompleted,
       completionDate
     });
