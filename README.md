@@ -88,6 +88,12 @@ git push -u origin main
   - customerName: string
   - phoneNumber: string
   - currentStatus: string
+  - bookingReference: string
+  - loadingPoint: string
+  - commodity: string
+  - containerCount: number
+  - tonnage: number
+  - destination: string
   - checkpoints: array (location, timestamp, operator, comment)
   - driverDetails: { name, vehicleReg }
 

@@ -81,7 +81,56 @@ export const deliveryApi = {
   sendInitialSms: async (to, message) => {
     const res = await api.post('/send-initial-sms', { to, message });
     return res.data;
-  }
+  },
+
+  async getParentBooking(id) {
+    const response = await fetch(`${API_URL}/parent-bookings/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch parent booking');
+    return response.json();
+  },
+
+  async getDeliveriesByParentId(parentId) {
+    const response = await fetch(`${API_URL}/parent-bookings/${parentId}/deliveries`);
+    if (!response.ok) throw new Error('Failed to fetch deliveries');
+    return response.json();
+  },
+
+  async getMilestoneNotifications(parentId) {
+    const response = await fetch(`${API_URL}/parent-bookings/${parentId}/notifications`);
+    if (!response.ok) throw new Error('Failed to fetch notifications');
+    return response.json();
+  },
+
+  async createParentBooking(data) {
+    const response = await fetch(`${API_URL}/parent-bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to create parent booking');
+    return response.json();
+  },
+
+  async updateMilestoneNotifications(parentId, milestoneData) {
+    const response = await fetch(`${API_URL}/parent-bookings/${parentId}/notifications`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(milestoneData),
+    });
+    if (!response.ok) throw new Error('Failed to update milestone notifications');
+    return response.json();
+  },
+
+  async getAllParentBookings(filters = {}) {
+    const queryParams = new URLSearchParams(filters).toString();
+    const response = await fetch(`${API_URL}/parent-bookings?${queryParams}`);
+    if (!response.ok) throw new Error('Failed to fetch parent bookings');
+    return response.json();
+  },
 };
 
 export const authApi = {
