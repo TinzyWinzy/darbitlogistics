@@ -539,6 +539,9 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
   } = req.body;
 
   try {
+    // Generate booking code first
+    const bookingCode = generateBookingCode();
+
     // Validate required fields
     if (!customerName || !phoneNumber || !totalTonnage || !mineral_type || !loadingPoint || !destination || !deadline) {
       return res.status(400).json({ error: 'Missing required fields.' });
@@ -574,9 +577,6 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
     if (mineral_grade && !['Premium', 'Standard', 'Low Grade', 'Mixed', 'Ungraded'].includes(mineral_grade)) {
       return res.status(400).json({ error: 'Invalid mineral grade.' });
     }
-
-    // Generate booking code
-    const bookingCode = generateBookingCode();
 
     const result = await pool.query(
       `INSERT INTO parent_bookings (
