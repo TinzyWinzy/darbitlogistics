@@ -338,6 +338,10 @@ BEFORE INSERT OR UPDATE ON deliveries
 FOR EACH ROW
 EXECUTE FUNCTION validate_tonnage();
 
+-- Drop and recreate users table to ensure correct structure
+DROP TABLE IF EXISTS sessions CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -431,11 +435,6 @@ LEFT JOIN deliveries d ON pb.id = d.parent_booking_id
 GROUP BY pb.id, pb.customer_name, pb.total_tonnage, pb.deadline, pb.mineral_type, 
          pb.mineral_grade, pb.loading_point, pb.destination, pb.booking_code, 
          pb.notes, pb.status, pb.remaining_tonnage, pb.created_at, pb.updated_at;
-
--- Insert a default operator user if not exists
-INSERT INTO users (username, password, role)
-VALUES ('operator', 'changeme', 'operator')
-ON CONFLICT (username) DO NOTHING;
 
 -- Create checkpoint_logs table for better audit trail
 CREATE TABLE IF NOT EXISTS checkpoint_logs (
@@ -571,4 +570,9 @@ CREATE INDEX IF NOT EXISTS idx_checkpoint_logs_created ON checkpoint_logs(create
 CREATE INDEX IF NOT EXISTS idx_environmental_incidents_delivery ON environmental_incidents(delivery_tracking_id);
 CREATE INDEX IF NOT EXISTS idx_environmental_incidents_status ON environmental_incidents(status);
 CREATE INDEX IF NOT EXISTS idx_sampling_records_delivery ON sampling_records(delivery_tracking_id);
-CREATE INDEX IF NOT EXISTS idx_sampling_records_status ON sampling_records(analysis_status); 
+CREATE INDEX IF NOT EXISTS idx_sampling_records_status ON sampling_records(analysis_status);
+
+-- Finally, insert the default operator user at the very end
+INSERT INTO users (username, password, role)
+VALUES ('operator', 'changeme', 'operator')
+ON CONFLICT (username) DO NOTHING; 

@@ -560,6 +560,21 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
       return res.status(400).json({ error: 'Deadline must be in the future.' });
     }
 
+    // Validate moisture content if provided
+    if (moisture_content !== undefined && (moisture_content < 0 || moisture_content > 100)) {
+      return res.status(400).json({ error: 'Moisture content must be between 0 and 100%.' });
+    }
+
+    // Validate mineral type
+    if (!['Coal', 'Iron Ore', 'Copper Ore', 'Gold Ore', 'Bauxite', 'Limestone', 'Phosphate', 'Manganese', 'Other'].includes(mineral_type)) {
+      return res.status(400).json({ error: 'Invalid mineral type.' });
+    }
+
+    // Validate mineral grade if provided
+    if (mineral_grade && !['Premium', 'Standard', 'Low Grade', 'Mixed', 'Ungraded'].includes(mineral_grade)) {
+      return res.status(400).json({ error: 'Invalid mineral grade.' });
+    }
+
     // Generate booking code
     const bookingCode = generateBookingCode();
 
@@ -580,8 +595,9 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
         requires_analysis,
         special_handling_notes,
         environmental_concerns,
-        remaining_tonnage
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+        remaining_tonnage,
+        status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
       RETURNING *`,
       [
         customerName, 
@@ -599,7 +615,8 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
         requires_analysis || false,
         special_handling_notes,
         environmental_concerns,
-        totalTonnage // Initially, remaining_tonnage equals total_tonnage
+        totalTonnage, // Initially, remaining_tonnage equals total_tonnage
+        'Active'  // Default status
       ]
     );
 

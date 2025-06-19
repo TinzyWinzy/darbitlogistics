@@ -1094,6 +1094,33 @@ export default function OperatorDashboard() {
               />
             </div>
 
+            <div className="col-md-4">
+              <label className="form-label">Environmental Incidents</label>
+              <textarea
+                className="form-control"
+                rows="2"
+                placeholder="Enter any environmental incidents"
+                value={createForm.environmentalIncidents}
+                onChange={e => setCreateForm(prev => ({ ...prev, environmentalIncidents: e.target.value }))}
+                disabled={creating || !createForm.selectedBookingId}
+              />
+            </div>
+
+            <div className="col-md-4">
+              <label className="form-label">Sampling Status</label>
+              <select
+                className="form-select"
+                value={createForm.samplingStatus}
+                onChange={e => setCreateForm(prev => ({ ...prev, samplingStatus: e.target.value }))}
+                disabled={creating || !createForm.selectedBookingId}
+              >
+                <option value="">Select status...</option>
+                <option value="Not Sampled">Not Sampled</option>
+                <option value="Sampled">Sampled</option>
+                <option value="Pending">Pending</option>
+              </select>
+            </div>
+
             <div className="col-12">
               <button 
                 type="submit" 

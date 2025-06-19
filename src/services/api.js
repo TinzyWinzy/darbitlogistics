@@ -51,7 +51,19 @@ export const toCamel = d => ({
   samplingRequired: d.sampling_required,
   samplingStatus: d.sampling_status,
   environmentalIncident: d.environmental_incident,
-  incidentDetails: d.incident_details
+  incidentDetails: d.incident_details,
+  mineralType: d.mineral_type,
+  mineralGrade: d.mineral_grade,
+  moistureContent: d.moisture_content,
+  particleSize: d.particle_size,
+  requiresAnalysis: d.requires_analysis,
+  analysisCertificate: d.analysis_certificate,
+  specialHandlingNotes: d.special_handling_notes,
+  environmentalConcerns: d.environmental_concerns,
+  notes: d.notes,
+  status: d.status,
+  remainingTonnage: d.remaining_tonnage,
+  completedTonnage: d.completed_tonnage
 });
 
 export const toSnake = d => ({
@@ -66,7 +78,23 @@ export const toSnake = d => ({
   loading_point: d.loadingPoint,
   destination: d.destination,
   checkpoints: d.checkpoints || [],
-  driver_details: d.driverDetails || { name: '', vehicleReg: '' }
+  driver_details: d.driverDetails || { name: '', vehicleReg: '' },
+  mineral_type: d.mineralType || 'Other',
+  mineral_grade: d.mineralGrade || 'Ungraded',
+  moisture_content: d.moistureContent,
+  particle_size: d.particleSize,
+  requires_analysis: d.requiresAnalysis || false,
+  analysis_certificate: d.analysisCertificate,
+  special_handling_notes: d.specialHandlingNotes,
+  environmental_concerns: d.environmentalConcerns,
+  notes: d.notes,
+  status: d.status || 'Active',
+  remaining_tonnage: d.remainingTonnage,
+  completed_tonnage: d.completedTonnage || 0,
+  environmental_incident: d.environmentalIncident || false,
+  incident_details: d.incidentDetails || {},
+  sampling_required: d.samplingRequired || false,
+  sampling_status: d.samplingStatus
 });
 
 // API endpoints
