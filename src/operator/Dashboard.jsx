@@ -113,9 +113,27 @@ export default function OperatorDashboard() {
       setCreating(false);
       return;
     }
+
+    // Validate phone number format
+    if (!validateZimPhone(createForm.phoneNumber)) {
+      setCreateFeedback('Please enter a valid Zimbabwean phone number (e.g., 07xxxxxxxx, +263xxxxxxxx)');
+      setCreating(false);
+      return;
+    }
+
+    // Format phone number to include country code if not present
+    let formattedPhone = createForm.phoneNumber;
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '263' + formattedPhone.substring(1);
+    } else if (formattedPhone.startsWith('+')) {
+      formattedPhone = formattedPhone.substring(1);
+    } else if (formattedPhone.startsWith('7')) {
+      formattedPhone = '263' + formattedPhone;
+    }
+
     const deliveryData = {
       customerName: createForm.customerName,
-      phoneNumber: createForm.phoneNumber,
+      phoneNumber: formattedPhone,
       currentStatus: createForm.currentStatus,
       checkpoints: [],
       driverDetails: { name: createForm.driverName, vehicleReg: createForm.vehicleReg },
