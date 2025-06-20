@@ -136,20 +136,11 @@ export const deliveryApi = {
   },
 
   // Update checkpoint
-  updateCheckpoint: async (trackingId, checkpoint, currentStatus) => {
+  updateCheckpoint: async (trackingId, checkpoints, currentStatus) => {
     try {
       const res = await api.post('/updateCheckpoint', {
         trackingId,
-        checkpoint: {
-          location: checkpoint.location,
-          operator: checkpoint.operator,
-          comment: checkpoint.comment || '',
-          timestamp: checkpoint.timestamp,
-          coordinates: checkpoint.coordinates || null,
-          hasIssue: checkpoint.hasIssue || false,
-          issueDetails: checkpoint.issueDetails || '',
-          status: currentStatus
-        },
+        checkpoints,
         currentStatus
       });
       return res.data;

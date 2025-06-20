@@ -138,7 +138,7 @@ export default function OperatorDashboard() {
   const fetchDeliveries = async () => {
     try {
       const data = await deliveryApi.getAll();
-      setDeliveries(data.map(toCamel));
+      setDeliveries(data);
     } catch (error) {
       console.error('Fetch error:', error);
       setError(error.response?.data?.error || 'Failed to fetch deliveries');
@@ -365,18 +365,9 @@ export default function OperatorDashboard() {
 
       // Refresh deliveries
       const data = await deliveryApi.getAll();
-      setDeliveries(data.map(toCamel));
+      setDeliveries(data);
       setFeedback('Checkpoint updated successfully!');
       
-      // Send SMS notification
-      if (delivery.currentStatus !== currentStatus) {
-        const message = `Delivery ${trackingId} status updated to: ${currentStatus}. Location: ${newCheckpoint.location}`;
-        try {
-          await deliveryApi.sendInitialSms(delivery.phoneNumber, message);
-        } catch (error) {
-          console.error('Failed to send status update SMS:', error);
-        }
-      }
     } catch (error) {
       setFeedback(error.response?.data?.error || 'Failed to update checkpoint');
     } finally {
@@ -1285,7 +1276,7 @@ export default function OperatorDashboard() {
                 <ul className="list-group">
                   {filteredDeliveries.map((delivery) => (
                     <li
-                      key={delivery.trackingId}
+                      key={delivery.trackingId}  
                       className={`list-group-item list-group-item-action ${selectedId === delivery.trackingId ? 'active' : ''}`}
                       style={selectedId === delivery.trackingId ? { background: '#e88a3a', color: '#fff', borderColor: '#e88a3a' } : { cursor: 'pointer' }}
                       onClick={() => setSelectedId(delivery.trackingId)}
