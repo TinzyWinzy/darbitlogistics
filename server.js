@@ -374,7 +374,7 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
          SET completed_tonnage = completed_tonnage + $1,
              remaining_tonnage = remaining_tonnage - $1
          WHERE id = $2`,
-        [tonnageDelta, tonnageDelta, row.parent_booking_id]
+        [tonnageDelta, row.parent_booking_id]
       );
     }
     
