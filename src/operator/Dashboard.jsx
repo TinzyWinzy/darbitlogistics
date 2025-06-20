@@ -81,6 +81,7 @@ export default function OperatorDashboard() {
   const [progressSortOrder, setProgressSortOrder] = useState('asc');
   const [selectedParentBooking, setSelectedParentBooking] = useState(null);
   const [showParentDetails, setShowParentDetails] = useState(false);
+  const [showCreateParentBookingModal, setShowCreateParentBookingModal] = useState(false);
 
   // Add toCamel utility function at the top level
   const toCamel = d => ({
@@ -751,221 +752,249 @@ export default function OperatorDashboard() {
     <div className="container py-5">
       <h1 className="display-6 fw-bold mb-4" style={{ color: '#D2691E' }}>Operator Dashboard</h1>
       
-      {/* Parent Booking Form */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-body">
-          <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
-            <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
-            Create Parent Booking
+      {/* Trigger button for Parent Booking Modal */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+          <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
+              <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>track_changes</span>
+              Delivery Progress
           </h2>
-          <form onSubmit={handleCreateParentBooking} className="row g-3 align-items-end" autoComplete="off">
-            <div className="col-md-3">
-              <label className="form-label">Customer Name *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                value={parentForm.customerName}
-                onChange={e => setParentForm(prev => ({ ...prev, customerName: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-            
-            <div className="col-md-3">
-              <label className="form-label">Phone Number *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                placeholder="e.g. 0771234567"
-                value={parentForm.phoneNumber}
-                onChange={e => setParentForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-            
-            <div className="col-md-3">
-              <label className="form-label">Total Tonnage *</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                required 
-                min="0.01"
-                step="0.01"
-                value={parentForm.totalTonnage}
-                onChange={e => setParentForm(prev => ({ ...prev, totalTonnage: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+          <button
+              className="btn btn-primary fw-bold"
+              style={{ background: '#D2691E', border: 'none' }}
+              onClick={() => setShowCreateParentBookingModal(true)}
+          >
+              <span className="material-icons align-middle me-1">add_box</span>
+              Create New Booking
+          </button>
+      </div>
+      
+      {/* Parent Booking Form Modal */}
+      {showCreateParentBookingModal && (
+        <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+          <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
+                  <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
+                  Create Parent Booking
+                </h2>
+                <button type="button" className="btn-close" onClick={() => setShowCreateParentBookingModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <form onSubmit={handleCreateParentBooking} className="row g-3" autoComplete="off">
+                  <div className="col-md-6">
+                    <label className="form-label">Customer Name *</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      required 
+                      value={parentForm.customerName}
+                      onChange={e => setParentForm(prev => ({ ...prev, customerName: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+                  
+                  <div className="col-md-6">
+                    <label className="form-label">Phone Number *</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      required 
+                      placeholder="e.g. 0771234567"
+                      value={parentForm.phoneNumber}
+                      onChange={e => setParentForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+                  
+                  <div className="col-md-6">
+                    <label className="form-label">Total Tonnage *</label>
+                    <input 
+                      type="number" 
+                      className="form-control" 
+                      required 
+                      min="0.01"
+                      step="0.01"
+                      value={parentForm.totalTonnage}
+                      onChange={e => setParentForm(prev => ({ ...prev, totalTonnage: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
 
-            <div className="col-md-3">
-              <label className="form-label">Mineral Type *</label>
-              <select 
-                className="form-select"
-                required
-                value={parentForm.mineral_type}
-                onChange={e => setParentForm(prev => ({ ...prev, mineral_type: e.target.value }))}
-                disabled={creating}
-              >
-                <option value="">Select type...</option>
-                <option value="Coal">Coal</option>
-                <option value="Iron Ore">Iron Ore</option>
-                <option value="Copper Ore">Copper Ore</option>
-                <option value="Gold Ore">Gold Ore</option>
-                <option value="Bauxite">Bauxite</option>
-                <option value="Limestone">Limestone</option>
-                <option value="Phosphate">Phosphate</option>
-                <option value="Manganese">Manganese</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Mineral Type *</label>
+                    <select 
+                      className="form-select"
+                      required
+                      value={parentForm.mineral_type}
+                      onChange={e => setParentForm(prev => ({ ...prev, mineral_type: e.target.value }))}
+                      disabled={creating}
+                    >
+                      <option value="">Select type...</option>
+                      <option value="Coal">Coal</option>
+                      <option value="Iron Ore">Iron Ore</option>
+                      <option value="Copper Ore">Copper Ore</option>
+                      <option value="Gold Ore">Gold Ore</option>
+                      <option value="Bauxite">Bauxite</option>
+                      <option value="Limestone">Limestone</option>
+                      <option value="Phosphate">Phosphate</option>
+                      <option value="Manganese">Manganese</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
 
-            <div className="col-md-3">
-              <label className="form-label">Mineral Grade</label>
-              <select 
-                className="form-select"
-                value={parentForm.mineral_grade}
-                onChange={e => setParentForm(prev => ({ ...prev, mineral_grade: e.target.value }))}
-                disabled={creating}
-              >
-                <option value="Ungraded">Ungraded</option>
-                <option value="Premium">Premium</option>
-                <option value="Standard">Standard</option>
-                <option value="Low Grade">Low Grade</option>
-                <option value="Mixed">Mixed</option>
-              </select>
-            </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Mineral Grade</label>
+                    <select 
+                      className="form-select"
+                      value={parentForm.mineral_grade}
+                      onChange={e => setParentForm(prev => ({ ...prev, mineral_grade: e.target.value }))}
+                      disabled={creating}
+                    >
+                      <option value="Ungraded">Ungraded</option>
+                      <option value="Premium">Premium</option>
+                      <option value="Standard">Standard</option>
+                      <option value="Low Grade">Low Grade</option>
+                      <option value="Mixed">Mixed</option>
+                    </select>
+                  </div>
 
-            <div className="col-md-3">
-              <label className="form-label">Loading Point *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required
-                value={parentForm.loadingPoint}
-                onChange={e => setParentForm(prev => ({ ...prev, loadingPoint: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Loading Point *</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      required
+                      value={parentForm.loadingPoint}
+                      onChange={e => setParentForm(prev => ({ ...prev, loadingPoint: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
 
-            <div className="col-md-3">
-              <label className="form-label">Destination *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required
-                value={parentForm.destination}
-                onChange={e => setParentForm(prev => ({ ...prev, destination: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Destination *</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      required
+                      value={parentForm.destination}
+                      onChange={e => setParentForm(prev => ({ ...prev, destination: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+                  
+                  <div className="col-md-6">
+                    <label className="form-label">Deadline *</label>
+                    <DatePicker
+                      selected={parentForm.deadline}
+                      onChange={date => setParentForm(prev => ({ ...prev, deadline: date }))}
+                      showTimeSelect
+                      dateFormat="yyyy-MM-dd HH:mm"
+                      className="form-control"
+                      minDate={new Date()}
+                      placeholderText="Select deadline"
+                      required
+                      disabled={creating}
+                    />
+                  </div>
 
-            <div className="col-md-3">
-              <label className="form-label">Deadline *</label>
-              <input 
-                type="datetime-local" 
-                className="form-control" 
-                required
-                min={new Date().toISOString().slice(0, 16)}
-                value={parentForm.deadline || ''}
-                onChange={e => setParentForm(prev => ({ ...prev, deadline: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Moisture Content (%)</label>
+                    <input 
+                      type="number" 
+                      className="form-control" 
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={parentForm.moisture_content}
+                      onChange={e => setParentForm(prev => ({ ...prev, moisture_content: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
 
-            <div className="col-md-3">
-              <label className="form-label">Moisture Content (%)</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                min="0"
-                max="100"
-                step="0.01"
-                value={parentForm.moisture_content}
-                onChange={e => setParentForm(prev => ({ ...prev, moisture_content: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Particle Size</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="e.g. 0-50mm"
+                      value={parentForm.particle_size}
+                      onChange={e => setParentForm(prev => ({ ...prev, particle_size: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
 
-            <div className="col-md-3">
-              <label className="form-label">Particle Size</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="e.g. 0-50mm"
-                value={parentForm.particle_size}
-                onChange={e => setParentForm(prev => ({ ...prev, particle_size: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+                  <div className="col-md-12">
+                    <div className="form-check">
+                      <input 
+                        type="checkbox" 
+                        className="form-check-input" 
+                        id="requires_analysis"
+                        checked={parentForm.requires_analysis}
+                        onChange={e => setParentForm(prev => ({ ...prev, requires_analysis: e.target.checked }))}
+                        disabled={creating}
+                      />
+                      <label className="form-check-label" htmlFor="requires_analysis">
+                        Requires Analysis
+                      </label>
+                    </div>
+                  </div>
 
-            <div className="col-md-12">
-              <div className="form-check">
-                <input 
-                  type="checkbox" 
-                  className="form-check-input" 
-                  id="requires_analysis"
-                  checked={parentForm.requires_analysis}
-                  onChange={e => setParentForm(prev => ({ ...prev, requires_analysis: e.target.checked }))}
-                  disabled={creating}
-                />
-                <label className="form-check-label" htmlFor="requires_analysis">
-                  Requires Analysis
-                </label>
+                  <div className="col-md-12">
+                    <label className="form-label">Special Handling Notes</label>
+                    <textarea 
+                      className="form-control" 
+                      rows="2"
+                      value={parentForm.special_handling_notes}
+                      onChange={e => setParentForm(prev => ({ ...prev, special_handling_notes: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+
+                  <div className="col-md-12">
+                    <label className="form-label">Environmental Concerns</label>
+                    <textarea 
+                      className="form-control" 
+                      rows="2"
+                      value={parentForm.environmental_concerns}
+                      onChange={e => setParentForm(prev => ({ ...prev, environmental_concerns: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+
+                  <div className="col-md-12">
+                    <label className="form-label">Notes</label>
+                    <textarea 
+                      className="form-control" 
+                      rows="2"
+                      value={parentForm.notes}
+                      onChange={e => setParentForm(prev => ({ ...prev, notes: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+
+                  <div className="col-12 mt-4">
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary fw-bold w-100" 
+                      style={{ background: '#D2691E', border: 'none' }} 
+                      disabled={creating}
+                    >
+                      {creating ? 'Creating...' : 'Create Parent Booking'}
+                    </button>
+                  </div>
+                </form>
+                {createFeedback && (
+                  <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
+                    {createFeedback}
+                  </div>
+                )}
               </div>
             </div>
-
-            <div className="col-md-12">
-              <label className="form-label">Special Handling Notes</label>
-              <textarea 
-                className="form-control" 
-                rows="2"
-                value={parentForm.special_handling_notes}
-                onChange={e => setParentForm(prev => ({ ...prev, special_handling_notes: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-
-            <div className="col-md-12">
-              <label className="form-label">Environmental Concerns</label>
-              <textarea 
-                className="form-control" 
-                rows="2"
-                value={parentForm.environmental_concerns}
-                onChange={e => setParentForm(prev => ({ ...prev, environmental_concerns: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-
-            <div className="col-md-12">
-              <label className="form-label">Notes</label>
-              <textarea 
-                className="form-control" 
-                rows="2"
-                value={parentForm.notes}
-                onChange={e => setParentForm(prev => ({ ...prev, notes: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-
-            <div className="col-12">
-              <button 
-                type="submit" 
-                className="btn btn-primary fw-bold" 
-                style={{ background: '#D2691E', border: 'none' }} 
-                disabled={creating}
-              >
-                {creating ? 'Creating...' : 'Create Parent Booking'}
-              </button>
-            </div>
-          </form>
-          {createFeedback && (
-            <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
-              {createFeedback}
-            </div>
-          )}
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setShowCreateParentBookingModal(false)}></div>
         </div>
-      </div>
+      )}
 
       {/* Progress Tracking Section with Filters */}
       <div className="row mb-4">
