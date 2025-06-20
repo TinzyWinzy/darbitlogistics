@@ -329,7 +329,7 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
   }
 
   try {
-    // Get delivery and validate status transition
+    // Get delivery and its parent booking status
     const deliveryResult = await pool.query(
       'SELECT d.*, pb.status as parent_status FROM deliveries d ' +
       'LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id ' +
@@ -343,25 +343,19 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     
     const row = deliveryResult.rows[0];
 
-    // Check if parent booking is active
-    if (row.parent_status !== 'Active') {
-      return res.status(400).json({ 
-        error: 'Cannot update delivery - parent booking is not active' 
-      });
+    // Determine if the delivery's completion state is changing
+    const isNowCompleted = currentStatus === 'Delivered';
+    const wasCompleted = row.is_completed;
+    
+    // Prevent a new delivery from completing an already closed parent booking
+    if (row.parent_status === 'Completed' && isNowCompleted && !wasCompleted) {
+        return res.status(400).json({ 
+            error: 'Parent booking is already closed. Cannot complete this delivery.' 
+        });
     }
 
-    // Check if delivery is already completed
-    if (row.is_completed && currentStatus !== 'Cancelled') {
-      return res.status(400).json({ 
-        error: 'Cannot update completed delivery unless cancelling' 
-      });
-    }
-
-    // Determine if delivery is completed based on status
-    const isCompleted = currentStatus === 'Delivered';
-    const completionDate = isCompleted ? new Date().toISOString() : null;
-
-    // Update delivery with the full new checkpoints array and status
+    // Update the delivery's status and completion date
+    const completionDate = isNowCompleted ? (wasCompleted ? row.completion_date : new Date().toISOString()) : null;
     await pool.query(
       `UPDATE deliveries 
        SET checkpoints = $1, 
@@ -370,31 +364,40 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
            completion_date = $4,
            updated_at = CURRENT_TIMESTAMP
        WHERE tracking_id = $5`,
-      [JSON.stringify(checkpoints), currentStatus, isCompleted, completionDate, trackingId]
+      [JSON.stringify(checkpoints), currentStatus, isNowCompleted, completionDate, trackingId]
     );
 
-    // If delivery is completed, update parent booking
-    if (isCompleted && !row.is_completed) { // Only update tonnage once
+    // If completion status has changed, adjust the parent booking's tonnage
+    let tonnageDelta = 0;
+    if (isNowCompleted && !wasCompleted) {
+      tonnageDelta = row.tonnage; // Subtract tonnage
+    } else if (!isNowCompleted && wasCompleted) {
+      tonnageDelta = -row.tonnage; // Add tonnage back
+    }
+
+    if (tonnageDelta !== 0) {
       await pool.query(
         `UPDATE parent_bookings 
          SET completed_tonnage = completed_tonnage + $1,
              remaining_tonnage = remaining_tonnage - $1
          WHERE id = $2`,
-        [row.tonnage, row.parent_booking_id]
+        [tonnageDelta, tonnageDelta, row.parent_booking_id]
       );
-
-      // Check if parent booking is complete
-      const parentBooking = await pool.query(
-        'SELECT * FROM parent_bookings WHERE id = $1',
+    }
+    
+    // Always re-evaluate parent booking status based on its current tonnage
+    const parentBookingResult = await pool.query(
+        'SELECT status, remaining_tonnage FROM parent_bookings WHERE id = $1',
         [row.parent_booking_id]
-      );
+    );
+    const parentBooking = parentBookingResult.rows[0];
+    const newParentStatus = parentBooking.remaining_tonnage > 0.001 ? 'Active' : 'Completed';
 
-      if (parentBooking.rows[0].remaining_tonnage <= 0) {
-        await pool.query(
-          'UPDATE parent_bookings SET status = $1 WHERE id = $2',
-          ['Completed', row.parent_booking_id]
-        );
-      }
+    if (parentBooking.status !== newParentStatus) {
+      await pool.query(
+        'UPDATE parent_bookings SET status = $1 WHERE id = $2',
+        [newParentStatus, row.parent_booking_id]
+      );
     }
     
     // Get the latest checkpoint for SMS notification
@@ -404,7 +407,7 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     let smsMessage = `Update: Your delivery (${trackingId}) is now at ${latestCheckpoint.location}. Status: ${currentStatus}.`;
     
     // Add completion information if delivery is completed
-    if (isCompleted) {
+    if (isNowCompleted) {
       smsMessage += ' Delivery completed successfully!';
     }
     
@@ -431,7 +434,7 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     res.json({ 
       success: true,
       checkpoints: checkpoints,
-      isCompleted,
+      isCompleted: isNowCompleted,
       completionDate
     });
   } catch (err) {
