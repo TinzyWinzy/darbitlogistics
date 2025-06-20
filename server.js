@@ -347,13 +347,6 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     const isNowCompleted = currentStatus === 'Delivered';
     const wasCompleted = row.is_completed;
     
-    // Prevent a new delivery from completing an already closed parent booking
-    if (row.parent_status === 'Completed' && isNowCompleted && !wasCompleted) {
-        return res.status(400).json({ 
-            error: 'Parent booking is already closed. Cannot complete this delivery.' 
-        });
-    }
-
     // Update the delivery's status and completion date
     const completionDate = isNowCompleted ? (wasCompleted ? row.completion_date : new Date().toISOString()) : null;
     await pool.query(
