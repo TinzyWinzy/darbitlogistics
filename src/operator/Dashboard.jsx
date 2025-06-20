@@ -115,26 +115,6 @@ export default function OperatorDashboard() {
     mineralGrade: d.mineral_grade
   });
 
-  const parentBookingToCamel = d => ({
-    id: d.parent_booking_id,
-    customerName: d.customer_name,
-    phoneNumber: d.phone_number,
-    totalTonnage: d.total_tonnage,
-    mineral_type: d.mineral_type,
-    mineral_grade: d.mineral_grade,
-    loadingPoint: d.loading_point,
-    destination: d.destination,
-    deadline: d.deadline,
-    bookingCode: d.booking_code,
-    status: d.status,
-    remainingTonnage: d.remaining_tonnage,
-    completionPercentage: d.completion_percentage,
-    completedTonnage: d.completed_tonnage,
-    totalDeliveries: d.total_deliveries,
-    completedDeliveries: d.completed_deliveries,
-    notes: d.notes,
-  });
-
   // Add fetchDeliveries function
   const fetchDeliveries = async () => {
     try {
@@ -152,9 +132,8 @@ export default function OperatorDashboard() {
   const fetchParentBookings = async () => {
     try {
       const data = await deliveryApi.getAllParentBookings();
-      const camelCaseData = data.map(parentBookingToCamel);
-      setParentBookings(camelCaseData);
-      updateCustomersList(camelCaseData);
+      setParentBookings(data);
+      updateCustomersList(data);
     } catch (error) {
       console.error('Failed to fetch parent bookings:', error);
       setError(error.response?.data?.error || 'Failed to fetch parent bookings');
@@ -319,10 +298,9 @@ export default function OperatorDashboard() {
           deliveryApi.getAll(),
           deliveryApi.getAllParentBookings()
         ]);
-        setDeliveries(deliveriesData.map(toCamel));
-        const camelCaseBookings = bookingsData.map(parentBookingToCamel);
-        setParentBookings(camelCaseBookings);
-        updateCustomersList(camelCaseBookings);
+        setDeliveries(deliveriesData);
+        setParentBookings(bookingsData);
+        updateCustomersList(bookingsData);
       }
     } catch (error) {
       console.error('Create delivery error:', error);
@@ -365,9 +343,15 @@ export default function OperatorDashboard() {
       setSubmitting(true);
       await deliveryApi.updateCheckpoint(trackingId, updatedCheckpoints, currentStatus);
 
-      // Refresh deliveries
-      const data = await deliveryApi.getAll();
-      setDeliveries(data);
+      // Refresh both deliveries and parent bookings
+      const [deliveriesData, bookingsData] = await Promise.all([
+        deliveryApi.getAll(),
+        deliveryApi.getAllParentBookings()
+      ]);
+      setDeliveries(deliveriesData);
+      setParentBookings(bookingsData);
+      updateCustomersList(bookingsData);
+
       setFeedback('Checkpoint updated successfully!');
       
     } catch (error) {

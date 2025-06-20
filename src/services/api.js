@@ -66,6 +66,26 @@ export const toCamel = d => ({
   completedTonnage: d.completed_tonnage
 });
 
+export const parentBookingToCamel = d => ({
+  id: d.parent_booking_id,
+  customerName: d.customer_name,
+  phoneNumber: d.phone_number,
+  totalTonnage: d.total_tonnage,
+  mineral_type: d.mineral_type,
+  mineral_grade: d.mineral_grade,
+  loadingPoint: d.loading_point,
+  destination: d.destination,
+  deadline: d.deadline,
+  bookingCode: d.booking_code,
+  status: d.status,
+  remainingTonnage: d.remaining_tonnage,
+  completionPercentage: d.completion_percentage,
+  completedTonnage: d.completed_tonnage,
+  totalDeliveries: d.total_deliveries,
+  completedDeliveries: d.completed_deliveries,
+  notes: d.notes,
+});
+
 export const toSnake = d => ({
   customer_name: d.customerName,
   phone_number: d.phoneNumber,
@@ -211,7 +231,7 @@ export const deliveryApi = {
     try {
       const queryParams = new URLSearchParams(filters).toString();
       const res = await api.get(`/parent-bookings?${queryParams}`);
-      return res.data;
+      return Array.isArray(res.data) ? res.data.map(parentBookingToCamel) : [];
     } catch (error) {
       console.error('Failed to fetch parent bookings:', error);
       throw error;
