@@ -442,7 +442,18 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
 
 app.get('/deliveries', authenticateSession, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM deliveries ORDER BY created_at DESC');
+    const result = await pool.query(`
+      SELECT 
+        d.*,
+        pb.mineral_type,
+        pb.mineral_grade
+      FROM 
+        deliveries d
+      LEFT JOIN 
+        parent_bookings pb ON d.parent_booking_id = pb.id
+      ORDER BY 
+        d.created_at DESC
+    `);
     res.json(result.rows);
   } catch (err) {
     console.error('Get deliveries error:', err);
