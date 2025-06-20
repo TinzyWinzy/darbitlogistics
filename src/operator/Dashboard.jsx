@@ -110,8 +110,8 @@ export default function OperatorDashboard() {
     samplingStatus: d.sampling_status,
     environmentalIncident: d.environmental_incident,
     incidentDetails: d.incident_details,
-    mineral_type: d.mineral_type,
-    mineral_grade: d.mineral_grade
+    mineralType: d.mineral_type,
+    mineralGrade: d.mineral_grade
   });
 
   const parentBookingToCamel = d => ({
@@ -192,8 +192,8 @@ export default function OperatorDashboard() {
         (d.customerName || '').toLowerCase().includes(q) ||
         (d.trackingId || '').toLowerCase().includes(q) ||
         (d.bookingReference || '').toLowerCase().includes(q) ||
-        (d.mineral_type || '').toLowerCase().includes(q) ||
-        (d.mineral_grade || '').toLowerCase().includes(q) ||
+        (d.mineralType || '').toLowerCase().includes(q) ||
+        (d.mineralGrade || '').toLowerCase().includes(q) ||
         (d.destination || '').toLowerCase().includes(q) ||
         (d.currentStatus || '').toLowerCase().includes(q)
       );
@@ -1302,7 +1302,7 @@ export default function OperatorDashboard() {
                           </div>
                             <div className="text-muted small">Booking Ref: {delivery.bookingReference}</div>
                             <div className="text-muted small">
-                              {delivery.containerCount} container(s) | {delivery.tonnage} tons | {delivery.mineral_type} ({delivery.mineral_grade})
+                              {delivery.containerCount} container(s) | {delivery.tonnage} tons | {delivery.mineralType} ({delivery.mineralGrade})
                             </div>
                           <div className="text-muted small">
                             From: {delivery.loadingPoint} → To: {delivery.destination}
