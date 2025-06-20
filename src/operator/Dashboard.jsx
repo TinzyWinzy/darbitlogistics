@@ -350,6 +350,7 @@ export default function OperatorDashboard() {
     // Create the full new checkpoint object
     const updatedCheckpoint = {
       ...newCheckpoint,
+      status: currentStatus,
       timestamp: newCheckpoint.timestamp.toISOString(),
       coordinates: newCheckpoint.coordinates || null,
       hasIssue: newCheckpoint.hasIssue || false,
