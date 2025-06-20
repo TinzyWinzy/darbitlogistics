@@ -35,62 +35,61 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-100 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 space-y-6">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-stone-800">
-            Operator Login
+    <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
+      <div className="card shadow-sm border-0" style={{ maxWidth: '400px', width: '100%' }}>
+        <div className="card-body p-4 p-md-5">
+          <h2 className="card-title text-center fw-bold mb-4" style={{ color: '#D2691E' }}>
+            Sign in
           </h2>
-          <p className="mt-2 text-sm text-stone-600">Welcome back, operator.</p>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="username" className="sr-only">
-                Username
-              </label>
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="form-floating mb-3">
               <input
-                id="username"
-                name="username"
                 type="text"
-                required
-                className="w-full px-4 py-3 bg-stone-50 border border-stone-300 rounded-lg text-stone-900 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-[#D2691E] focus:border-transparent transition"
+                className="form-control"
+                id="username"
                 placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
                 required
-                className="w-full px-4 py-3 bg-stone-50 border border-stone-300 rounded-lg text-stone-900 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-[#D2691E] focus:border-transparent transition"
+              />
+              <label htmlFor="username">Username</label>
+            </div>
+            <div className="form-floating mb-3">
+              <input
+                type="password"
+                className="form-control"
+                id="password"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
               />
+              <label htmlFor="password">Password</label>
             </div>
-          </div>
 
-          {error && (
-            <div className="text-red-600 text-sm font-medium text-center">{error}</div>
-          )}
+            {error && (
+              <div className="alert alert-danger text-center py-2">{error}</div>
+            )}
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-[#D2691E] hover:bg-[#a14e13] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a14e13] transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Authenticating...' : 'Sign In'}
-            </button>
-          </div>
-        </form>
+            <div className="d-grid mt-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-primary fw-bold"
+                style={{ background: '#D2691E', border: 'none' }}
+              >
+                {loading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign in'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
