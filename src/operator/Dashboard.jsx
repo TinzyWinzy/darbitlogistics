@@ -147,7 +147,7 @@ export default function OperatorDashboard() {
   const error = deliveriesError || parentBookingsError;
 
   const filteredAndSortedParentBookings = useMemo(() => {
-    const q = search.toLowerCase();
+      const q = search.toLowerCase();
 
     const withDeliveries = parentBookings.map(booking => ({
       ...booking,
@@ -1127,18 +1127,18 @@ export default function OperatorDashboard() {
               {/* Search and Filter Controls */}
               <div className="d-flex flex-wrap gap-2 mb-3">
                 <div className="input-group flex-grow-1">
-                  <span className="input-group-text bg-white" style={{ color: '#D2691E' }}>
-                    <span className="material-icons">search</span>
-                  </span>
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
+                <span className="input-group-text bg-white" style={{ color: '#D2691E' }}>
+                  <span className="material-icons">search</span>
+                </span>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
                     placeholder="Search consignments or loads..."
-                    className="form-control"
-                    disabled={loading}
-                  />
-                </div>
+                  className="form-control"
+                  disabled={loading}
+                />
+              </div>
                 
                 <select 
                   className="form-select form-select-sm" 
@@ -1226,27 +1226,27 @@ export default function OperatorDashboard() {
 
                           {/* Deliveries List */}
                           {booking.deliveries.length > 0 ? (
-                            <ul className="list-group">
+                <ul className="list-group">
                               {booking.deliveries.map(delivery => (
-                                <li
-                                  key={delivery.trackingId}  
-                                  className={`list-group-item list-group-item-action ${selectedId === delivery.trackingId ? 'active' : ''}`}
-                                  style={selectedId === delivery.trackingId ? { background: '#e88a3a', color: '#fff', borderColor: '#e88a3a' } : { cursor: 'pointer' }}
-                                  onClick={() => setSelectedId(delivery.trackingId)}
-                                >
+                    <li
+                      key={delivery.trackingId}  
+                      className={`list-group-item list-group-item-action ${selectedId === delivery.trackingId ? 'active' : ''}`}
+                      style={selectedId === delivery.trackingId ? { background: '#e88a3a', color: '#fff', borderColor: '#e88a3a' } : { cursor: 'pointer' }}
+                      onClick={() => setSelectedId(delivery.trackingId)}
+                    >
                                   <div className="d-flex justify-content-between">
-                                    <div>
+                        <div>
                                       <strong>{delivery.trackingId}</strong>
                                       <div className='small text-muted'>{delivery.driverDetails.name} ({delivery.driverDetails.vehicleReg})</div>
                                       <div className='small text-muted'>{delivery.tonnage} tons</div>
-                                    </div>
+                          </div>
                                     <span className="badge rounded-pill align-self-center" style={{ background: '#D2691E', color: '#fff' }}>
-                                      {delivery.currentStatus}
-                                    </span>
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
+                          {delivery.currentStatus}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
                           ) : (
                             <p className="text-muted text-center small mt-3">No loads dispatched for this consignment yet.</p>
                           )}

@@ -108,34 +108,54 @@ export default function TrackDelivery() {
                 {error && <div className="alert alert-danger mt-3">{error}</div>}
 
                 {delivery && (
-                  <div className="card shadow-sm mt-4">
-                    <div className="card-header bg-white">
-                      <h2 className="h5 mb-0">Tracking ID: {delivery.trackingId}</h2>
+                  <div className="card shadow-sm mt-4 border-0">
+                    <div className="card-header bg-white d-flex justify-content-between align-items-center">
+                      <h2 className="h5 mb-0" style={{ color: '#a14e13' }}>
+                        <span className="material-icons align-middle me-2">receipt_long</span>
+                        Tracking ID: {delivery.trackingId}
+                      </h2>
+                      <StatusBadge status={delivery.currentStatus} />
                     </div>
                     <div className="card-body">
-                      <p><strong>Status:</strong> <StatusBadge status={delivery.currentStatus} /></p>
-                      <p><strong>Customer:</strong> {delivery.customerName}</p>
+                      <div className="row text-muted small mb-3">
+                        <div className="col-md-6"><strong>Customer:</strong> {delivery.customerName}</div>
+                        <div className="col-md-6"><strong>Booking Ref:</strong> {delivery.bookingReference}</div>
+                        <div className="col-md-6"><strong>From:</strong> {delivery.loadingPoint}</div>
+                        <div className="col-md-6"><strong>To:</strong> {delivery.destination}</div>
+                        <div className="col-md-6"><strong>Mineral:</strong> {delivery.mineralType} ({delivery.mineralGrade})</div>
+                        <div className="col-md-6"><strong>Tonnage:</strong> {delivery.tonnage} tons</div>
+                      </div>
                       <hr />
                       <h3 className="h6 mt-4">Tracking History</h3>
                       {delivery.checkpoints && delivery.checkpoints.length > 0 ? (
-                        <ul className="list-unstyled">
-                          {delivery.checkpoints.map((cp, index) => (
-                            <li key={cp.timestamp}>
-                              <div className="d-flex justify-content-between align-items-center">
-                                <div>
-                                  <strong>{cp.location}</strong>
-                                  <small className="text-muted">
-                                    {formatDate(cp.timestamp)}
-                                  </small>
+                        <div className="timeline-container mt-3">
+                          {delivery.checkpoints.slice().reverse().map((cp, index) => (
+                            <div className="timeline-item" key={index}>
+                              <div className="timeline-dot"></div>
+                              <div className="timeline-content">
+                                <div className="d-flex justify-content-between">
+                                  <strong className="text-dark">{cp.status}</strong>
+                                  <small className="text-muted">{formatDate(cp.timestamp)}</small>
                                 </div>
-                                <small className="text-muted">Updated by: {cp.operator}</small>
+                                <div className="mb-1">{cp.location}</div>
+                                {cp.comment && (
+                                  <p className="text-muted small mb-1 fst-italic">"{cp.comment}"</p>
+                                )}
+                                {cp.hasIssue && (
+                                  <div className="alert alert-warning p-2 mt-2">
+                                    <strong className="d-block">
+                                      <span className="material-icons align-middle small me-1">warning</span>
+                                      Issue Reported:
+                                    </strong>
+                                    <span className="small">{cp.issueDetails}</span>
+                                  </div>
+                                )}
                               </div>
-                              <p>{cp.comment}</p>
-                            </li>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       ) : (
-                        <p>No tracking history available yet.</p>
+                        <p className="text-center text-muted mt-3">No tracking history available yet.</p>
                       )}
                     </div>
                   </div>
