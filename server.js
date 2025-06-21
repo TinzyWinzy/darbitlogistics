@@ -360,6 +360,13 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields.' });
   }
 
+  // Ensure operator_id is set from the authenticated user
+  const operatorId = req.user.id;
+  const updatedCheckpoints = checkpoints.map(c => ({
+    ...c,
+    operator_id: c.operator_id || operatorId
+  }));
+
   try {
     // Get delivery and its parent booking status
     const deliveryResult = await pool.query(
@@ -389,7 +396,7 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
            completion_date = $4,
            updated_at = CURRENT_TIMESTAMP
        WHERE tracking_id = $5`,
-      [JSON.stringify(checkpoints), currentStatus, isNowCompleted, completionDate, trackingId]
+      [JSON.stringify(updatedCheckpoints), currentStatus, isNowCompleted, completionDate, trackingId]
     );
 
     // If completion status has changed, adjust the parent booking's tonnage
@@ -431,7 +438,7 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     }
     
     // Get the latest checkpoint for SMS notification
-    const latestCheckpoint = checkpoints[checkpoints.length - 1];
+    const latestCheckpoint = updatedCheckpoints[updatedCheckpoints.length - 1];
 
     // Prepare SMS message with enhanced information
     let smsMessage = `Update for ${trackingId}: Now at ${latestCheckpoint.location}. Status: ${currentStatus}.`;
@@ -457,13 +464,13 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
         success: true,
         warning: 'Checkpoint updated, but SMS failed',
         smsError: smsRes.error,
-        checkpoints: checkpoints
+        checkpoints: updatedCheckpoints
       });
     }
     
     res.json({ 
       success: true,
-      checkpoints: checkpoints,
+      checkpoints: updatedCheckpoints,
       isCompleted: isNowCompleted,
       completionDate
     });

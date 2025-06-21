@@ -199,19 +199,19 @@ export default function OperatorDashboard() {
       }
 
       const deliveryData = {
-        parentBookingId: selectedBooking.id,
-        customerName: selectedBooking.customerName,
-        phoneNumber: selectedBooking.phoneNumber,
-        currentStatus: createForm.currentStatus || 'Pending',
-        loadingPoint: selectedBooking.loadingPoint,
+        parent_booking_id: selectedBooking.id,
+        customer_name: selectedBooking.customerName,
+        phone_number: selectedBooking.phoneNumber,
+        current_status: createForm.currentStatus || 'Pending',
+        loading_point: selectedBooking.loadingPoint,
         destination: selectedBooking.destination,
         mineral_type: selectedBooking.mineral_type,
         mineral_grade: selectedBooking.mineral_grade,
-        containerCount: parseInt(createForm.containerCount),
+        container_count: parseInt(createForm.containerCount),
         tonnage: parseFloat(createForm.tonnage),
-        vehicleType: createForm.vehicleType || 'Standard Truck',
-        vehicleCapacity: parseFloat(createForm.vehicleCapacity) || 30.00,
-        driverDetails: {
+        vehicle_type: createForm.vehicleType || 'Standard Truck',
+        vehicle_capacity: parseFloat(createForm.vehicleCapacity) || 30.00,
+        driver_details: {
           name: createForm.driverDetails.name.trim(),
           vehicleReg: createForm.driverDetails.vehicleReg.trim()
         }
@@ -433,14 +433,14 @@ export default function OperatorDashboard() {
       }
 
       const parentBookingData = {
-        customerName: parentForm.customerName.trim(),
-        phoneNumber: formattedPhone,
-        totalTonnage: parseFloat(parentForm.totalTonnage),
+        customer_name: parentForm.customerName.trim(),
+        phone_number: formattedPhone,
+        total_tonnage: parseFloat(parentForm.totalTonnage),
         mineral_type: parentForm.mineral_type.trim(),
         mineral_grade: parentForm.mineral_grade?.trim() || 'Ungraded',
         moisture_content: parentForm.moisture_content ? parseFloat(parentForm.moisture_content) : null,
         particle_size: parentForm.particle_size?.trim() || null,
-        loadingPoint: parentForm.loadingPoint.trim(),
+        loading_point: parentForm.loadingPoint.trim(),
         destination: parentForm.destination.trim(),
         deadline: deadline.toISOString(),
         requires_analysis: Boolean(parentForm.requires_analysis),

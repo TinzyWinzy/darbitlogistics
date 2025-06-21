@@ -465,7 +465,7 @@ CREATE TABLE IF NOT EXISTS checkpoint_logs (
     delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
     checkpoint_type checkpoint_type NOT NULL,
     location TEXT NOT NULL,
-    operator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT,
     status delivery_status NOT NULL,
     coordinates TEXT,
     comment TEXT,
@@ -474,6 +474,14 @@ CREATE TABLE IF NOT EXISTS checkpoint_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     metadata JSONB DEFAULT '{}'::jsonb
 );
+
+-- Add missing columns to checkpoint_logs if they don't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'checkpoint_logs' AND column_name = 'operator_id') THEN
+        ALTER TABLE checkpoint_logs ADD COLUMN operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
+    END IF;
+END $$;
 
 -- Create environmental_incidents table
 CREATE TABLE IF NOT EXISTS environmental_incidents (
@@ -556,10 +564,18 @@ CREATE OR REPLACE FUNCTION log_checkpoint()
 RETURNS TRIGGER AS $$
 DECLARE
     new_checkpoint jsonb;
+    op_id integer;
 BEGIN
     IF TG_OP = 'UPDATE' AND OLD.checkpoints IS DISTINCT FROM NEW.checkpoints THEN
         -- Get the latest checkpoint
         new_checkpoint := NEW.checkpoints->-1;
+
+        -- Validate that operator_id exists and is not null
+        IF new_checkpoint->>'operator_id' IS NULL THEN
+            RAISE EXCEPTION 'Checkpoint data is missing a valid operator_id';
+        END IF;
+
+        op_id := (new_checkpoint->>'operator_id')::integer;
         
         -- Insert into checkpoint_logs
         INSERT INTO checkpoint_logs (
@@ -577,7 +593,7 @@ BEGIN
             NEW.tracking_id,
             COALESCE((new_checkpoint->>'type')::checkpoint_type, 'Location Update'),
             new_checkpoint->>'location',
-            (new_checkpoint->>'operator_id')::integer,
+            op_id,
             (new_checkpoint->>'status')::delivery_status,
             new_checkpoint->>'coordinates',
             new_checkpoint->>'comment',

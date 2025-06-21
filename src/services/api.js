@@ -143,12 +143,10 @@ export const deliveryApi = {
   },
 
   // Create new delivery
-  create: async (delivery) => {
+  create: async (deliveryData) => {
     try {
-      console.log('Creating delivery:', delivery);
-      const snakeData = toSnake(delivery);
-      console.log('Transformed data:', snakeData);
-      const res = await api.post('/deliveries', snakeData);
+      console.log('Sending delivery data to API:', deliveryData);
+      const res = await api.post('/deliveries', deliveryData);
       return res.data;
     } catch (error) {
       console.error('Failed to create delivery:', error);
@@ -204,24 +202,10 @@ export const deliveryApi = {
     }
   },
 
-  async createParentBooking(data) {
+  async createParentBooking(bookingData) {
     try {
-      const res = await api.post('/parent-bookings', {
-        customerName: data.customerName,
-        phoneNumber: data.phoneNumber,
-        totalTonnage: data.totalTonnage,
-        mineral_type: data.mineral_type,
-        mineral_grade: data.mineral_grade,
-        moisture_content: data.moisture_content,
-        particle_size: data.particle_size,
-        loading_point: data.loadingPoint,
-        destination: data.destination,
-        deadline: data.deadline,
-        requires_analysis: data.requires_analysis,
-        special_handling_notes: data.special_handling_notes,
-        environmental_concerns: data.environmental_concerns,
-        notes: data.notes
-      });
+      console.log('Sending parent booking data to API:', bookingData);
+      const res = await api.post('/parent-bookings', bookingData);
       return res.data;
     } catch (error) {
       console.error('Failed to create parent booking:', error);
