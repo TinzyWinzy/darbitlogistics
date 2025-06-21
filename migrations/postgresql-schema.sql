@@ -479,7 +479,11 @@ CREATE TABLE IF NOT EXISTS checkpoint_logs (
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'checkpoint_logs' AND column_name = 'operator_id') THEN
-        ALTER TABLE checkpoint_logs ADD COLUMN operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'checkpoint_logs' AND column_name = 'operator') THEN
+            ALTER TABLE checkpoint_logs RENAME COLUMN operator TO operator_id;
+        ELSE
+            ALTER TABLE checkpoint_logs ADD COLUMN operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
+        END IF;
     END IF;
 END $$;
 
