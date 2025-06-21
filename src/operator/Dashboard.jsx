@@ -122,6 +122,12 @@ export default function OperatorDashboard() {
     setLoading(loadingDeliveries);
   }, [loadingDeliveries]);
 
+  useEffect(() => {
+    if (user) {
+      setForm(prevForm => ({ ...prevForm, operator: user.username }));
+    }
+  }, [user]);
+
   const error = deliveriesError || parentBookingsError;
 
   function generateTrackingId() {
@@ -1076,15 +1082,18 @@ export default function OperatorDashboard() {
                 </div>
                 
                 <div className="col-md-6">
-                  <label className="form-label">Operator *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={form.operator}
-                    onChange={e => setForm(prev => ({ ...prev, operator: e.target.value }))}
-                    required
-                    disabled={submitting}
-                  />
+                  <div className="form-floating mb-3">
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      id="operator" 
+                      name="operator" 
+                      value={form.operator}
+                      readOnly
+                      onChange={(e) => setForm({ ...form, operator: e.target.value })} 
+                    />
+                    <label htmlFor="operator" className="form-label">Operator</label>
+                  </div>
                 </div>
 
                 <div className="col-md-6">
