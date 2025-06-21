@@ -258,37 +258,25 @@ export default function OperatorDashboard() {
     setCreating(false);
   };
 
-  const handleUpdateCheckpoint = async (trackingId, newCheckpoint, currentStatus) => {
-    if (!trackingId || !newCheckpoint || !currentStatus) {
-      setFeedback('All fields are required.');
-      return;
-    }
-
+  const handleUpdateCheckpoint = async (trackingId, newCheckpoint) => {
     const delivery = deliveries.find(d => d.trackingId === trackingId);
     if (!delivery) {
       setFeedback('Could not find the delivery to update.');
       return;
     }
 
-    if (delivery.isCompleted && currentStatus !== 'Cancelled') {
-      setFeedback('Cannot update completed delivery unless cancelling.');
+    if (delivery.isCompleted && newCheckpoint.status !== 'Cancelled') {
+      setFeedback('Cannot update a completed delivery unless cancelling.');
       return;
     }
     
-    const updatedCheckpoint = {
-      ...newCheckpoint,
-      status: currentStatus,
-      operator_id: user.id,
-      operator_username: user.username
-    };
-
-    const updatedCheckpoints = [...(delivery.checkpoints || []), updatedCheckpoint];
+    const updatedCheckpoints = [...(delivery.checkpoints || []), newCheckpoint];
 
     try {
       setSubmitting(true);
       const res = await deliveryApi.updateCheckpoint(trackingId, {
         checkpoints: updatedCheckpoints,
-        currentStatus: currentStatus
+        currentStatus: newCheckpoint.status
       });
       
       setLocalDeliveries(prev => prev.map(d => 
@@ -296,7 +284,7 @@ export default function OperatorDashboard() {
           ? { 
               ...d, 
               checkpoints: res.checkpoints, 
-              currentStatus: currentStatus,
+              currentStatus: newCheckpoint.status,
               isCompleted: res.isCompleted,
               completionDate: res.completionDate,
               updatedAt: new Date().toISOString()
@@ -309,7 +297,7 @@ export default function OperatorDashboard() {
       
       setForm({
         location: '',
-        operator: '',
+        operator: user?.username || '',
         comment: '',
         status: '',
         coordinates: '',
@@ -347,22 +335,24 @@ export default function OperatorDashboard() {
       return;
     }
 
-    if (!form.location || !form.operator || !form.status) {
-      setFeedback('Location, Operator, and Status are required.');
+    if (!form.location || !form.status) {
+      setFeedback('Location and Status are required.');
       return;
     }
 
     const checkpoint = {
       location: form.location.trim(),
-      operator: form.operator.trim(),
+      status: form.status,
+      operator_id: user.id,
+      operator_username: user.username,
       comment: form.comment.trim(),
-      timestamp: form.timestamp,
+      timestamp: form.timestamp.toISOString(),
       coordinates: form.coordinates.trim(),
       hasIssue: form.hasIssue,
       issueDetails: form.hasIssue ? form.issueDetails.trim() : ''
     };
 
-    await handleUpdateCheckpoint(selectedId, checkpoint, form.status);
+    await handleUpdateCheckpoint(selectedId, checkpoint);
   }
 
   const handleCreateParentBooking = async (e) => {
