@@ -605,7 +605,14 @@ CREATE INDEX IF NOT EXISTS idx_environmental_incidents_status ON environmental_i
 CREATE INDEX IF NOT EXISTS idx_sampling_records_delivery ON sampling_records(delivery_tracking_id);
 CREATE INDEX IF NOT EXISTS idx_sampling_records_status ON sampling_records(analysis_status);
 
--- Finally, insert the default operator user at the very end
-INSERT INTO users (username, password, role)
-VALUES ('operator', 'changeme', 'operator')
-ON CONFLICT (username) DO NOTHING; 
+-- Insert the admin and operator users with pre-hashed passwords.
+INSERT INTO users (username, role, password)
+VALUES
+    ('hanzo', 'admin', '$2b$10$Xij6OW7UWNCECrnZNcUoe.hLMihjDm9zAVoP6aLBNwDsOLopMG0hC'),
+    ('innocent', 'operator', '$2b$10$gsdpmE1AXLJk24uxlNM.KOlmWKbYps5bMlZxIy1ixA9EM3m3eVZqi'),
+    ('operator', 'operator', '$2b$10$nlWGMWSdQ9Z.cmpZP6Ff1ed4eZIEQl2hpkkwnjNIy8MzRR3acQHYW'),
+    ('operator1', 'operator', '$2b$10$p0/KXmJWegRtxAIG/kiKi.3SNIl93iPyggRpXzpofaE63F7wSOPQS')
+ON CONFLICT (username) DO UPDATE 
+SET 
+    password = EXCLUDED.password,
+    role = EXCLUDED.role; 

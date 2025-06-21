@@ -310,8 +310,11 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
           ]
         );
 
-        // 4. Send SMS to customer
-        const smsMessage = `Welcome! Your delivery is created. Tracking ID: ${tracking_id}. Status: ${current_status}`;
+        const newDelivery = result.rows[0];
+
+        // 4. Construct and send an enhanced SMS to the customer
+        const progressMessage = `Progress: ${parseFloat(booking.completed_tonnage) + parseFloat(tonnage)}/${booking.total_tonnage} tons dispatched.`;
+        const smsMessage = `New delivery for booking ${booking.booking_code}. Tracking ID: ${tracking_id}. ${progressMessage}`;
         const smsRes = await sendSMS(phone_number, smsMessage);
 
         // 5. Audit log
@@ -322,7 +325,7 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
             success: true,
             warning: 'Delivery created, but SMS failed',
             trackingId: tracking_id,
-            delivery: result.rows[0],
+            delivery: newDelivery,
             smsError: smsRes.error
           });
         }
@@ -330,7 +333,7 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
         res.json({ 
           success: true, 
           trackingId: tracking_id,
-          delivery: result.rows[0]
+          delivery: newDelivery
         });
       } catch (err) {
         if (err.code === '23505') { // Unique violation
@@ -431,15 +434,15 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
     const latestCheckpoint = checkpoints[checkpoints.length - 1];
 
     // Prepare SMS message with enhanced information
-    let smsMessage = `Update: Your delivery (${trackingId}) is now at ${latestCheckpoint.location}. Status: ${currentStatus}.`;
+    let smsMessage = `Update for ${trackingId}: Now at ${latestCheckpoint.location}. Status: ${currentStatus}.`;
     
     // Add completion information if delivery is completed
     if (isNowCompleted) {
-      smsMessage += ' Delivery completed successfully!';
+      smsMessage = `Delivery ${trackingId} has been successfully completed and delivered.`;
     }
     
     // Add issue information if there's an issue
-    if (latestCheckpoint.hasIssue) {
+    if (latestCheckpoint.hasIssue && !isNowCompleted) {
       smsMessage += ` Note: ${latestCheckpoint.issueDetails}`;
     }
 
@@ -696,7 +699,7 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
     );
 
     // Send SMS notification
-    const smsMessage = `Welcome! Your booking is created. Booking Code: ${bookingCode}. Total Tonnage: ${data.totalTonnage}`;
+    const smsMessage = `Your booking is confirmed. Booking Code: ${bookingCode}. Total Tonnage: ${data.totalTonnage}. We will notify you as deliveries are dispatched.`;
     const smsRes = await sendSMS(data.phoneNumber, smsMessage);
 
     // Audit log
