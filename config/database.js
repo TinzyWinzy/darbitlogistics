@@ -6,7 +6,9 @@ dotenv.config();
 // For Render deployment, use the internal connection string if available
 const connectionString = process.env.DATABASE_URL || process.env.RENDER_DATABASE_URL;
 const isProduction = process.env.NODE_ENV === 'production';
-const useSsl = !!connectionString; // Use SSL if a connection string is provided
+
+// Use SSL only if a connection string is provided AND it's not a local connection
+const useSsl = !!connectionString && !connectionString.includes('localhost');
 
 const pool = connectionString 
   ? new pg.Pool({
