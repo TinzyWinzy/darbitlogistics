@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext, useRef } from 'react';
+import { useEffect, useState, useContext, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { deliveryApi } from '../services/api';
@@ -73,6 +73,8 @@ export default function OperatorDashboard() {
   const [toastMsg, setToastMsg] = useState('');
   const [showSmsPreview, setShowSmsPreview] = useState(false);
   const [smsPreview, setSmsPreview] = useState('');
+  
+  const [openBookingId, setOpenBookingId] = useState(null);
   const [selectedParentId, setSelectedParentId] = useState(null);
   const [parentForm, setParentForm] = useState({
     customerName: '',
@@ -144,20 +146,75 @@ export default function OperatorDashboard() {
   const loading = deliveriesLoading || parentBookingsLoading;
   const error = deliveriesError || parentBookingsError;
 
-  const filteredDeliveries = deliveries
-    .filter(d => d.trackingId) // Only include deliveries with a valid trackingId
-    .filter(d => {
-      const q = search.toLowerCase();
-      return (
-        (d.customerName || '').toLowerCase().includes(q) ||
+  const filteredAndSortedParentBookings = useMemo(() => {
+    const q = search.toLowerCase();
+
+    const withDeliveries = parentBookings.map(booking => ({
+      ...booking,
+      deliveries: deliveries.filter(d => d.parentBookingId === booking.id)
+    }));
+
+    const searchFiltered = q ? withDeliveries.filter(booking => {
+      if (
+        (booking.customerName || '').toLowerCase().includes(q) ||
+        (booking.bookingCode || '').toLowerCase().includes(q) ||
+        (booking.destination || '').toLowerCase().includes(q) ||
+        (booking.loadingPoint || '').toLowerCase().includes(q)
+      ) {
+        return true;
+      }
+
+      const hasMatchingDelivery = booking.deliveries.some(d =>
         (d.trackingId || '').toLowerCase().includes(q) ||
-        (d.bookingReference || '').toLowerCase().includes(q) ||
-        (d.mineralType || '').toLowerCase().includes(q) ||
-        (d.mineralGrade || '').toLowerCase().includes(q) ||
-        (d.destination || '').toLowerCase().includes(q) ||
-        (d.currentStatus || '').toLowerCase().includes(q)
+        (d.currentStatus || '').toLowerCase().includes(q) ||
+        (d.driverDetails?.name || '').toLowerCase().includes(q) ||
+        (d.driverDetails?.vehicleReg || '').toLowerCase().includes(q)
       );
+
+      return hasMatchingDelivery;
+    }) : withDeliveries;
+
+    const progressFiltered = searchFiltered.filter(booking => {
+      switch (progressFilter) {
+        case 'completed':
+          return booking.completionPercentage === 100;
+        case 'in-progress':
+          return booking.completionPercentage > 0 && booking.completionPercentage < 100;
+        case 'not-started':
+          return booking.completionPercentage === 0;
+        case 'overdue':
+          const isOverdue = new Date(booking.deadline) < new Date();
+          return isOverdue && booking.completionPercentage < 100;
+        default:
+          return true;
+      }
     });
+
+    const sorted = progressFiltered.sort((a, b) => {
+      let comparison = 0;
+      switch (progressSort) {
+        case 'deadline':
+          comparison = new Date(a.deadline) - new Date(b.deadline);
+          break;
+        case 'progress':
+          comparison = a.completionPercentage - b.completionPercentage;
+          break;
+        case 'tonnage':
+          comparison = a.totalTonnage - b.totalTonnage;
+          break;
+        case 'customer':
+          comparison = a.customerName.localeCompare(b.customerName);
+          break;
+        default:
+          comparison = 0;
+      }
+      return progressSortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+
+  }, [search, parentBookings, deliveries, progressFilter, progressSort, progressSortOrder]);
+
 
   function generateTrackingId() {
     // Simple unique code: 3 letters + 4 digits
@@ -509,42 +566,6 @@ export default function OperatorDashboard() {
     setCreating(false);
   };
 
-  const filteredAndSortedParentBookings = parentBookings
-    .filter(booking => {
-      switch (progressFilter) {
-        case 'completed':
-          return booking.completionPercentage === 100;
-        case 'in-progress':
-          return booking.completionPercentage > 0 && booking.completionPercentage < 100;
-        case 'not-started':
-          return booking.completionPercentage === 0;
-        case 'overdue':
-          return new Date(booking.deadline) < new Date();
-        default:
-          return true;
-      }
-    })
-    .sort((a, b) => {
-      let comparison = 0;
-      switch (progressSort) {
-        case 'deadline':
-          comparison = new Date(a.deadline) - new Date(b.deadline);
-          break;
-        case 'progress':
-          comparison = a.completionPercentage - b.completionPercentage;
-          break;
-        case 'tonnage':
-          comparison = a.totalTonnage - b.totalTonnage;
-          break;
-        case 'customer':
-          comparison = a.customerName.localeCompare(b.customerName);
-          break;
-        default:
-          comparison = 0;
-      }
-      return progressSortOrder === 'asc' ? comparison : -comparison;
-    });
-
   // Function to generate a unique booking code
   const generateBookingCode = () => {
     const prefix = 'MB'; // MB for Morres Booking
@@ -682,8 +703,8 @@ export default function OperatorDashboard() {
       {/* Trigger button for Parent Booking Modal */}
       <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
-              <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>track_changes</span>
-              Consignment Monitoring
+              <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>apps</span>
+              Dashboard
           </h2>
           <button
               className="btn btn-primary fw-bold"
@@ -925,116 +946,6 @@ export default function OperatorDashboard() {
         </>
       )}
 
-      {/* Progress Tracking Section with Filters */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow-sm">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
-                  <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>track_changes</span>
-                  Consignment Monitoring
-                </h2>
-                <div className="d-flex gap-2">
-                  {/* Filter Dropdown */}
-                  <select 
-                    className="form-select form-select-sm" 
-                    value={progressFilter}
-                    onChange={(e) => setProgressFilter(e.target.value)}
-                  >
-                    <option value="all">All Bookings</option>
-                    <option value="completed">Completed</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="not-started">Not Started</option>
-                    <option value="overdue">Overdue</option>
-                  </select>
-
-                  {/* Sort Dropdown */}
-                  <select 
-                    className="form-select form-select-sm" 
-                    value={progressSort}
-                    onChange={(e) => setProgressSort(e.target.value)}
-                  >
-                    <option value="deadline">Sort by Deadline</option>
-                    <option value="progress">Sort by Progress</option>
-                    <option value="tonnage">Sort by Tonnage</option>
-                    <option value="customer">Sort by Customer</option>
-                  </select>
-
-                  {/* Sort Order Toggle */}
-                  <button 
-                    className="btn btn-sm btn-outline-secondary" 
-                    onClick={() => setProgressSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
-                  >
-                    {progressSortOrder === 'asc' ? '↑' : '↓'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Progress Cards */}
-              <div className="row g-3">
-                {filteredAndSortedParentBookings.map(booking => (
-                  <div key={booking.id} className="col-12">
-                    <div 
-                      className="card mb-0 cursor-pointer" 
-                      onClick={() => {
-                        setSelectedParentBooking(booking);
-                        setShowParentDetails(true);
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className="card-body">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div>
-                            <h5 className="card-title mb-1">{booking.customerName}</h5>
-                            <div className="text-muted small">
-                              {booking.loadingPoint} → {booking.destination}
-                            </div>
-                          </div>
-                          <div className="text-end">
-                            <div className={`badge ${getDeadlineBadgeClass(booking.deadline)}`}>
-                              {getTimeLeft(booking.deadline)}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="progress mb-2" style={{ height: '25px' }}>
-                          <div 
-                            className="progress-bar" 
-                            role="progressbar"
-                            style={{ 
-                              width: `${booking.completionPercentage}%`,
-                              backgroundColor: '#D2691E'
-                            }}
-                            aria-valuenow={booking.completionPercentage}
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                          >
-                            {booking.completionPercentage}%
-                          </div>
-                        </div>
-
-                        <div className="row g-2 text-muted small">
-                          <div className="col-md-4">
-                            <strong>Total Tonnage:</strong> {booking.totalTonnage} tons
-                          </div>
-                          <div className="col-md-4">
-                            <strong>Completed:</strong> {booking.completedTonnage} tons
-                          </div>
-                          <div className="col-md-4">
-                            <strong>Deliveries:</strong> {booking.completedDeliveries}/{booking.totalDeliveries}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Parent Booking Details Modal */}
       {showParentDetails && selectedParentBooking && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
@@ -1210,62 +1121,140 @@ export default function OperatorDashboard() {
             <div className="card-body">
               <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
                 <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>list_alt</span>
-                Active Loads
+                Consignment & Load Monitoring
               </h2>
-              <div className="input-group mb-3">
-                <span className="input-group-text bg-white" style={{ color: '#D2691E' }}>
-                  <span className="material-icons">search</span>
-                </span>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search by name, tracking ID, or status..."
-                  className="form-control"
-                  disabled={loading}
-                />
+              
+              {/* Search and Filter Controls */}
+              <div className="d-flex flex-wrap gap-2 mb-3">
+                <div className="input-group flex-grow-1">
+                  <span className="input-group-text bg-white" style={{ color: '#D2691E' }}>
+                    <span className="material-icons">search</span>
+                  </span>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search consignments or loads..."
+                    className="form-control"
+                    disabled={loading}
+                  />
+                </div>
+                
+                <select 
+                  className="form-select form-select-sm" 
+                  style={{ flexBasis: '150px' }}
+                  value={progressFilter}
+                  onChange={(e) => setProgressFilter(e.target.value)}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="completed">Completed</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="not-started">Not Started</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+
+                <select 
+                  className="form-select form-select-sm" 
+                  style={{ flexBasis: '150px' }}
+                  value={progressSort}
+                  onChange={(e) => setProgressSort(e.target.value)}
+                >
+                  <option value="deadline">Sort: Deadline</option>
+                  <option value="progress">Sort: Progress</option>
+                  <option value="tonnage">Sort: Tonnage</option>
+                  <option value="customer">Sort: Customer</option>
+                </select>
+
+                <button 
+                  className="btn btn-sm btn-outline-secondary" 
+                  onClick={() => setProgressSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
+                >
+                  {progressSortOrder === 'asc' ? '↑' : '↓'}
+                </button>
               </div>
+
               {loading ? (
                 <Spinner />
               ) : error ? (
                 <div className="alert alert-danger">Error: {error}</div>
-              ) : filteredDeliveries.length === 0 ? (
-                <div className="alert alert-warning">No deliveries found.</div>
+              ) : filteredAndSortedParentBookings.length === 0 ? (
+                <div className="alert alert-warning">No consignments found.</div>
               ) : (
-                <ul className="list-group">
-                  {filteredDeliveries.map((delivery) => (
-                    <li
-                      key={delivery.trackingId}  
-                      className={`list-group-item list-group-item-action ${selectedId === delivery.trackingId ? 'active' : ''}`}
-                      style={selectedId === delivery.trackingId ? { background: '#e88a3a', color: '#fff', borderColor: '#e88a3a' } : { cursor: 'pointer' }}
-                      onClick={() => setSelectedId(delivery.trackingId)}
-                      tabIndex={0}
-                      onKeyPress={e => { if (e.key === 'Enter') setSelectedId(delivery.trackingId); }}
-                    >
-                      <div className="d-flex justify-content-between align-items-start">
-                        <div>
-                          <div>
-                            <span className="fw-bold" style={{ color: selectedId === delivery.trackingId ? '#fff' : '#D2691E' }}>
-                              {delivery.customerName}
-                            </span>
-                            <span className="text-muted small ms-2">({delivery.trackingId})</span>
-                          </div>
-                            <div className="text-muted small">Booking Ref: {delivery.bookingReference}</div>
-                            <div className="text-muted small">
-                              {delivery.containerCount} container(s) | {delivery.tonnage} tons | {delivery.mineralType} ({delivery.mineralGrade})
+                <div className="accordion" id="bookingAccordion">
+                  {filteredAndSortedParentBookings.map((booking) => (
+                    <div className="accordion-item" key={booking.id}>
+                      <h2 className="accordion-header" id={`heading-${booking.id}`}>
+                        <button 
+                          className={`accordion-button ${openBookingId !== booking.id ? 'collapsed' : ''}`} 
+                          type="button" 
+                          onClick={() => setOpenBookingId(openBookingId === booking.id ? null : booking.id)}
+                        >
+                          <div className="w-100 d-flex justify-content-between align-items-center pe-2">
+                            <div>
+                              <strong style={{ color: '#a14e13' }}>{booking.customerName}</strong>
+                              <small className="text-muted ms-2">({booking.bookingCode})</small>
                             </div>
-                          <div className="text-muted small">
-                            From: {delivery.loadingPoint} → To: {delivery.destination}
+                            <span className={`badge ${getDeadlineBadgeClass(booking.deadline)}`}>
+                              {getTimeLeft(booking.deadline)}
+                            </span>
                           </div>
-                          <div className="text-muted small">Phone: {delivery.phoneNumber}</div>
+                        </button>
+                      </h2>
+                      <div 
+                        id={`collapse-${booking.id}`} 
+                        className={`accordion-collapse collapse ${openBookingId === booking.id ? 'show' : ''}`}
+                      >
+                        <div className="accordion-body">
+                          {/* Progress Bar and Stats */}
+                          <div className="progress mb-2" style={{ height: '20px' }}>
+                            <div 
+                              className="progress-bar" 
+                              role="progressbar"
+                              style={{ 
+                                width: `${booking.completionPercentage}%`,
+                                backgroundColor: '#D2691E'
+                              }}
+                            >
+                              {booking.completionPercentage}%
+                            </div>
+                          </div>
+                          <div className="row g-2 text-muted small mb-3">
+                            <div className="col"><strong>Total:</strong> {booking.totalTonnage}t</div>
+                            <div className="col"><strong>Completed:</strong> {booking.completedTonnage}t</div>
+                            <div className="col"><strong>Loads:</strong> {booking.deliveries.length}</div>
+                          </div>
+
+                          {/* Deliveries List */}
+                          {booking.deliveries.length > 0 ? (
+                            <ul className="list-group">
+                              {booking.deliveries.map(delivery => (
+                                <li
+                                  key={delivery.trackingId}  
+                                  className={`list-group-item list-group-item-action ${selectedId === delivery.trackingId ? 'active' : ''}`}
+                                  style={selectedId === delivery.trackingId ? { background: '#e88a3a', color: '#fff', borderColor: '#e88a3a' } : { cursor: 'pointer' }}
+                                  onClick={() => setSelectedId(delivery.trackingId)}
+                                >
+                                  <div className="d-flex justify-content-between">
+                                    <div>
+                                      <strong>{delivery.trackingId}</strong>
+                                      <div className='small text-muted'>{delivery.driverDetails.name} ({delivery.driverDetails.vehicleReg})</div>
+                                      <div className='small text-muted'>{delivery.tonnage} tons</div>
+                                    </div>
+                                    <span className="badge rounded-pill align-self-center" style={{ background: '#D2691E', color: '#fff' }}>
+                                      {delivery.currentStatus}
+                                    </span>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-muted text-center small mt-3">No loads dispatched for this consignment yet.</p>
+                          )}
                         </div>
-                        <span className="badge rounded-pill" style={{ background: '#D2691E', color: '#fff' }}>
-                          {delivery.currentStatus}
-                        </span>
                       </div>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
             </div>
           </div>
@@ -1421,7 +1410,7 @@ function getDeadlineBadgeClass(deadline) {
   const daysUntilDeadline = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
 
   if (daysUntilDeadline < 0) return 'bg-danger';
-  if (daysUntilDeadline <= 3) return 'bg-warning';
+  if (daysUntilDeadline <= 3) return 'bg-warning text-dark';
   return 'bg-success';
 }
 
