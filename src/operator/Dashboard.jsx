@@ -2,6 +2,8 @@ import { useEffect, useState, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { deliveryApi } from '../services/api';
+import { useDeliveries } from '../services/useDeliveries';
+import { useParentBookings } from '../services/useParentBookings';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -17,9 +19,22 @@ function Spinner() {
 }
 
 export default function OperatorDashboard() {
-  const [deliveries, setDeliveries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { 
+    deliveries, 
+    loading: deliveriesLoading, 
+    error: deliveriesError, 
+    createDelivery, 
+    updateCheckpoint 
+  } = useDeliveries();
+  
+  const { 
+    parentBookings, 
+    loading: parentBookingsLoading, 
+    error: parentBookingsError, 
+    createParentBooking,
+    fetchParentBookings
+  } = useParentBookings();
+
   const [selectedId, setSelectedId] = useState('');
   const [form, setForm] = useState({
     location: '',
@@ -58,7 +73,6 @@ export default function OperatorDashboard() {
   const [toastMsg, setToastMsg] = useState('');
   const [showSmsPreview, setShowSmsPreview] = useState(false);
   const [smsPreview, setSmsPreview] = useState('');
-  const [parentBookings, setParentBookings] = useState([]);
   const [selectedParentId, setSelectedParentId] = useState(null);
   const [parentForm, setParentForm] = useState({
     customerName: '',
@@ -115,54 +129,20 @@ export default function OperatorDashboard() {
     mineralGrade: d.mineral_grade
   });
 
-  // Add fetchDeliveries function
-  const fetchDeliveries = async () => {
-    try {
-      const data = await deliveryApi.getAll();
-      setDeliveries(data);
-    } catch (error) {
-      console.error('Fetch error:', error);
-      setError(error.response?.data?.error || 'Failed to fetch deliveries');
-      setDeliveries([]);
-      throw error;
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
     }
-  };
-
-  // Add fetchParentBookings function
-  const fetchParentBookings = async () => {
-    try {
-      const data = await deliveryApi.getAllParentBookings();
-      setParentBookings(data);
-      updateCustomersList(data);
-    } catch (error) {
-      console.error('Failed to fetch parent bookings:', error);
-      setError(error.response?.data?.error || 'Failed to fetch parent bookings');
-    }
-  };
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (isAuthenticated) {
-        setLoading(true);
-        setError(null);
-        try {
-          await Promise.all([
-            fetchDeliveries(),
-            fetchParentBookings()
-          ]);
-        } catch (error) {
-          console.error('Error fetching data:', error);
-          setError(error.response?.data?.error || 'Failed to fetch data');
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        navigate('/login');
-      }
-    };
+    if (parentBookings.length > 0) {
+      updateCustomersList(parentBookings);
+    }
+  }, [parentBookings]);
 
-    fetchData();
-  }, [navigate, isAuthenticated, setIsAuthenticated]);
+  const loading = deliveriesLoading || parentBookingsLoading;
+  const error = deliveriesError || parentBookingsError;
 
   const filteredDeliveries = deliveries
     .filter(d => d.trackingId) // Only include deliveries with a valid trackingId
@@ -272,7 +252,7 @@ export default function OperatorDashboard() {
         }
       };
 
-      const res = await deliveryApi.create(deliveryData);
+      const res = await createDelivery(deliveryData);
 
       if (res.success) {
         setShowToast(true);
@@ -293,14 +273,8 @@ export default function OperatorDashboard() {
           }
         });
 
-        // Refresh data
-        const [deliveriesData, bookingsData] = await Promise.all([
-          deliveryApi.getAll(),
-          deliveryApi.getAllParentBookings()
-        ]);
-        setDeliveries(deliveriesData);
-        setParentBookings(bookingsData);
-        updateCustomersList(bookingsData);
+        // Refresh parent bookings to update remaining tonnage
+        await fetchParentBookings();
       }
     } catch (error) {
       console.error('Create delivery error:', error);
@@ -341,18 +315,12 @@ export default function OperatorDashboard() {
 
     try {
       setSubmitting(true);
-      await deliveryApi.updateCheckpoint(trackingId, updatedCheckpoints, currentStatus);
+      await updateCheckpoint(trackingId, updatedCheckpoints, currentStatus);
+      
+      // Refresh parent bookings to update progress
+      await fetchParentBookings();
 
-      // Refresh both deliveries and parent bookings
-      const [deliveriesData, bookingsData] = await Promise.all([
-        deliveryApi.getAll(),
-        deliveryApi.getAllParentBookings()
-      ]);
-      setDeliveries(deliveriesData);
-      setParentBookings(bookingsData);
-      updateCustomersList(bookingsData);
-
-      setFeedback('Checkpoint updated successfully!');
+      setFeedback('Checkpoint logged successfully!');
       
     } catch (error) {
       setFeedback(error.response?.data?.error || 'Failed to update checkpoint');
@@ -366,21 +334,6 @@ export default function OperatorDashboard() {
       await deliveryApi.logout();
     } catch {}
     navigate('/login');
-  };
-
-  const handleSendInitialSMS = async (trackingId, phone, status) => {
-    setShowSmsPreview(false);
-    setShowToast(true);
-    setToastMsg('Sending SMS notification...');
-    const message = `Welcome! Your delivery is created. Tracking ID: ${trackingId}. Status: ${status}`;
-    try {
-      await deliveryApi.sendInitialSms(phone, message);
-      setToastMsg('SMS notification sent successfully!');
-    } catch (error) {
-      setToastMsg('SMS notification failed. You can try resending later.');
-      console.error('SMS send error:', error);
-    }
-    setTimeout(() => setShowToast(false), 2500);
   };
 
   async function handleSubmit(e) {
@@ -523,11 +476,11 @@ export default function OperatorDashboard() {
 
       console.log('Sending parent booking data:', parentBookingData);
 
-      const res = await deliveryApi.createParentBooking(parentBookingData);
+      const res = await createParentBooking(parentBookingData);
       
       if (res.success) {
         setShowToast(true);
-        setToastMsg(`Parent booking created successfully! Booking Code: ${res.booking.booking_code}`);
+        setToastMsg(`Consignment logged successfully! Booking Code: ${res.booking.booking_code}`);
         
         // Reset form
         setParentForm({
@@ -547,10 +500,7 @@ export default function OperatorDashboard() {
           notes: ''
         });
 
-        // Refresh parent bookings and update customers list
-        const data = await deliveryApi.getAllParentBookings();
-        setParentBookings(data);
-        updateCustomersList(data);
+        // The hook already refreshes the list, no need to do it here.
       }
     } catch (error) {
       console.error('Create parent booking error:', error);
@@ -678,13 +628,6 @@ export default function OperatorDashboard() {
     }
   };
 
-  // Add useEffect to initialize customers list
-  useEffect(() => {
-    if (parentBookings.length > 0) {
-      updateCustomersList(parentBookings);
-    }
-  }, [parentBookings]);
-
   // Add delivery status options
   const statusOptions = [
     'Pending',
@@ -734,13 +677,13 @@ export default function OperatorDashboard() {
 
   return (
     <div className="container py-5">
-      <h1 className="display-6 fw-bold mb-4" style={{ color: '#D2691E' }}>Operator Dashboard</h1>
+      <h1 className="display-6 fw-bold mb-4" style={{ color: '#D2691E' }}>Morres Logistics - Operations Hub</h1>
       
       {/* Trigger button for Parent Booking Modal */}
       <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
               <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>track_changes</span>
-              Delivery Progress
+              Consignment Monitoring
           </h2>
           <button
               className="btn btn-primary fw-bold"
@@ -748,7 +691,7 @@ export default function OperatorDashboard() {
               onClick={() => setShowCreateParentBookingModal(true)}
           >
               <span className="material-icons align-middle me-1">add_box</span>
-              Create New Booking
+              Log New Consignment
           </button>
       </div>
       
@@ -760,222 +703,222 @@ export default function OperatorDashboard() {
               <div className="modal-content">
                 <div className="modal-header">
                   <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
-                    <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
-                    Create Parent Booking
-                  </h2>
+            <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
+            Log New Consignment
+          </h2>
                   <button type="button" className="btn-close" onClick={() => setShowCreateParentBookingModal(false)}></button>
                 </div>
                 <div className="modal-body">
                   <form onSubmit={handleCreateParentBooking} className="row g-3" autoComplete="off">
                     <div className="col-md-6">
-                      <label className="form-label">Customer Name *</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        required 
-                        value={parentForm.customerName}
-                        onChange={e => setParentForm(prev => ({ ...prev, customerName: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
-                    
+              <label className="form-label">Customer Name *</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                required 
+                value={parentForm.customerName}
+                onChange={e => setParentForm(prev => ({ ...prev, customerName: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+            
                     <div className="col-md-6">
-                      <label className="form-label">Phone Number *</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        required 
-                        placeholder="e.g. 0771234567"
-                        value={parentForm.phoneNumber}
-                        onChange={e => setParentForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
-                    
+              <label className="form-label">Phone Number *</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                required 
+                placeholder="e.g. 0771234567"
+                value={parentForm.phoneNumber}
+                onChange={e => setParentForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+            
                     <div className="col-md-6">
-                      <label className="form-label">Total Tonnage *</label>
-                      <input 
-                        type="number" 
-                        className="form-control" 
-                        required 
-                        min="0.01"
-                        step="0.01"
-                        value={parentForm.totalTonnage}
-                        onChange={e => setParentForm(prev => ({ ...prev, totalTonnage: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
+              <label className="form-label">Total Tonnage *</label>
+              <input 
+                type="number" 
+                className="form-control" 
+                required 
+                min="0.01"
+                step="0.01"
+                value={parentForm.totalTonnage}
+                onChange={e => setParentForm(prev => ({ ...prev, totalTonnage: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
 
                     <div className="col-md-6">
-                      <label className="form-label">Mineral Type *</label>
-                      <select 
-                        className="form-select"
-                        required
-                        value={parentForm.mineral_type}
-                        onChange={e => setParentForm(prev => ({ ...prev, mineral_type: e.target.value }))}
-                        disabled={creating}
-                      >
-                        <option value="">Select type...</option>
-                        <option value="Coal">Coal</option>
-                        <option value="Iron Ore">Iron Ore</option>
-                        <option value="Copper Ore">Copper Ore</option>
-                        <option value="Gold Ore">Gold Ore</option>
-                        <option value="Bauxite">Bauxite</option>
-                        <option value="Limestone">Limestone</option>
-                        <option value="Phosphate">Phosphate</option>
-                        <option value="Manganese">Manganese</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
+              <label className="form-label">Mineral Type *</label>
+              <select 
+                className="form-select"
+                required
+                value={parentForm.mineral_type}
+                onChange={e => setParentForm(prev => ({ ...prev, mineral_type: e.target.value }))}
+                disabled={creating}
+              >
+                <option value="">Select type...</option>
+                <option value="Coal">Coal</option>
+                <option value="Iron Ore">Iron Ore</option>
+                <option value="Copper Ore">Copper Ore</option>
+                <option value="Gold Ore">Gold Ore</option>
+                <option value="Bauxite">Bauxite</option>
+                <option value="Limestone">Limestone</option>
+                <option value="Phosphate">Phosphate</option>
+                <option value="Manganese">Manganese</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
 
                     <div className="col-md-6">
-                      <label className="form-label">Mineral Grade</label>
-                      <select 
-                        className="form-select"
-                        value={parentForm.mineral_grade}
-                        onChange={e => setParentForm(prev => ({ ...prev, mineral_grade: e.target.value }))}
-                        disabled={creating}
-                      >
-                        <option value="Ungraded">Ungraded</option>
-                        <option value="Premium">Premium</option>
-                        <option value="Standard">Standard</option>
-                        <option value="Low Grade">Low Grade</option>
-                        <option value="Mixed">Mixed</option>
-                      </select>
-                    </div>
+              <label className="form-label">Mineral Grade</label>
+              <select 
+                className="form-select"
+                value={parentForm.mineral_grade}
+                onChange={e => setParentForm(prev => ({ ...prev, mineral_grade: e.target.value }))}
+                disabled={creating}
+              >
+                <option value="Ungraded">Ungraded</option>
+                <option value="Premium">Premium</option>
+                <option value="Standard">Standard</option>
+                <option value="Low Grade">Low Grade</option>
+                <option value="Mixed">Mixed</option>
+              </select>
+            </div>
 
                     <div className="col-md-6">
-                      <label className="form-label">Loading Point *</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        required
-                        value={parentForm.loadingPoint}
-                        onChange={e => setParentForm(prev => ({ ...prev, loadingPoint: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
+              <label className="form-label">Loading Point *</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                required
+                value={parentForm.loadingPoint}
+                onChange={e => setParentForm(prev => ({ ...prev, loadingPoint: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
 
                     <div className="col-md-6">
-                      <label className="form-label">Destination *</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        required
-                        value={parentForm.destination}
-                        onChange={e => setParentForm(prev => ({ ...prev, destination: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
-                    
+              <label className="form-label">Destination *</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                required
+                value={parentForm.destination}
+                onChange={e => setParentForm(prev => ({ ...prev, destination: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
+
                     <div className="col-md-6">
-                      <label className="form-label">Deadline *</label>
+              <label className="form-label">Deadline *</label>
                       <DatePicker
                         selected={parentForm.deadline}
                         onChange={date => setParentForm(prev => ({ ...prev, deadline: date }))}
                         showTimeSelect
                         dateFormat="yyyy-MM-dd HH:mm"
-                        className="form-control"
+                className="form-control" 
                         minDate={new Date()}
                         placeholderText="Select deadline"
-                        required
-                        disabled={creating}
-                      />
-                    </div>
+                required
+                disabled={creating}
+              />
+            </div>
 
                     <div className="col-md-6">
-                      <label className="form-label">Moisture Content (%)</label>
-                      <input 
-                        type="number" 
-                        className="form-control" 
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={parentForm.moisture_content}
-                        onChange={e => setParentForm(prev => ({ ...prev, moisture_content: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
+              <label className="form-label">Moisture Content (%)</label>
+              <input 
+                type="number" 
+                className="form-control" 
+                min="0"
+                max="100"
+                step="0.01"
+                value={parentForm.moisture_content}
+                onChange={e => setParentForm(prev => ({ ...prev, moisture_content: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
 
                     <div className="col-md-6">
-                      <label className="form-label">Particle Size</label>
-                      <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="e.g. 0-50mm"
-                        value={parentForm.particle_size}
-                        onChange={e => setParentForm(prev => ({ ...prev, particle_size: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
+              <label className="form-label">Particle Size</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="e.g. 0-50mm"
+                value={parentForm.particle_size}
+                onChange={e => setParentForm(prev => ({ ...prev, particle_size: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
 
-                    <div className="col-md-12">
-                      <div className="form-check">
-                        <input 
-                          type="checkbox" 
-                          className="form-check-input" 
-                          id="requires_analysis"
-                          checked={parentForm.requires_analysis}
-                          onChange={e => setParentForm(prev => ({ ...prev, requires_analysis: e.target.checked }))}
-                          disabled={creating}
-                        />
-                        <label className="form-check-label" htmlFor="requires_analysis">
-                          Requires Analysis
-                        </label>
-                      </div>
-                    </div>
+            <div className="col-md-12">
+              <div className="form-check">
+                <input 
+                  type="checkbox" 
+                  className="form-check-input" 
+                  id="requires_analysis"
+                  checked={parentForm.requires_analysis}
+                  onChange={e => setParentForm(prev => ({ ...prev, requires_analysis: e.target.checked }))}
+                  disabled={creating}
+                />
+                <label className="form-check-label" htmlFor="requires_analysis">
+                  Requires Analysis
+                </label>
+              </div>
+            </div>
 
-                    <div className="col-md-12">
-                      <label className="form-label">Special Handling Notes</label>
-                      <textarea 
-                        className="form-control" 
-                        rows="2"
-                        value={parentForm.special_handling_notes}
-                        onChange={e => setParentForm(prev => ({ ...prev, special_handling_notes: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
+            <div className="col-md-12">
+              <label className="form-label">Special Handling Notes</label>
+              <textarea 
+                className="form-control" 
+                rows="2"
+                value={parentForm.special_handling_notes}
+                onChange={e => setParentForm(prev => ({ ...prev, special_handling_notes: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
 
-                    <div className="col-md-12">
-                      <label className="form-label">Environmental Concerns</label>
-                      <textarea 
-                        className="form-control" 
-                        rows="2"
-                        value={parentForm.environmental_concerns}
-                        onChange={e => setParentForm(prev => ({ ...prev, environmental_concerns: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
+            <div className="col-md-12">
+              <label className="form-label">Environmental Concerns</label>
+              <textarea 
+                className="form-control" 
+                rows="2"
+                value={parentForm.environmental_concerns}
+                onChange={e => setParentForm(prev => ({ ...prev, environmental_concerns: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
 
-                    <div className="col-md-12">
-                      <label className="form-label">Notes</label>
-                      <textarea 
-                        className="form-control" 
-                        rows="2"
-                        value={parentForm.notes}
-                        onChange={e => setParentForm(prev => ({ ...prev, notes: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
+            <div className="col-md-12">
+              <label className="form-label">Notes</label>
+              <textarea 
+                className="form-control" 
+                rows="2"
+                value={parentForm.notes}
+                onChange={e => setParentForm(prev => ({ ...prev, notes: e.target.value }))}
+                disabled={creating}
+              />
+            </div>
 
                     <div className="col-12 mt-4">
-                      <button 
-                        type="submit" 
+              <button 
+                type="submit" 
                         className="btn btn-primary fw-bold w-100" 
-                        style={{ background: '#D2691E', border: 'none' }} 
-                        disabled={creating}
-                      >
-                        {creating ? 'Creating...' : 'Create Parent Booking'}
-                      </button>
-                    </div>
-                  </form>
-                  {createFeedback && (
-                    <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
-                      {createFeedback}
-                    </div>
-                  )}
-                </div>
-              </div>
+                style={{ background: '#D2691E', border: 'none' }} 
+                disabled={creating}
+              >
+                {creating ? 'Creating...' : 'Log Consignment'}
+              </button>
+            </div>
+          </form>
+          {createFeedback && (
+            <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
+              {createFeedback}
+            </div>
+          )}
+        </div>
+      </div>
             </div>
           </div>
           <div className="modal-backdrop fade show" onClick={() => setShowCreateParentBookingModal(false)}></div>
@@ -990,7 +933,7 @@ export default function OperatorDashboard() {
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
                   <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>track_changes</span>
-                  Delivery Progress
+                  Consignment Monitoring
                 </h2>
                 <div className="d-flex gap-2">
                   {/* Filter Dropdown */}
@@ -1108,7 +1051,7 @@ export default function OperatorDashboard() {
         <div className="card-body">
           <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
             <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
-            Create New Delivery
+            Dispatch New Load
           </h2>
           <form onSubmit={handleCreateDelivery} className="row g-3 align-items-end" autoComplete="off">
             <div className="col-md-4">
@@ -1130,7 +1073,7 @@ export default function OperatorDashboard() {
             </div>
 
             <div className="col-md-4">
-              <label className="form-label">Select Booking *</label>
+              <label className="form-label">Select Consignment *</label>
               <select 
                 className="form-select"
                 value={createForm.selectedBookingId}
@@ -1138,10 +1081,10 @@ export default function OperatorDashboard() {
                 disabled={creating || !createForm.customerId}
                 required
               >
-                <option value="">Choose booking...</option>
+                <option value="">Choose consignment...</option>
                 {selectedCustomerBookings.map(booking => (
                   <option key={booking.id} value={booking.id}>
-                    {booking.bookingCode} - {booking.mineral_type} ({booking.mineral_grade}) - {booking.remainingTonnage} tons remaining
+                    {booking.bookingCode} - {booking.mineral_type} ({booking.mineral_grade}) - {booking.remainingTonnage} tons available
                   </option>
                 ))}
               </select>
@@ -1250,7 +1193,7 @@ export default function OperatorDashboard() {
                 style={{ background: '#D2691E', border: 'none' }} 
                 disabled={creating || !createForm.selectedBookingId}
               >
-                {creating ? 'Creating...' : 'Create Delivery'}
+                {creating ? 'Creating...' : 'Dispatch Load'}
               </button>
             </div>
           </form>
@@ -1267,7 +1210,7 @@ export default function OperatorDashboard() {
             <div className="card-body">
               <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
                 <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>list_alt</span>
-                Active Deliveries
+                Active Loads
               </h2>
               <div className="input-group mb-3">
                 <span className="input-group-text bg-white" style={{ color: '#D2691E' }}>
@@ -1332,7 +1275,7 @@ export default function OperatorDashboard() {
             <div className="card-body">
               <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
                 <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>edit_location_alt</span>
-                Update Checkpoint
+                Log Checkpoint
               </h2>
               {selectedId && (() => {
                 const sel = deliveries.find(d => d.trackingId === selectedId);
@@ -1447,7 +1390,7 @@ export default function OperatorDashboard() {
                     disabled={submitting}
                     style={{ background: '#D2691E', border: 'none' }}
                   >
-                    {submitting ? 'Updating...' : 'Update Checkpoint'}
+                    {submitting ? 'Updating...' : 'Log Checkpoint'}
                   </button>
                 </div>
 

@@ -1,11 +1,11 @@
 // Minimal Express + PostgreSQL backend for Morres Logistics MVP (ES Module version)
 import express from 'express';
-import axios from 'axios';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
+import twilio from 'twilio'; // Import Twilio
 import pool from './config/database.js';
 
 dotenv.config();
@@ -45,27 +45,30 @@ app.use(cors(corsOptions));
 // Ensure only the correct preflight handler is present
 app.options('/{*any}', cors(corsOptions));
 
-// Helper: Send SMS via Africa's Talking
+// Helper: Send SMS via Twilio
 async function sendSMS(to, message) {
-  const username = process.env.AT_USERNAME;
-  const apiKey = process.env.AT_API_KEY;
-  const senderId = process.env.AT_SENDER_ID || 'MorresLogistics';
-  const payload = new URLSearchParams({
-    username,
-    to,
-    message,
-    from: senderId,
-  });
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!accountSid || !authToken || !fromNumber) {
+    console.error('Twilio environment variables are not set.');
+    return { success: false, error: 'SMS service not configured.' };
+  }
+  
+  const client = twilio(accountSid, authToken);
+
   try {
-    const resp = await axios.post('https://api.africastalking.com/version1/messaging', payload, {
-      headers: {
-        apiKey,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+    const response = await client.messages.create({
+      body: message,
+      from: fromNumber,
+      to: to,
     });
-    return { success: true, data: resp.data };
+    console.log('Twilio SMS sent successfully. SID:', response.sid);
+    return { success: true, data: response };
   } catch (err) {
-    return { success: false, error: err.response?.data || err.message };
+    console.error('Twilio SMS error:', err.message);
+    return { success: false, error: err.message };
   }
 }
 
@@ -377,20 +380,20 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
         [tonnageDelta, row.parent_booking_id]
       );
     }
-    
+
     // Always re-evaluate parent booking status based on its current tonnage
     const parentBookingResult = await pool.query(
         'SELECT status, remaining_tonnage FROM parent_bookings WHERE id = $1',
         [row.parent_booking_id]
-    );
+      );
     const parentBooking = parentBookingResult.rows[0];
     const newParentStatus = parentBooking.remaining_tonnage > 0.001 ? 'Active' : 'Completed';
 
     if (parentBooking.status !== newParentStatus) {
-      await pool.query(
-        'UPDATE parent_bookings SET status = $1 WHERE id = $2',
+        await pool.query(
+          'UPDATE parent_bookings SET status = $1 WHERE id = $2',
         [newParentStatus, row.parent_booking_id]
-      );
+        );
     }
     
     // Get the latest checkpoint for SMS notification

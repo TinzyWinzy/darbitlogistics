@@ -38,9 +38,10 @@ export default function Login() {
     <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
       <div className="card shadow-sm border-0" style={{ maxWidth: '400px', width: '100%' }}>
         <div className="card-body p-4 p-md-5">
-          <h2 className="card-title text-center fw-bold mb-4" style={{ color: '#D2691E' }}>
-            Sign in
+          <h2 className="card-title text-center fw-bold mb-1" style={{ color: '#D2691E' }}>
+            Sign In
           </h2>
+          <p className="text-center text-muted mb-4">Morres Logistics Operator Hub</p>
           <form onSubmit={handleSubmit} noValidate>
             <div className="form-floating mb-3">
               <input

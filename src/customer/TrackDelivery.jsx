@@ -62,13 +62,15 @@ export default function TrackDelivery() {
   return (
     <div className="bg-gradient" style={{ minHeight: '90vh', background: 'linear-gradient(135deg, #e88a3a 0%, #fffbe6 100%)' }}>
       <div className="container py-5">
+        <h1 className="display-6 fw-bold text-center mb-4" style={{ color: '#D2691E' }}>
+          Track Your Consignment
+        </h1>
         <div className="row justify-content-center">
           <div className="col-12 col-md-8 col-lg-6">
             <div className="card shadow-lg border-0 rounded-lg overflow-hidden" style={{ background: 'rgba(255,255,255,0.97)' }}>
               <div className="card-body p-4 p-md-5">
                 <div className="text-center mb-4">
                   <span style={{ fontSize: '2.5em' }} role="img" aria-label="tracking">🔍</span>
-                  <h1 className="h3 fw-bold mt-3" style={{ color: '#D2691E' }}>Track Your Delivery</h1>
                   <p className="text-muted">Enter your tracking ID to see delivery status and updates</p>
                 </div>
 
@@ -102,86 +104,39 @@ export default function TrackDelivery() {
                   </div>
                 </form>
 
-                {error && (
-                  <div className="alert alert-danger d-flex align-items-center" role="alert">
-                    <span className="material-icons me-2">error_outline</span>
-                    <div>{error}</div>
-                  </div>
-                )}
-
                 {loading && <Spinner />}
+                {error && <div className="alert alert-danger mt-3">{error}</div>}
 
                 {delivery && (
-                  <div className="delivery-details">
-                    <div className="border-bottom pb-4 mb-4">
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <h2 className="h5 fw-bold mb-0" style={{ color: '#D2691E' }}>Delivery Details</h2>
-                        <StatusBadge status={delivery.currentStatus} />
-                      </div>
-                      <div className="row g-3">
-                        <div className="col-12 col-sm-6">
-                          <div className="p-3 rounded" style={{ background: 'rgba(232, 138, 58, 0.1)' }}>
-                            <div className="text-muted small">Tracking ID</div>
-                            <div className="fw-bold">{delivery.trackingId}</div>
-                          </div>
-                        </div>
-                        <div className="col-12 col-sm-6">
-                          <div className="p-3 rounded" style={{ background: 'rgba(232, 138, 58, 0.1)' }}>
-                            <div className="text-muted small">Customer</div>
-                            <div className="fw-bold">{delivery.customerName}</div>
-                          </div>
-                        </div>
-                      </div>
+                  <div className="card shadow-sm mt-4">
+                    <div className="card-header bg-white">
+                      <h2 className="h5 mb-0">Tracking ID: {delivery.trackingId}</h2>
                     </div>
-
-                    <div>
-                      <h3 className="h5 fw-bold mb-4" style={{ color: '#D2691E' }}>
-                        <span className="material-icons align-middle me-2">timeline</span>
-                        Delivery Timeline
-                      </h3>
-                      <div className="timeline">
-                        {delivery.checkpoints.map((checkpoint, idx) => (
-                          <div key={checkpoint.timestamp} className="timeline-item pb-4">
-                            <div className="position-relative">
-                              <div className="timeline-line" style={{
-                                position: 'absolute',
-                                left: '15px',
-                                top: '30px',
-                                bottom: idx === delivery.checkpoints.length - 1 ? '0' : '-10px',
-                                width: '2px',
-                                background: idx === delivery.checkpoints.length - 1 ? 'transparent' : '#e88a3a'
-                              }} />
-                              <div className="d-flex">
-                                <div className="timeline-icon me-3">
-                                  <div className="rounded-circle d-flex align-items-center justify-content-center" 
-                                    style={{ 
-                                      width: '32px', 
-                                      height: '32px', 
-                                      background: '#D2691E',
-                                      color: 'white',
-                                      fontSize: '14px',
-                                      fontWeight: 'bold'
-                                    }}>
-                                    {delivery.checkpoints.length - idx}
-                                  </div>
+                    <div className="card-body">
+                      <p><strong>Status:</strong> <StatusBadge status={delivery.currentStatus} /></p>
+                      <p><strong>Customer:</strong> {delivery.customerName}</p>
+                      <hr />
+                      <h3 className="h6 mt-4">Tracking History</h3>
+                      {delivery.checkpoints && delivery.checkpoints.length > 0 ? (
+                        <ul className="list-unstyled">
+                          {delivery.checkpoints.map((cp, index) => (
+                            <li key={cp.timestamp}>
+                              <div className="d-flex justify-content-between align-items-center">
+                                <div>
+                                  <strong>{cp.location}</strong>
+                                  <small className="text-muted">
+                                    {formatDate(cp.timestamp)}
+                                  </small>
                                 </div>
-                                <div className="timeline-content flex-grow-1">
-                                  <div className="card border-0 shadow-sm">
-                                    <div className="card-body p-3">
-                                      <div className="d-flex justify-content-between align-items-start mb-2">
-                                        <h4 className="h6 fw-bold mb-0" style={{ color: '#D2691E' }}>{checkpoint.location}</h4>
-                                        <small className="text-muted">{formatDate(checkpoint.timestamp)}</small>
-                                      </div>
-                                      <p className="text-muted small mb-1">{checkpoint.comment}</p>
-                                      <small className="text-muted">Updated by: {checkpoint.operator}</small>
-                                    </div>
-                                  </div>
-                                </div>
+                                <small className="text-muted">Updated by: {cp.operator}</small>
                               </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                              <p>{cp.comment}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>No tracking history available yet.</p>
+                      )}
                     </div>
                   </div>
                 )}

@@ -15,8 +15,8 @@ An internal logistics system for real-time shipment tracking and automated SMS n
 ## Tech Stack
 - **Frontend:** Vite + React (hosted on Vercel)
 - **Backend:** Node.js/Express (hosted on Render)
-- **Database:** Supabase
-- **SMS API:** Africa's Talking (Zimbabwe)
+- **Database:** PostgreSQL on Render
+- **SMS API:** Twilio
 
 ---
 
@@ -24,18 +24,15 @@ An internal logistics system for real-time shipment tracking and automated SMS n
 Create a `.env` file (or use your host's dashboard) with:
 
 ```
-# Africa's Talking
-AT_USERNAME=your_africas_talking_username
-AT_API_KEY=your_africas_talking_api_key
-AT_SENDER_ID=MorresLogistics
+# Twilio
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=your_twilio_phone_number
 
-# Supabase
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
+# Database (Render)
+DATABASE_URL=your_render_postgresql_connection_string
 
 # (Frontend only)
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_API_URL=https://your-backend.onrender.com
 ```
 
