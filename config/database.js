@@ -6,11 +6,12 @@ dotenv.config();
 // For Render deployment, use the internal connection string if available
 const connectionString = process.env.DATABASE_URL || process.env.RENDER_DATABASE_URL;
 const isProduction = process.env.NODE_ENV === 'production';
+const useSsl = !!connectionString; // Use SSL if a connection string is provided
 
 const pool = connectionString 
   ? new pg.Pool({
       connectionString,
-      ssl: isProduction ? {
+      ssl: useSsl ? {
         rejectUnauthorized: false
       } : false
     })
@@ -20,7 +21,7 @@ const pool = connectionString
       database: process.env.PGDATABASE || 'morres',
       password: process.env.PGPASSWORD || 'postgres',
       port: parseInt(process.env.PGPORT || '5432'),
-      ssl: isProduction ? { rejectUnauthorized: false } : false
+      ssl: false // Local connections typically don't use SSL
     });
 
 // Handle pool errors

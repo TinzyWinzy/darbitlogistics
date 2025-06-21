@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './operator/Dashboard';
+import AdminDashboard from './operator/AdminDashboard';
 import TrackDelivery from './customer/TrackDelivery';
 import Navbar from './public/Navbar';
 import Landing from './public/Landing';
@@ -24,6 +25,21 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" />;
   }
   
+  return children;
+};
+
+// Admin Route component
+const AdminRoute = ({ children }) => {
+  const { user, isAuthenticated, loading } = useContext(AuthContext);
+
+  if (loading) {
+    return <div className="d-flex justify-content-center p-5">Loading...</div>;
+  }
+
+  if (!isAuthenticated || user?.role !== 'admin') {
+    return <Navigate to="/dashboard" />;
+  }
+
   return children;
 };
 
@@ -62,6 +78,11 @@ export default function App() {
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
+          } />
+          <Route path="/admin/dashboard" element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
           } />
           <Route path="/track" element={<TrackDelivery />} />
           <Route path="/offerings" element={<Offerings />} />
