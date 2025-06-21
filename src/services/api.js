@@ -63,7 +63,8 @@ export const toCamel = d => ({
   notes: d.notes,
   status: d.status,
   remainingTonnage: d.remaining_tonnage,
-  completedTonnage: d.completed_tonnage
+  completedTonnage: d.completed_tonnage,
+  createdByUserId: d.created_by_user_id
 });
 
 export const parentBookingToCamel = d => ({
@@ -155,17 +156,18 @@ export const deliveryApi = {
     }
   },
 
-  // Update checkpoint
-  updateCheckpoint: async (trackingId, checkpoints, currentStatus) => {
+  // Update a delivery's checkpoints and status
+  updateCheckpoint: async (trackingId, data) => {
     try {
-      const res = await api.post('/updateCheckpoint', {
+      const payload = {
         trackingId,
-        checkpoints,
-        currentStatus
-      });
+        checkpoints: data.checkpoints,
+        currentStatus: data.currentStatus,
+      };
+      const res = await api.post('/updateCheckpoint', payload);
       return res.data;
     } catch (error) {
-      console.error('Failed to update checkpoint:', error);
+      console.error(`Failed to update checkpoint for ${trackingId}:`, error);
       throw error;
     }
   },
@@ -258,27 +260,36 @@ export const deliveryApi = {
       console.error(`Failed to fetch progress for booking ${id}:`, error);
       throw error;
     }
-  }
-};
-
-export const authApi = {
-  login: async (username, password) => {
-    try {
-      const res = await api.post('/login', { username, password });
-      return res.data;
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
   },
+  admin: {
+    getAllUsers: async () => {
+      try {
+        const res = await api.get('/admin/users');
+        return res.data;
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+        throw error;
+      }
+    },
 
-  logout: async () => {
-    try {
-      const res = await api.post('/logout');
-      return res.data;
-    } catch (error) {
-      console.error('Logout failed:', error);
-      throw error;
+    createUser: async (userData) => {
+      try {
+        const res = await api.post('/admin/users', userData);
+        return res.data;
+      } catch (error) {
+        console.error('Failed to create user:', error);
+        throw error;
+      }
+    },
+
+    deleteUser: async (userId) => {
+      try {
+        const res = await api.delete(`/admin/users/${userId}`);
+        return res.data;
+      } catch (error) {
+        console.error(`Failed to delete user ${userId}:`, error);
+        throw error;
+      }
     }
   }
 };

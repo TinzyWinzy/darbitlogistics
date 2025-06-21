@@ -36,6 +36,14 @@ DATABASE_URL=your_render_postgresql_connection_string
 VITE_API_URL=https://your-backend.onrender.com
 ```
 
+### Local Development Setup
+For local development, create a file named `.env.local` in the `morres-app` directory. This file is ignored by Git and will override production settings. Add the following to it:
+
+```
+VITE_API_URL=http://localhost:3000
+```
+This will point your local frontend to your local backend server. Remember to restart the Vite server after creating this file.
+
 ---
 
 ## Deployment Guide

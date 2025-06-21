@@ -6,6 +6,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
 import twilio from 'twilio'; // Import Twilio
+import bcrypt from 'bcrypt';
 import pool from './config/database.js';
 
 dotenv.config();
@@ -35,7 +36,7 @@ const corsOptions = {
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   exposedHeaders: ['set-cookie'],
 };
@@ -83,17 +84,25 @@ async function authenticateSession(req, res, next) {
   
   try {
     const result = await pool.query(
-      'SELECT * FROM sessions WHERE session_id = $1 AND expires_at > NOW()',
+      `SELECT u.id, u.username, u.role
+       FROM sessions s
+       JOIN users u ON s.username = u.username
+       WHERE s.session_id = $1 AND s.expires_at > NOW()`,
       [sessionId]
     );
     
     if (result.rows.length === 0) {
       console.log('Invalid or expired session');
-      await pool.query('DELETE FROM sessions WHERE session_id = $1', [sessionId]);
+      res.clearCookie('session_id', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        path: '/'
+      });
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
     
-    req.user = { username: result.rows[0].username };
+    req.user = result.rows[0]; // { id, username, role }
     next();
   } catch (err) {
     console.error('Session auth error:', err);
@@ -102,6 +111,15 @@ async function authenticateSession(req, res, next) {
       ? err.message 
       : 'Internal server error';
     res.status(500).json({ error: errorMessage });
+  }
+}
+
+// Middleware to restrict access to admins
+function adminOnly(req, res, next) {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ error: 'Forbidden: Admins only' });
   }
 }
 
@@ -115,32 +133,38 @@ app.post('/login', async (req, res) => {
   
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1 AND password = $2',
-      [username, password]
+      'SELECT * FROM users WHERE username = $1',
+      [username]
     );
     
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
+    const user = result.rows[0];
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
     const sessionId = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 12); // 12 hours
     
     await pool.query(
       'INSERT INTO sessions (session_id, username, expires_at) VALUES ($1, $2, $3)',
-      [sessionId, username, expiresAt]
+      [sessionId, user.username, expiresAt]
     );
     
-    // Updated cookie settings for cross-origin
-    res.cookie('session_id', sessionId, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 1000 * 60 * 60 * 12, // 12 hours
-      path: '/'
-    });
-    
-    res.json({ success: true, username });
+    // Sanitize the user object to send to the client
+    const userForClient = {
+      id: user.id,
+      username: user.username,
+      role: user.role
+    };
+
+    res.cookie('session_id', sessionId, { httpOnly: true, secure: true, sameSite: 'none', expires: expiresAt });
+    res.json({ success: true, user: userForClient });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -263,8 +287,9 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
             destination,
             booking_reference,
             checkpoints, 
-            driver_details
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            driver_details,
+            created_by_user_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
           RETURNING *`,
           [
             tracking_id, 
@@ -280,7 +305,8 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
             destination || booking.destination,
             booking_reference,
             JSON.stringify(checkpoints), 
-            JSON.stringify(driver_details)
+            JSON.stringify(driver_details),
+            req.user.id
           ]
         );
 
@@ -386,14 +412,19 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
         'SELECT status, remaining_tonnage FROM parent_bookings WHERE id = $1',
         [row.parent_booking_id]
       );
-    const parentBooking = parentBookingResult.rows[0];
-    const newParentStatus = parentBooking.remaining_tonnage > 0.001 ? 'Active' : 'Completed';
+    
+    if (parentBookingResult.rows.length > 0) {
+      const parentBooking = parentBookingResult.rows[0];
+      const newParentStatus = parentBooking.remaining_tonnage > 0.001 ? 'Active' : 'Completed';
 
-    if (parentBooking.status !== newParentStatus) {
-        await pool.query(
-          'UPDATE parent_bookings SET status = $1 WHERE id = $2',
-        [newParentStatus, row.parent_booking_id]
-        );
+      if (parentBooking.status !== newParentStatus) {
+          await pool.query(
+            'UPDATE parent_bookings SET status = $1 WHERE id = $2',
+          [newParentStatus, row.parent_booking_id]
+          );
+      }
+    } else {
+      console.warn(`[DATA INCONSISTENCY] Parent booking with ID ${row.parent_booking_id} not found for delivery ${trackingId}. Skipping parent status update.`);
     }
     
     // Get the latest checkpoint for SMS notification
@@ -441,18 +472,27 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
 
 app.get('/deliveries', authenticateSession, async (req, res) => {
   try {
-    const result = await pool.query(`
+    let query = `
       SELECT 
         d.*,
         pb.mineral_type,
-        pb.mineral_grade
+        pb.mineral_grade,
+        pb.created_by_user_id
       FROM 
         deliveries d
       LEFT JOIN 
         parent_bookings pb ON d.parent_booking_id = pb.id
-      ORDER BY 
-        d.created_at DESC
-    `);
+    `;
+    const params = [];
+
+    if (req.user.role === 'operator') {
+      query += ' WHERE pb.created_by_user_id = $1';
+      params.push(req.user.id);
+    }
+
+    query += ' ORDER BY d.created_at DESC';
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
     console.error('Get deliveries error:', err);
@@ -500,6 +540,14 @@ app.post('/logout', authenticateSession, async (req, res) => {
   } catch (err) {
     console.error('Logout error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/me', authenticateSession, (req, res) => {
+  if (req.user) {
+    res.json(req.user);
+  } else {
+    res.status(401).json({ error: 'Not authenticated' });
   }
 });
 
@@ -621,8 +669,9 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
         special_handling_notes,
         environmental_concerns,
         remaining_tonnage,
-        status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
+        status,
+        created_by_user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
       RETURNING *`,
       [
         data.customerName, 
@@ -641,7 +690,8 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
         data.special_handling_notes,
         data.environmental_concerns,
         data.totalTonnage, // Initially, remaining_tonnage equals total_tonnage
-        'Active'  // Default status
+        'Active',  // Default status
+        req.user.id // Add the user ID from the authenticated session
       ]
     );
 
@@ -670,7 +720,25 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
 
 app.get('/parent-bookings', authenticateSession, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM booking_progress ORDER BY deadline ASC');
+    let query = `
+      SELECT bp.* 
+      FROM booking_progress bp
+    `;
+    const params = [];
+
+    if (req.user.role === 'operator') {
+      query = `
+        SELECT bp.* 
+        FROM booking_progress bp 
+        JOIN parent_bookings p ON bp.parent_booking_id = p.id
+        WHERE p.created_by_user_id = $1
+      `;
+      params.push(req.user.id);
+    }
+
+    query += ' ORDER BY deadline ASC';
+    
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
     console.error('Get parent bookings error:', err);
@@ -698,6 +766,97 @@ app.get('/parent-bookings/:id/deliveries', authenticateSession, async (req, res)
   } catch (err) {
     console.error('Get parent booking deliveries error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/parent-bookings/:id/status', authenticateSession, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ error: 'Status is required.' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE parent_bookings SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Parent booking not found.' });
+    }
+
+    console.log(`[AUDIT] Parent booking ${id} status updated to ${status} by ${req.user.username}`);
+    res.json({ success: true, booking: result.rows[0] });
+  } catch (err) {
+    console.error(`Update parent booking status error for id ${id}:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin routes for user management
+app.get('/admin/users', authenticateSession, adminOnly, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin get users error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/admin/users', authenticateSession, adminOnly, async (req, res) => {
+  const { username, password, role } = req.body;
+
+  if (!username || !password || !role) {
+    return res.status(400).json({ error: 'Username, password, and role are required' });
+  }
+
+  if (role !== 'operator' && role !== 'admin') {
+    return res.status(400).json({ error: 'Invalid role. Must be "operator" or "admin".' });
+  }
+
+  try {
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const result = await pool.query(
+      'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at',
+      [username, hashedPassword, role]
+    );
+
+    console.log(`[AUDIT] User ${username} created by admin ${req.user.username}`);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') { // unique_violation
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    console.error('Admin create user error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/admin/users/:id', authenticateSession, adminOnly, async (req, res) => {
+  const { id } = req.params;
+
+  // Prevent admin from deleting themselves
+  if (parseInt(id, 10) === req.user.id) {
+    return res.status(400).json({ error: 'Cannot delete your own account.' });
+  }
+
+  try {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING username', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log(`[AUDIT] User ${result.rows[0].username} deleted by admin ${req.user.username}`);
+    res.json({ success: true, message: `User ${result.rows[0].username} deleted.` });
+  } catch (err) {
+    console.error('Admin delete user error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

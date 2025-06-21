@@ -2,15 +2,22 @@ import { Link, NavLink } from 'react-router-dom';
 import { useContext } from 'react';
 import { AuthContext } from '../App';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 export default function Navbar() {
-  const { isAuthenticated, setIsAuthenticated } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
   const navigate = useNavigate();
 
   async function handleLogout() {
-    await fetch(`${import.meta.env.VITE_API_URL}/logout`, { method: 'POST', credentials: 'include' });
-    setIsAuthenticated(false);
-    navigate('/login');
+    try {
+      await axios.post(`${import.meta.env.VITE_API_URL}/logout`, {}, {
+        withCredentials: true,
+      });
+      setUser(null);
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   }
 
   return (
@@ -34,7 +41,7 @@ export default function Navbar() {
             <li className="nav-item">
               <NavLink to="/track" className={({ isActive }) => 'nav-link' + (isActive ? ' active text-white fw-bold' : ' text-white')}>Track Delivery</NavLink>
             </li>
-            {isAuthenticated ? (
+            {user && (
               <>
                 <li className="nav-item ms-lg-3">
                   <NavLink to="/dashboard" className={({ isActive }) => 'btn btn-light fw-bold px-4 py-2' + (isActive ? ' active' : '')} style={{ color: '#D2691E' }}>Dashboard</NavLink>
@@ -43,10 +50,6 @@ export default function Navbar() {
                   <button className="btn btn-outline-light fw-bold px-4 py-2" style={{ color: '#D2691E' }} onClick={handleLogout}>Logout</button>
                 </li>
               </>
-            ) : (
-              <li className="nav-item ms-lg-3">
-                <Link to="/login" className="btn btn-light fw-bold px-4 py-2" style={{ color: '#D2691E' }}>Login</Link>
-              </li>
             )}
           </ul>
         </div>

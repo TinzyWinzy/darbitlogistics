@@ -6,6 +6,8 @@ import { useDeliveries } from '../services/useDeliveries';
 import { useParentBookings } from '../services/useParentBookings';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
+import axios from 'axios';
+import ParentBookingDetails from './ParentBookingDetails';
 
 // Spinner component
 function Spinner() {
@@ -20,11 +22,11 @@ function Spinner() {
 
 export default function OperatorDashboard() {
   const { 
-    deliveries, 
-    loading: deliveriesLoading, 
+    deliveries: initialDeliveries, 
+    loading: loadingDeliveries, 
     error: deliveriesError, 
-    createDelivery, 
-    updateCheckpoint 
+    createDelivery,
+    setDeliveries
   } = useDeliveries();
   
   const { 
@@ -67,7 +69,7 @@ export default function OperatorDashboard() {
   const [creating, setCreating] = useState(false);
   const [createFeedback, setCreateFeedback] = useState('');
   const navigate = useNavigate();
-  const { setIsAuthenticated, isAuthenticated } = useContext(AuthContext);
+  const { setUser, user } = useContext(AuthContext);
   const customerNameRef = useRef();
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
@@ -98,6 +100,9 @@ export default function OperatorDashboard() {
   const [selectedParentBooking, setSelectedParentBooking] = useState(null);
   const [showParentDetails, setShowParentDetails] = useState(false);
   const [showCreateParentBookingModal, setShowCreateParentBookingModal] = useState(false);
+
+  const [deliveries, setLocalDeliveries] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Add toCamel utility function at the top level
   const toCamel = d => ({
@@ -132,10 +137,10 @@ export default function OperatorDashboard() {
   });
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!user) {
       navigate('/login');
     }
-  }, [isAuthenticated, navigate]);
+  }, [user, navigate]);
 
   useEffect(() => {
     if (parentBookings.length > 0) {
@@ -143,7 +148,16 @@ export default function OperatorDashboard() {
     }
   }, [parentBookings]);
 
-  const loading = deliveriesLoading || parentBookingsLoading;
+  useEffect(() => {
+    if (initialDeliveries) {
+      setLocalDeliveries(initialDeliveries);
+    }
+  }, [initialDeliveries]);
+
+  useEffect(() => {
+    setLoading(loadingDeliveries);
+  }, [loadingDeliveries]);
+
   const error = deliveriesError || parentBookingsError;
 
   const filteredAndSortedParentBookings = useMemo(() => {
@@ -315,6 +329,10 @@ export default function OperatorDashboard() {
         setShowToast(true);
         setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId}`);
         
+        // Add new delivery to local state to trigger UI update
+        const newDelivery = toCamel(res.delivery);
+        setLocalDeliveries(prev => [newDelivery, ...prev]);
+        
         // Reset form
         setCreateForm({
           customerId: '',
@@ -357,28 +375,50 @@ export default function OperatorDashboard() {
       return;
     }
     
-    // Create the full new checkpoint object
     const updatedCheckpoint = {
       ...newCheckpoint,
       status: currentStatus,
-      timestamp: newCheckpoint.timestamp.toISOString(),
-      coordinates: newCheckpoint.coordinates || null,
-      hasIssue: newCheckpoint.hasIssue || false,
-      issueDetails: newCheckpoint.hasIssue ? newCheckpoint.issueDetails : ''
+      operator_id: user.id,
+      operator_username: user.username
     };
 
-    // Combine old and new checkpoints
     const updatedCheckpoints = [...(delivery.checkpoints || []), updatedCheckpoint];
 
     try {
       setSubmitting(true);
-      await updateCheckpoint(trackingId, updatedCheckpoints, currentStatus);
+      const res = await deliveryApi.updateCheckpoint(trackingId, {
+        checkpoints: updatedCheckpoints,
+        currentStatus: currentStatus
+      });
       
-      // Refresh parent bookings to update progress
+      setLocalDeliveries(prev => prev.map(d => 
+        d.trackingId === trackingId
+          ? { 
+              ...d, 
+              checkpoints: res.checkpoints, 
+              currentStatus: currentStatus,
+              isCompleted: res.isCompleted,
+              completionDate: res.completionDate,
+              updatedAt: new Date().toISOString()
+            }
+          : d
+      ));
+      
       await fetchParentBookings();
-
       setFeedback('Checkpoint logged successfully!');
       
+      setForm({
+        location: '',
+        operator: '',
+        comment: '',
+        status: '',
+        coordinates: '',
+        timestamp: new Date(),
+        hasIssue: false,
+        issueDetails: ''
+      });
+      setSelectedId('');
+
     } catch (error) {
       setFeedback(error.response?.data?.error || 'Failed to update checkpoint');
     } finally {
@@ -388,26 +428,27 @@ export default function OperatorDashboard() {
 
   const handleLogout = async () => {
     try {
-      await deliveryApi.logout();
-    } catch {}
-    navigate('/login');
+      await axios.post(`${import.meta.env.VITE_API_URL}/logout`, {}, { withCredentials: true });
+      setUser(null);
+      navigate('/login');
+    } catch (error) {
+      console.error("Logout failed", error);
+      setFeedback('Logout failed');
+    }
   };
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setSubmitting(true);
     setFeedback('');
     
     const delivery = deliveries.find(d => d.trackingId === selectedId);
     if (!delivery) {
       setFeedback('No delivery selected.');
-      setSubmitting(false);
       return;
     }
 
     if (!form.location || !form.operator || !form.status) {
       setFeedback('Location, Operator, and Status are required.');
-      setSubmitting(false);
       return;
     }
 
@@ -421,24 +462,7 @@ export default function OperatorDashboard() {
       issueDetails: form.hasIssue ? form.issueDetails.trim() : ''
     };
 
-    try {
-      await handleUpdateCheckpoint(selectedId, checkpoint, form.status);
-      // Reset form
-      setForm({
-        location: '',
-        operator: '',
-        comment: '',
-        status: '',
-        coordinates: '',
-        timestamp: new Date(),
-        hasIssue: false,
-        issueDetails: ''
-      });
-      setSelectedId('');
-    } catch (err) {
-      setFeedback('Network error: ' + err.message);
-    }
-    setSubmitting(false);
+    await handleUpdateCheckpoint(selectedId, checkpoint, form.status);
   }
 
   const handleCreateParentBooking = async (e) => {
@@ -670,28 +694,27 @@ export default function OperatorDashboard() {
     }
 
     return (
-      <div className="checkpoint-history">
-        <h6 className="mb-3">Checkpoint History</h6>
-        <div className="timeline">
-          {checkpoints.map((cp, index) => (
-            <div key={index} className="checkpoint-item mb-3">
-              <div className="d-flex justify-content-between">
-                <strong>{cp.location}</strong>
-                <small className="text-muted">
-                  {new Date(cp.timestamp).toLocaleString()}
-                </small>
+      <div className="checkpoint-history mt-3">
+        <h6 className="mb-3 fw-bold" style={{ color: '#a14e13' }}>Audit Log</h6>
+        <ul className="list-unstyled">
+          {checkpoints.slice().reverse().map((cp, index) => (
+            <li key={index} className="checkpoint-item mb-3 border-start border-3 ps-3" style={{ borderColor: '#D2691E' }}>
+              <div className="d-flex justify-content-between align-items-center">
+                <strong className="text-dark">{cp.location}</strong>
+                <span className={`badge ${cp.hasIssue ? 'bg-danger' : 'bg-secondary'}`}>{cp.status}</span>
               </div>
-              <div>Status: <span className="badge bg-info">{cp.status}</span></div>
-              <div>Operator: {cp.operator}</div>
-              {cp.comment && <div className="text-muted">{cp.comment}</div>}
+              <small className="text-muted d-block">
+                {new Date(cp.timestamp).toLocaleString()} by <strong>{cp.operator || cp.operator_username || 'System'}</strong>
+              </small>
+              {cp.comment && <p className="mb-0 mt-1 fst-italic">"{cp.comment}"</p>}
               {cp.hasIssue && (
                 <div className="alert alert-warning mt-1 mb-0 py-1 px-2">
-                  <small><strong>Issue:</strong> {cp.issueDetails}</small>
+                  <small><strong>Issue Reported:</strong> {cp.issueDetails}</small>
                 </div>
               )}
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     );
   };
@@ -1226,27 +1249,40 @@ export default function OperatorDashboard() {
 
                           {/* Deliveries List */}
                           {booking.deliveries.length > 0 ? (
-                <ul className="list-group">
+                            <ul className="list-group list-group-flush">
                               {booking.deliveries.map(delivery => (
-                    <li
-                      key={delivery.trackingId}  
-                      className={`list-group-item list-group-item-action ${selectedId === delivery.trackingId ? 'active' : ''}`}
-                      style={selectedId === delivery.trackingId ? { background: '#e88a3a', color: '#fff', borderColor: '#e88a3a' } : { cursor: 'pointer' }}
-                      onClick={() => setSelectedId(delivery.trackingId)}
-                    >
-                                  <div className="d-flex justify-content-between">
-                        <div>
-                                      <strong>{delivery.trackingId}</strong>
-                                      <div className='small text-muted'>{delivery.driverDetails.name} ({delivery.driverDetails.vehicleReg})</div>
-                                      <div className='small text-muted'>{delivery.tonnage} tons</div>
-                          </div>
-                                    <span className="badge rounded-pill align-self-center" style={{ background: '#D2691E', color: '#fff' }}>
-                          {delivery.currentStatus}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                                <li
+                                  key={delivery.trackingId}  
+                                  className={`list-group-item list-group-item-action p-3 ${selectedId === delivery.trackingId ? 'active' : ''}`}
+                                  style={selectedId === delivery.trackingId ? { background: '#D2691E', color: '#fff', borderColor: '#D2691E' } : { cursor: 'pointer' }}
+                                  onClick={() => setSelectedId(delivery.trackingId === selectedId ? null : delivery.trackingId)}
+                                >
+                                  <div className="d-flex justify-content-between align-items-center">
+                                    <div>
+                                      <strong className="d-block" style={{ color: '#a14e13' }}>{delivery.trackingId}</strong>
+                                      <small className="text-muted">{delivery.driverDetails.name} ({delivery.driverDetails.vehicleReg})</small>
+                                    </div>
+                                    <span className={`badge rounded-pill align-self-center fs-6 ${delivery.isCompleted ? 'bg-success' : 'bg-info'}`}>
+                                      {delivery.currentStatus}
+                                    </span>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-top d-flex justify-content-between text-muted small">
+                                    <span>
+                                      <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>scale</span>
+                                      {' '}{delivery.tonnage}t
+                                    </span>
+                                    <span>
+                                      <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>local_shipping</span>
+                                      {' '}{delivery.vehicleType}
+                                    </span>
+                                    <span>
+                                      <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>diamond</span>
+                                      {' '}{delivery.mineralType || 'N/A'}
+                                    </span>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
                           ) : (
                             <p className="text-muted text-center small mt-3">No loads dispatched for this consignment yet.</p>
                           )}

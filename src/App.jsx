@@ -28,22 +28,21 @@ const ProtectedRoute = ({ children }) => {
 };
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Try to fetch deliveries as an auth check
-        await axios.get(`${import.meta.env.VITE_API_URL}/deliveries`, {
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/me`, {
           withCredentials: true,
           headers: {
             'Content-Type': 'application/json'
           }
         });
-        setIsAuthenticated(true);
+        setUser(data);
       } catch (error) {
-        setIsAuthenticated(false);
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -52,8 +51,10 @@ export default function App() {
     checkAuth();
   }, []);
 
+  const isAuthenticated = !!user;
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated, loading }}>
+    <AuthContext.Provider value={{ user, setUser, isAuthenticated, loading }}>
       <Router>
         <Navbar />
         <Routes>

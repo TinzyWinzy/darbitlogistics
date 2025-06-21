@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS parent_bookings (
     status TEXT DEFAULT 'Active' CHECK (status IN ('Active', 'Completed', 'Cancelled')),
     remaining_tonnage DECIMAL(10,2),
     completed_tonnage DECIMAL(10,2) DEFAULT 0,
+    created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT valid_tonnage CHECK (completed_tonnage <= total_tonnage),
@@ -130,6 +131,10 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parent_bookings' AND column_name = 'environmental_concerns') THEN
         ALTER TABLE parent_bookings ADD COLUMN environmental_concerns TEXT;
     END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parent_bookings' AND column_name = 'created_by_user_id') THEN
+        ALTER TABLE parent_bookings ADD COLUMN created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
 END $$;
 
 -- Clean up legacy columns that may exist in older database versions
@@ -166,6 +171,7 @@ CREATE TABLE IF NOT EXISTS deliveries (
     destination TEXT NOT NULL,
     is_completed BOOLEAN DEFAULT FALSE,
     completion_date TIMESTAMP WITH TIME ZONE,
+    created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT valid_weights CHECK (net_weight IS NULL OR (tare_weight IS NOT NULL AND net_weight >= 0)),
@@ -174,7 +180,7 @@ CREATE TABLE IF NOT EXISTS deliveries (
         (
             SELECT bool_and(
                 jsonb_typeof(checkpoint->'location') = 'string' AND
-                jsonb_typeof(checkpoint->'operator') = 'string' AND
+                jsonb_typeof(checkpoint->'operator_id') = 'number' AND
                 jsonb_typeof(checkpoint->'status') = 'string' AND
                 jsonb_typeof(checkpoint->'timestamp') = 'string'
             )
@@ -191,6 +197,10 @@ CREATE TABLE IF NOT EXISTS deliveries (
 -- Add missing columns to deliveries if they don't exist
 DO $$
 BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'container_count') THEN
+        ALTER TABLE deliveries ADD COLUMN container_count INTEGER NOT NULL DEFAULT 1 CHECK (container_count > 0);
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'tonnage') THEN
         ALTER TABLE deliveries ADD COLUMN tonnage DECIMAL(10,2) NOT NULL DEFAULT 0;
     END IF;
@@ -253,6 +263,10 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'incident_details') THEN
         ALTER TABLE deliveries ADD COLUMN incident_details JSONB DEFAULT '{}';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'created_by_user_id') THEN
+        ALTER TABLE deliveries ADD COLUMN created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     END IF;
 END $$;
 
@@ -451,7 +465,7 @@ CREATE TABLE IF NOT EXISTS checkpoint_logs (
     delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
     checkpoint_type checkpoint_type NOT NULL,
     location TEXT NOT NULL,
-    operator TEXT NOT NULL,
+    operator_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     status delivery_status NOT NULL,
     coordinates TEXT,
     comment TEXT,
@@ -468,7 +482,7 @@ CREATE TABLE IF NOT EXISTS environmental_incidents (
     incident_type TEXT NOT NULL,
     description TEXT NOT NULL,
     severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
-    reported_by TEXT NOT NULL,
+    reported_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     location TEXT NOT NULL,
     coordinates TEXT,
     reported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -483,7 +497,7 @@ CREATE TABLE IF NOT EXISTS sampling_records (
     id SERIAL PRIMARY KEY,
     delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
     sample_code TEXT UNIQUE NOT NULL,
-    collected_by TEXT NOT NULL,
+    collected_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     collection_location TEXT NOT NULL,
     collection_date TIMESTAMP WITH TIME ZONE NOT NULL,
     sample_type TEXT NOT NULL,
@@ -510,11 +524,11 @@ BEGIN
         LOOP
             IF NOT (
                 checkpoint ? 'location' AND
-                checkpoint ? 'operator' AND
+                checkpoint ? 'operator_id' AND
                 checkpoint ? 'status' AND
                 checkpoint ? 'timestamp'
             ) THEN
-                RAISE EXCEPTION 'Invalid checkpoint structure: Each checkpoint must have location, operator, status, and timestamp.';
+                RAISE EXCEPTION 'Invalid checkpoint structure: Each checkpoint must have location, operator_id, status, and timestamp.';
             END IF;
         END LOOP;
     END IF;
@@ -552,7 +566,7 @@ BEGIN
             delivery_tracking_id,
             checkpoint_type,
             location,
-            operator,
+            operator_id,
             status,
             coordinates,
             comment,
@@ -563,7 +577,7 @@ BEGIN
             NEW.tracking_id,
             COALESCE((new_checkpoint->>'type')::checkpoint_type, 'Location Update'),
             new_checkpoint->>'location',
-            new_checkpoint->>'operator',
+            (new_checkpoint->>'operator_id')::integer,
             (new_checkpoint->>'status')::delivery_status,
             new_checkpoint->>'coordinates',
             new_checkpoint->>'comment',

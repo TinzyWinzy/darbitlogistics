@@ -1,15 +1,15 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { AuthContext } from '../App';
-import { authApi } from '../services/api';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { setUser } = useContext(AuthContext);
   const navigate = useNavigate();
-  const { setIsAuthenticated } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,13 +22,26 @@ export default function Login() {
     setError('');
     
     try {
-      const data = await authApi.login(username, password);
-      if (data.success) {
-        setIsAuthenticated(true);
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/login`, 
+        { username, password },
+        { 
+          withCredentials: true,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      
+      console.log('Login response:', response.data);
+      if (response.data && response.data.user) {
+        setUser(response.data.user);
         navigate('/dashboard');
+      } else {
+        throw new Error('Invalid login response from server.');
       }
-    } catch (error) {
-      setError(error.response?.data?.error || 'Login failed');
+    } catch (err) {
+      console.error('Login failed:', err);
+      const errorMessage = err.response?.data?.error || err.message || 'Login failed. Please check your credentials.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
