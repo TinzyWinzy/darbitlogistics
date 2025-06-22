@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Dashboard from './operator/Dashboard';
 import AdminDashboard from './operator/AdminDashboard';
 import TrackDelivery from './customer/TrackDelivery';
+import TrackParentBooking from './customer/TrackParentBooking.jsx';
 import Navbar from './public/Navbar';
 import Landing from './public/Landing';
 import Offerings from './public/Offerings';
@@ -93,7 +94,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/track-delivery" element={<TrackDelivery />} />
           <Route path="/track-booking" element={<TrackParentBooking />} />
-          <Route path="/operator/dashboard" element={<OperatorDashboard />} />
+          <Route path="/operator/dashboard" element={<Dashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/parent-booking-details/:id" element={<ParentBookingDetails />} />
           <Route path="/billing" element={<BillingDashboard />} />
