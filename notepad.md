@@ -2,7 +2,7 @@ project:
   name: Morres Logistics SMS Tracking System
   description: |
     An internal logistics system that allows operators to update shipment checkpoint status,
-    triggering automatic SMS notifications to customers. Built using Vite + Supabase + Africa's Talking.
+    triggering automatic SMS notifications to customers. Built using Vite + postgres +
   version: MVP-1.0
   priority_features:
     - SMS notification on checkpoint update

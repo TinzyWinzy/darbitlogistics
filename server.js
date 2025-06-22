@@ -197,6 +197,67 @@ function adminOnly(req, res, next) {
   }
 }
 
+// Middleware to check subscription quotas
+async function checkQuota(resource) {
+  return async (req, res, next) => {
+    const userId = req.user.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required.' });
+    }
+    
+    try {
+      // 1. Fetch user's active/trial subscription
+      const subResult = await pool.query(
+        `SELECT * FROM subscriptions 
+         WHERE user_id = $1 AND (status = 'active' OR status = 'trial')
+         AND (end_date IS NULL OR end_date > NOW())`,
+        [userId]
+      );
+
+      if (subResult.rows.length === 0) {
+        return res.status(403).json({ 
+          error: 'No active subscription found or your subscription has expired. Please upgrade your plan.' 
+        });
+      }
+
+      const subscription = subResult.rows[0];
+      const { subscriptionTiers } = await import('./config/subscriptions.js');
+      const tierLimits = subscriptionTiers[subscription.tier];
+
+      // 2. Check the specific resource quota
+      let usage, limit, resourceName;
+      if (resource === 'delivery') {
+        usage = subscription.deliveries_used;
+        limit = tierLimits.maxDeliveries;
+        resourceName = 'delivery';
+      } else if (resource === 'sms') {
+        usage = subscription.sms_used;
+        limit = tierLimits.maxSms;
+        resourceName = 'SMS';
+      } else {
+        return res.status(500).json({ error: 'Invalid quota resource specified.' });
+      }
+
+      if (usage >= limit) {
+        return res.status(403).json({
+          error: `You have exceeded your monthly ${resourceName} quota.`,
+          quotaExceeded: true,
+          limit,
+          usage,
+        });
+      }
+
+      // 3. Attach subscription info to the request for the next handler to use
+      req.subscription = subscription;
+      next();
+
+    } catch (err) {
+      console.error('Quota check error:', err);
+      res.status(500).json({ error: 'Internal server error while checking quotas.' });
+    }
+  };
+}
+
 // Updated login endpoint with proper cookie settings
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
@@ -281,7 +342,7 @@ function generateBookingReference() {
 }
 
 // Improved delivery creation route
-app.post('/deliveries', authenticateSession, async (req, res) => {
+app.post('/deliveries', authenticateSession, checkQuota('delivery'), async (req, res) => {
   let { 
     customer_name, 
     phone_number, 
@@ -386,15 +447,20 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
 
         const newDelivery = result.rows[0];
 
-        // 4. Construct and send an enhanced SMS to the customer
+        // 4. Increment the quota usage in the database
+        await pool.query(
+          'UPDATE subscriptions SET deliveries_used = deliveries_used + 1 WHERE id = $1',
+          [req.subscription.id]
+        );
+        
+        // 5. Construct and send an enhanced SMS to the customer
         const trackingId = newDelivery.tracking_id;
         const trackingBaseUrl = process.env.FRONTEND_URL || 'https://morres-logistics.vercel.app';
 
-        // Send SMS notification
         const smsMessage = `Hi ${customer_name}, your delivery with tracking ID ${trackingId} has been dispatched. Track its progress here: ${trackingBaseUrl}/track-delivery?id=${trackingId}`;
         const smsRes = await sendSMS(phone_number, smsMessage);
 
-        // 5. Audit log
+        // 6. Audit log
         console.log(`[AUDIT] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${tracking_id}`);
 
         if (!smsRes.success) {
@@ -428,7 +494,7 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
   }
 });
 
-app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
+app.post('/updateCheckpoint', authenticateSession, checkQuota('sms'), async (req, res) => {
   console.log('UpdateCheckpoint body:', req.body);
   const { trackingId, checkpoints, currentStatus } = req.body;
   
@@ -514,6 +580,12 @@ app.post('/updateCheckpoint', authenticateSession, async (req, res) => {
       console.warn(`[DATA INCONSISTENCY] Parent booking with ID ${row.parent_booking_id} not found for delivery ${trackingId}. Skipping parent status update.`);
     }
     
+    // Increment SMS quota usage before sending
+    await pool.query(
+      'UPDATE subscriptions SET sms_used = sms_used + 1 WHERE id = $1',
+      [req.subscription.id]
+    );
+
     // Get the latest checkpoint for SMS notification
     const latestCheckpoint = updatedCheckpoints[updatedCheckpoints.length - 1];
 
@@ -842,27 +914,52 @@ app.post('/admin/users', authenticateSession, adminOnly, async (req, res) => {
     return res.status(400).json({ error: 'Username, password, and role are required' });
   }
 
-  if (role !== 'operator' && role !== 'admin') {
-    return res.status(400).json({ error: 'Invalid role. Must be "operator" or "admin".' });
+  if (role !== 'operator' && role !== 'admin' && role !== 'viewer') {
+    return res.status(400).json({ error: 'Invalid role. Must be "operator", "viewer", or "admin".' });
   }
+  
+  const client = await pool.connect();
 
   try {
+    await client.query('BEGIN');
+    
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    const result = await pool.query(
+    // Insert the new user
+    const userResult = await client.query(
       'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at',
       [username, hashedPassword, role]
     );
+    
+    const newUser = userResult.rows[0];
+
+    // Automatically create a trial subscription for the new user
+    const { trialSettings } = await import('./config/subscriptions.js');
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + trialSettings.durationDays);
+
+    await client.query(
+      `INSERT INTO subscriptions (user_id, tier, status, end_date)
+       VALUES ($1, $2, 'trial', $3)`,
+      [newUser.id, trialSettings.tier, trialEndDate]
+    );
+
+    await client.query('COMMIT');
 
     console.log(`[AUDIT] User ${username} created by admin ${req.user.username}`);
-    res.status(201).json(result.rows[0]);
+    console.log(`[SUBSCRIPTION] Trial subscription created for user ${username}. Expires on ${trialEndDate.toISOString()}`);
+
+    res.status(201).json(newUser);
   } catch (err) {
+    await client.query('ROLLBACK');
     if (err.code === '23505') { // unique_violation
       return res.status(409).json({ error: 'Username already exists' });
     }
     console.error('Admin create user error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -958,7 +1055,122 @@ app.post('/send-notification', authenticateSession, async (req, res) => {
     }
 });
 
+// ==> Subscription Management Endpoints <==
+
+// Get current user's subscription details
+app.get('/api/subscriptions/me', authenticateSession, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1',
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No subscription found for this user.' });
+    }
+    
+    const subscription = result.rows[0];
+    const { subscriptionTiers } = await import('./config/subscriptions.js');
+    const tierDetails = subscriptionTiers[subscription.tier];
+
+    res.json({ ...subscription, tierDetails });
+
+  } catch (err) {
+    console.error('Get my subscription error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all user subscriptions (Admin only)
+app.get('/api/admin/subscriptions', authenticateSession, adminOnly, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        s.id as subscription_id, s.user_id, u.username, s.tier, s.status, 
+        s.start_date, s.end_date, s.deliveries_used, s.sms_used
+      FROM subscriptions s
+      JOIN users u ON s.user_id = u.id
+      ORDER BY u.username, s.start_date DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin get subscriptions error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Manually update a user's subscription tier (Admin only)
+app.patch('/api/admin/subscriptions/:userId', authenticateSession, adminOnly, async (req, res) => {
+  const { userId } = req.params;
+  const { newTier, newStatus, newEndDate } = req.body;
+
+  if (!newTier && !newStatus && !newEndDate) {
+    return res.status(400).json({ error: 'At least one field to update is required (newTier, newStatus, newEndDate).' });
+  }
+
+  // Basic validation
+  const { subscriptionTiers } = await import('./config/subscriptions.js');
+  if (newTier && !subscriptionTiers[newTier]) {
+    return res.status(400).json({ error: 'Invalid subscription tier provided.' });
+  }
+  
+  try {
+    // This is a simplified update logic for the MVP. A real-world scenario
+    // would involve more complex logic like deactivating old subscriptions.
+    // Here we just update the most recent one.
+    const findSubQuery = `
+      SELECT id FROM subscriptions WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1
+    `;
+    const subResult = await pool.query(findSubQuery, [userId]);
+    if (subResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No existing subscription found for this user to update.' });
+    }
+    const subscriptionId = subResult.rows[0].id;
+
+    // Build the update query dynamically
+    const fields = [];
+    const values = [];
+    let queryIndex = 1;
+
+    if (newTier) {
+      fields.push(`tier = $${queryIndex++}`);
+      values.push(newTier);
+    }
+    if (newStatus) {
+      fields.push(`status = $${queryIndex++}`);
+      values.push(newStatus);
+    }
+    if (newEndDate) {
+      fields.push(`end_date = $${queryIndex++}`);
+      values.push(newEndDate);
+    }
+    
+    // Always reset quotas on tier change
+    if (newTier) {
+      fields.push('deliveries_used = 0', 'sms_used = 0');
+    }
+
+    values.push(subscriptionId);
+    
+    const updateQuery = `
+      UPDATE subscriptions SET ${fields.join(', ')} 
+      WHERE id = $${queryIndex}
+      RETURNING *
+    `;
+
+    const result = await pool.query(updateQuery, values);
+    
+    console.log(`[AUDIT] Subscription for user ${userId} updated by admin ${req.user.username}. New tier: ${newTier}`);
+    res.json({ success: true, subscription: result.rows[0] });
+
+  } catch (err) {
+    console.error(`Admin update subscription error for user ${userId}:`, err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Local API running on port ${PORT}`);
-}); 
+});

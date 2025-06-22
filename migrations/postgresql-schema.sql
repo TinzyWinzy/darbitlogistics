@@ -31,10 +31,10 @@ BEGIN
     CREATE TYPE mineral_type AS ENUM (
         'Agate', 'Adamite', 'Andalusite', 'Anhydrite', 'Angelisite', 'Anthophyllite', 'Antimony', 'Aragonite', 'Arucite', 'Arsenic', 
         'Bauxite', 'Beryl', 'Bismuth', 'Bornite', 'Calcite', 'Chalcocite', 'Chalcopyrite', 'Chromite', 'Coal', 'Cobalt', 'Copper', 
-        'Copper Ore', 'Corundum', 'Diamond', 'Dolomite', 'Fireclay', 'Galena', 'Gold', 'Gold Ore', 'Graphite', 'Gypsum', 'Hematite', 
+        'Copper Ore', 'Corundum', 'Corndian', 'Diamond', 'Dolomite', 'Fireclay', 'Galena', 'Galena (Lead)', 'Gold', 'Gold Ore', 'Graphite', 'Gypsum', 'Hematite', 'Hematite (Iron ore)',
         'Iron Ore', 'Jasper', 'Kaolinite Clay', 'Kyanite', 'Lead', 'Lepidolite', 'Limestone', 'Limonite Clay', 'Magnesite', 'Manganese', 
-        'Marble', 'Mercury', 'Molybdenum', 'Monazite', 'Mtorolite', 'Muscovite', 'Nickel', 'Orthoclase', 'PGMs', 'Phosphate', 'Phyllite', 
-        'Platinum', 'Pollucite', 'Pyrite', 'Quartz', 'Rutile', 'Scheelite', 'Schorl', 'Serpentine', 'Sillimanite', 'Silver', 'Slates', 
+        'Marble', 'Mercury', 'Modalite', 'Molybdenum', 'Monazite', 'Mtorolite', 'Muscovite', 'Nickel', 'Orthoclase', 'PGMs', 'Platinum/PGMs', 'Phosphate', 'Phyllite', 
+        'Platinum', 'Pollucite', 'Pyrite', 'Quartz', 'Rutile', 'Rutile (Titanium)', 'Scheelite', 'Schorl', 'Serpentine', 'Sillimanite', 'Silver', 'Slates', 
         'Sphalerite', 'Tantalite-columbite', 'Titanium', 'Tungsten', 'Wolfram', 'Other'
     );
 
