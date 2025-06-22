@@ -267,6 +267,23 @@ export const deliveryApi = {
       throw error;
     }
   },
+
+  // Subscription APIs
+  async getMySubscription() {
+    const res = await api.get('/api/subscriptions/me');
+    return res.data;
+  },
+
+  async getAllSubscriptions() {
+    const res = await api.get('/api/admin/subscriptions');
+    return res.data;
+  },
+
+  async updateUserSubscription(userId, data) {
+    const res = await api.patch(`/api/admin/subscriptions/${userId}`, data);
+    return res.data;
+  },
+
   admin: {
     getAllUsers: async () => {
       try {

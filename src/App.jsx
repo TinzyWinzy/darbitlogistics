@@ -10,8 +10,11 @@ import Footer from './public/Footer';
 import './App.css'
 import { useState, createContext, useEffect, useContext } from 'react';
 import axios from 'axios';
+import ParentBookingDetails from './operator/ParentBookingDetails';
+import BillingDashboard from './public/BillingDashboard';
+import SubscriptionPlans from './public/SubscriptionPlans';
 
-export const AuthContext = createContext();
+export const AuthContext = createContext(null);
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -88,6 +91,13 @@ export default function App() {
           <Route path="/offerings" element={<Offerings />} />
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Landing />} />
+          <Route path="/track-delivery" element={<TrackDelivery />} />
+          <Route path="/track-booking" element={<TrackParentBooking />} />
+          <Route path="/operator/dashboard" element={<OperatorDashboard />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/parent-booking-details/:id" element={<ParentBookingDetails />} />
+          <Route path="/billing" element={<BillingDashboard />} />
+          <Route path="/plans" element={<SubscriptionPlans />} />
         </Routes>
         <Footer />
       </Router>

@@ -46,14 +46,12 @@ export default function Navbar() {
             </li>
             {user && (
               <>
-                <li className="nav-item ms-lg-3">
-                  <NavLink to="/dashboard" className={({ isActive }) => 'btn btn-light fw-bold px-4 py-2' + (isActive ? ' active' : '')} style={{ color: '#D2691E' }}>Dashboard</NavLink>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/operator/dashboard">Dashboard</Link>
                 </li>
-                {user.role === 'admin' && (
-                  <li className="nav-item ms-lg-2">
-                    <NavLink to="/admin/dashboard" className={({ isActive }) => 'btn btn-warning fw-bold px-4 py-2' + (isActive ? ' active' : '')}>Admin Panel</NavLink>
-                  </li>
-                )}
+                <li className="nav-item">
+                  <Link className="nav-link" to="/billing">Billing</Link>
+                </li>
                 <li className="nav-item ms-lg-2">
                   <button className="btn btn-outline-light fw-bold px-4 py-2" style={{ color: '#D2691E' }} onClick={handleLogout}>Logout</button>
                 </li>

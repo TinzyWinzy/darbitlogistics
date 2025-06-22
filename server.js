@@ -198,7 +198,7 @@ function adminOnly(req, res, next) {
 }
 
 // Middleware to check subscription quotas
-async function checkQuota(resource) {
+function checkQuota(resource) {
   return async (req, res, next) => {
     const userId = req.user.id;
     if (!userId) {
