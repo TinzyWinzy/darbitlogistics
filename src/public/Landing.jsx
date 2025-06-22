@@ -40,7 +40,7 @@ export default function Landing() {
             <div className="col-12 col-md-4" key={title}>
               <div className="card h-100 shadow-sm border-0 text-center p-4 py-5" style={{ background: 'rgba(255,255,255,0.95)' }}>
                 <div className="mx-auto mb-3 rounded-circle d-flex align-items-center justify-content-center" style={{ width: 60, height: 60, background: '#e88a3a' }}>
-                  <span className="material-icons fs-2" style={{ color: '#D2691E' }}>{icon}</span>
+                  <span className="material-icons-outlined fs-2" style={{ color: '#D2691E' }}>{icon}</span>
                 </div>
                 <h5 className="fw-bold mb-2" style={{ color: '#a14e13' }}>{title}</h5>
                 <p className="text-muted small mb-0">{desc}</p>
@@ -62,14 +62,14 @@ export default function Landing() {
             <React.Fragment key={label}>
               <div className="col-12 col-md-3 text-center mb-4 mb-md-0">
                 <div className="mx-auto mb-3 rounded-circle d-flex align-items-center justify-content-center shadow" style={{ width: 56, height: 56, background: '#e88a3a' }}>
-                  <span className="material-icons fs-3" style={{ color: '#D2691E' }}>{icon}</span>
+                  <span className="material-icons-outlined fs-3" style={{ color: '#D2691E' }}>{icon}</span>
                 </div>
                 <div className="fw-semibold mb-2" style={{ color: '#D2691E' }}>{label}</div>
                 <div className="text-muted small mb-2">{desc}</div>
               </div>
               {idx < arr.length - 1 && (
                 <div className="col-12 col-md-1 d-none d-md-flex justify-content-center align-items-center">
-                  <span className="material-icons fs-2" style={{ color: '#a14e13' }}>arrow_forward</span>
+                  <span className="material-icons-outlined fs-2" style={{ color: '#a14e13' }}>arrow_forward</span>
                 </div>
               )}
             </React.Fragment>
@@ -89,7 +89,7 @@ export default function Landing() {
             <div className="col-12 col-md-4" key={title}>
               <div className="card h-100 shadow-sm border-0 text-center p-4 py-5" style={{ background: 'rgba(255,255,255,0.95)' }}>
                 <div className="mx-auto mb-3 rounded-circle d-flex align-items-center justify-content-center" style={{ width: 56, height: 56, background: '#e88a3a' }}>
-                  <span className="material-icons fs-3" style={{ color: '#D2691E' }}>{icon}</span>
+                  <span className="material-icons-outlined fs-3" style={{ color: '#D2691E' }}>{icon}</span>
                 </div>
                 <h5 className="fw-semibold mb-2" style={{ color: '#D2691E' }}>{title}</h5>
                 <p className="text-muted small mb-0">{desc}</p>
@@ -102,7 +102,7 @@ export default function Landing() {
       {/* Testimonial Section */}
       <section className="container py-5 my-5">
         <div className="card border-0 shadow-sm mx-auto text-center p-4 py-5" style={{ maxWidth: 600, background: 'rgba(255,255,255,0.95)' }}>
-          <span className="material-icons fs-2 mb-3" style={{ color: '#D2691E' }}>format_quote</span>
+          <span className="material-icons-outlined fs-2 mb-3" style={{ color: '#D2691E' }}>format_quote</span>
           <p className="fst-italic lead mb-3">"Morres made our logistics transparent and stress-free. We always know where our shipments are!"</p>
           <div className="fw-semibold" style={{ color: '#a14e13' }}>— Happy Customer</div>
         </div>

@@ -616,7 +616,7 @@ export default function OperatorDashboard() {
       {/* Trigger button for Parent Booking Modal */}
       <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
-              <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>apps</span>
+              <span className="material-icons-outlined align-middle me-2" style={{ color: '#D2691E' }}>apps</span>
               Dashboard
           </h2>
           <button
@@ -624,7 +624,7 @@ export default function OperatorDashboard() {
               style={{ background: '#D2691E', border: 'none' }}
               onClick={() => setShowCreateParentBookingModal(true)}
           >
-              <span className="material-icons align-middle me-1">add_box</span>
+              <span className="material-icons-outlined align-middle me-1">add_box</span>
               Log New Consignment
           </button>
       </div>
@@ -637,7 +637,7 @@ export default function OperatorDashboard() {
               <div className="modal-content">
                 <div className="modal-header">
                   <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
-            <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
+            <span className="material-icons-outlined align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
             Log New Consignment
           </h2>
                   <button type="button" className="btn-close" onClick={() => setShowCreateParentBookingModal(false)}></button>
@@ -874,7 +874,7 @@ export default function OperatorDashboard() {
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body">
           <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
-            <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
+            <span className="material-icons-outlined align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
             Dispatch New Load
           </h2>
           <form onSubmit={handleCreateDelivery} className="row g-3 align-items-end" autoComplete="off">
@@ -1043,7 +1043,7 @@ export default function OperatorDashboard() {
           <div className="card shadow-sm border-0">
             <div className="card-body">
               <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
-                <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>edit_location_alt</span>
+                <span className="material-icons-outlined align-middle me-2" style={{ color: '#D2691E' }}>edit_location_alt</span>
                 Log Checkpoint
               </h2>
               {selectedId && (() => {

@@ -13,9 +13,12 @@ export default function Footer() {
             <a href="tel:+263771234567" className="text-decoration-underline" style={{ color: '#a14e13' }}>+263 77 123 4567</a>
           </div>
           <div className="col-12 col-md-4 text-center text-md-end">
-            <a href="https://twitter.com/" target="_blank" rel="noopener noreferrer" className="me-2" style={{ color: '#D2691E' }}><span className="material-icons align-middle">alternate_email</span></a>
-            <a href="https://facebook.com/" target="_blank" rel="noopener noreferrer" className="me-2" style={{ color: '#D2691E' }}><span className="material-icons align-middle">facebook</span></a>
-            <a href="https://linkedin.com/" target="_blank" rel="noopener noreferrer" style={{ color: '#D2691E' }}><span className="material-icons align-middle">linkedin</span></a>
+            <h5 className="text-uppercase fw-bold" style={{ color: '#a14e13' }}>Follow Us</h5>
+            <div className="mt-3">
+              <a href="mailto:info@morreslogistics.com" className="me-3" style={{ color: '#D2691E' }}><span className="material-icons-outlined align-middle">alternate_email</span></a>
+              <a href="https://facebook.com/" target="_blank" rel="noopener noreferrer" className="me-3" style={{ color: '#D2691E' }}><span className="material-icons-outlined align-middle">facebook</span></a>
+              <a href="https://linkedin.com/" target="_blank" rel="noopener noreferrer" style={{ color: '#D2691E' }}><span className="material-icons-outlined align-middle">linkedin</span></a>
+            </div>
           </div>
         </div>
         <div className="row mt-2">

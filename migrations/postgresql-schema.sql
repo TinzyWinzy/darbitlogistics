@@ -475,15 +475,19 @@ CREATE TABLE IF NOT EXISTS checkpoint_logs (
     metadata JSONB DEFAULT '{}'::jsonb
 );
 
+-- Drop the legacy 'operator' text column if it exists.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'checkpoint_logs' AND column_name = 'operator') THEN
+        ALTER TABLE checkpoint_logs DROP COLUMN operator;
+    END IF;
+END $$;
+
 -- Add missing columns to checkpoint_logs if they don't exist
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'checkpoint_logs' AND column_name = 'operator_id') THEN
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'checkpoint_logs' AND column_name = 'operator') THEN
-            ALTER TABLE checkpoint_logs RENAME COLUMN operator TO operator_id;
-        ELSE
-            ALTER TABLE checkpoint_logs ADD COLUMN operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
-        END IF;
+        ALTER TABLE checkpoint_logs ADD COLUMN operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
     END IF;
 END $$;
 

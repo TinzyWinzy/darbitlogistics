@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom';
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
 import { AuthContext } from '../App';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -7,6 +7,9 @@ import axios from 'axios';
 export default function Navbar() {
   const { user, setUser } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [isNavCollapsed, setIsNavCollapsed] = useState(true);
+
+  const handleNavCollapse = () => setIsNavCollapsed(!isNavCollapsed);
 
   async function handleLogout() {
     try {
@@ -27,10 +30,10 @@ export default function Navbar() {
           <span style={{ fontSize: '1.7em', marginRight: 8 }} role="img" aria-label="logo">🚚</span>
           Morres Logistics
         </Link>
-        <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+        <button className="navbar-toggler" type="button" onClick={handleNavCollapse} aria-expanded={!isNavCollapsed} aria-label="Toggle navigation">
           <span className="navbar-toggler-icon"></span>
         </button>
-        <div className="collapse navbar-collapse" id="mainNavbar">
+        <div className={`${isNavCollapsed ? 'collapse' : ''} navbar-collapse`} id="mainNavbar">
           <ul className="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center gap-lg-2">
             <li className="nav-item">
               <NavLink to="/" className={({ isActive }) => 'nav-link' + (isActive ? ' active text-white fw-bold' : ' text-white')}>Home</NavLink>

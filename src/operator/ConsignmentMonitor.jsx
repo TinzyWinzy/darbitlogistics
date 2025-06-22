@@ -113,7 +113,7 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
     <div className="card shadow-sm border-0 mb-4">
       <div className="card-body">
         <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
-          <span className="material-icons align-middle me-2" style={{ color: '#D2691E' }}>list_alt</span>
+          <span className="material-icons-outlined align-middle me-2" style={{ color: '#D2691E' }}>list_alt</span>
           Consignment & Load Monitoring
         </h2>
         
@@ -121,7 +121,7 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
         <div className="d-flex flex-wrap gap-2 mb-3">
           <div className="input-group flex-grow-1">
             <span className="input-group-text bg-white" style={{ color: '#D2691E' }}>
-              <span className="material-icons">search</span>
+              <span className="material-icons-outlined">search</span>
             </span>
             <input
               type="text"
@@ -220,38 +220,55 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
                     {/* Deliveries List */}
                     {booking.deliveries.length > 0 ? (
                       <ul className="list-group list-group-flush">
-                        {booking.deliveries.map(delivery => (
-                          <li
-                            key={delivery.trackingId}  
-                            className={`list-group-item list-group-item-action p-3 ${selectedId === delivery.trackingId ? 'active' : ''}`}
-                            style={selectedId === delivery.trackingId ? { background: '#D269-1E', color: '#fff', borderColor: '#D2691E' } : { cursor: 'pointer' }}
-                            onClick={() => onSelectDelivery(delivery.trackingId)}
-                          >
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div>
-                                <strong className="d-block" style={{ color: '#a14e13' }}>{delivery.trackingId}</strong>
-                                <small className="text-muted">{delivery.driverDetails.name} ({delivery.driverDetails.vehicleReg})</small>
+                        {booking.deliveries.map(delivery => {
+                          const isSelected = selectedId === delivery.trackingId;
+                          const itemStyle = {
+                            cursor: 'pointer',
+                            ...(isSelected && {
+                              backgroundColor: '#D2691E',
+                              color: 'white',
+                              borderColor: '#a14e13'
+                            })
+                          };
+                          const headerStyle = {
+                            color: isSelected ? 'white' : '#a14e13'
+                          };
+
+                          return (
+                            <li
+                              key={delivery.trackingId}
+                              className="list-group-item list-group-item-action p-3"
+                              style={itemStyle}
+                              onClick={() => onSelectDelivery(delivery.trackingId)}
+                            >
+                              <div className="d-flex justify-content-between align-items-center">
+                                <div>
+                                  <strong className="d-block" style={headerStyle}>{delivery.trackingId}</strong>
+                                  <small className={isSelected ? 'text-white-50' : 'text-muted'}>
+                                    {delivery.driverDetails.name} ({delivery.driverDetails.vehicleReg})
+                                  </small>
+                                </div>
+                                <span className={`badge rounded-pill align-self-center fs-6 ${delivery.isCompleted ? 'bg-success' : 'bg-info'}`}>
+                                  {delivery.currentStatus}
+                                </span>
                               </div>
-                              <span className={`badge rounded-pill align-self-center fs-6 ${delivery.isCompleted ? 'bg-success' : 'bg-info'}`}>
-                                {delivery.currentStatus}
-                              </span>
-                            </div>
-                            <div className="mt-2 pt-2 border-top d-flex justify-content-between text-muted small">
-                              <span>
-                                <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>scale</span>
-                                {' '}{delivery.tonnage}t
-                              </span>
-                              <span>
-                                <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>local_shipping</span>
-                                {' '}{delivery.vehicleType}
-                              </span>
-                              <span>
-                                <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>diamond</span>
-                                {' '}{delivery.mineralType || 'N/A'}
-                              </span>
-                            </div>
-                          </li>
-                        ))}
+                              <div className={`mt-2 pt-2 border-top d-flex justify-content-between small ${isSelected ? 'text-white-50 border-top-light' : 'text-muted'}`}>
+                                <span>
+                                  <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>scale</span>
+                                  {' '}{delivery.tonnage}t
+                                </span>
+                                <span>
+                                  <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>local_shipping</span>
+                                  {' '}{delivery.vehicleType}
+                                </span>
+                                <span>
+                                  <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>diamond</span>
+                                  {' '}{delivery.mineralType || 'N/A'}
+                                </span>
+                              </div>
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : (
                       <p className="text-muted text-center small mt-3">No loads dispatched for this consignment yet.</p>

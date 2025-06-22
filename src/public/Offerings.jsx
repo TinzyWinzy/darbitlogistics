@@ -26,7 +26,7 @@ export default function Offerings() {
             <div className="col-12 col-md-4" key={title}>
               <div className="card h-100 shadow-sm border-0 text-center p-4" style={{ background: 'rgba(255,255,255,0.97)' }}>
                 <div className="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style={{ width: 56, height: 56, background: '#e88a3a' }}>
-                  <span className="material-icons fs-3" style={{ color: '#D2691E' }}>{icon}</span>
+                  <span className="material-icons-outlined fs-3" style={{ color: '#D2691E' }}>{icon}</span>
                 </div>
                 <h5 className="fw-semibold mb-1" style={{ color: '#D2691E' }}>{title}</h5>
                 <p className="text-muted small mb-0">{desc}</p>

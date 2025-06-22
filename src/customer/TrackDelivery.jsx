@@ -59,6 +59,17 @@ export default function TrackDelivery() {
     });
   };
 
+  if (loading) return <Spinner />;
+  if (error) return <div className="alert alert-danger">{error}</div>;
+
+  const renderIcon = () => {
+    if (!delivery) return null;
+    if (delivery.currentStatus === 'Delivered') {
+      return <span className="material-icons-outlined" style={{ color: '#198754', fontSize: '4rem' }}>task_alt</span>;
+    }
+    return <span className="material-icons-outlined" style={{ color: '#D2691E', fontSize: '4rem' }}>local_shipping</span>;
+  };
+
   return (
     <div className="bg-gradient" style={{ minHeight: '90vh', background: 'linear-gradient(135deg, #e88a3a 0%, #fffbe6 100%)' }}>
       <div className="container py-5">
@@ -70,14 +81,14 @@ export default function TrackDelivery() {
             <div className="card shadow-lg border-0 rounded-lg overflow-hidden" style={{ background: 'rgba(255,255,255,0.97)' }}>
               <div className="card-body p-4 p-md-5">
                 <div className="text-center mb-4">
-                  <span style={{ fontSize: '2.5em' }} role="img" aria-label="tracking">🔍</span>
+                  {renderIcon()}
                   <p className="text-muted">Enter your tracking ID to see delivery status and updates</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="mb-4">
                   <div className="input-group">
                     <span className="input-group-text bg-white border-end-0">
-                      <span className="material-icons" style={{ color: '#D2691E' }}>local_shipping</span>
+                      <span className="material-icons-outlined me-2">local_shipping</span>
                     </span>
                     <input
                       type="text"
@@ -97,21 +108,18 @@ export default function TrackDelivery() {
                       {loading ? (
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                       ) : (
-                        <span className="material-icons me-2">search</span>
+                        <span className="material-icons-outlined me-2">search</span>
                       )}
                       {loading ? 'Tracking...' : 'Track'}
                     </button>
                   </div>
                 </form>
 
-                {loading && <Spinner />}
-                {error && <div className="alert alert-danger mt-3">{error}</div>}
-
                 {delivery && (
                   <div className="card shadow-sm mt-4 border-0">
                     <div className="card-header bg-white d-flex justify-content-between align-items-center">
                       <h2 className="h5 mb-0" style={{ color: '#a14e13' }}>
-                        <span className="material-icons align-middle me-2">receipt_long</span>
+                        <span className="material-icons-outlined align-middle me-2">receipt_long</span>
                         Tracking ID: {delivery.trackingId}
                       </h2>
                       <StatusBadge status={delivery.currentStatus} />
@@ -144,7 +152,7 @@ export default function TrackDelivery() {
                                 {cp.hasIssue && (
                                   <div className="alert alert-warning p-2 mt-2">
                                     <strong className="d-block">
-                                      <span className="material-icons align-middle small me-1">warning</span>
+                                      <span className="material-icons-outlined align-middle small me-1">warning</span>
                                       Issue Reported:
                                     </strong>
                                     <span className="small">{cp.issueDetails}</span>
