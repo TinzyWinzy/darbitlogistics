@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { deliveryApi } from '../services/api'; // Correct the import
+import { usePushNotifications } from '../services/usePushNotifications';
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
@@ -10,6 +11,7 @@ const AdminDashboard = () => {
     password: '',
     role: 'operator',
   });
+  const { isSubscribed, subscribeToPush, error: pushError } = usePushNotifications();
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -67,6 +69,22 @@ const AdminDashboard = () => {
       <h2>Admin Dashboard: User Management</h2>
 
       {error && <div className="alert alert-danger">{error}</div>}
+      {pushError && <div className="alert alert-danger">Push Notification Error: {pushError.message}</div>}
+
+      <div className="card mb-4">
+        <div className="card-header">
+          Settings
+        </div>
+        <div className="card-body">
+          <button 
+            className="btn btn-info"
+            onClick={subscribeToPush}
+            disabled={isSubscribed}
+          >
+            {isSubscribed ? 'Notifications Enabled' : 'Enable Notifications'}
+          </button>
+        </div>
+      </div>
 
       <div className="card mb-4">
         <div className="card-header">

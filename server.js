@@ -6,10 +6,24 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
 import twilio from 'twilio'; // Import Twilio
+import AfricasTalking from 'africastalking'; // Import Africa's Talking
+import webPush from 'web-push'; // Import web-push
 import bcrypt from 'bcrypt';
 import pool from './config/database.js';
 
 dotenv.config();
+
+// VAPID keys for web push
+const vapidKeys = {
+  publicKey: process.env.VAPID_PUBLIC_KEY,
+  privateKey: process.env.VAPID_PRIVATE_KEY,
+};
+
+webPush.setVapidDetails(
+  'mailto:hanzohanic@gmail.com', 
+  vapidKeys.publicKey,
+  vapidKeys.privateKey
+);
 
 const app = express();
 app.use(bodyParser.json());
@@ -46,31 +60,91 @@ app.use(cors(corsOptions));
 // Ensure only the correct preflight handler is present
 app.options('/{*any}', cors(corsOptions));
 
-// Helper: Send SMS via Twilio
+// Initialize Africa's Talking
+let atSMS;
+const atApiKey = process.env.AT_API_KEY;
+const atEnv = process.env.AT_ENV || 'production';
+const atUsername = atEnv === 'sandbox' ? 'sandbox' : process.env.AT_USERNAME;
+
+if (atUsername && atApiKey) {
+  const africasTalking = AfricasTalking({
+    username: atUsername,
+    apiKey: atApiKey,
+  });
+  atSMS = africasTalking.SMS;
+  console.log(`Africa's Talking initialized in ${atEnv} mode.`);
+  console.log(`[DEBUG] AT Username Loaded: ${atUsername}`);
+} else {
+  console.warn("Africa's Talking credentials not set. SMS fallback will not work.");
+}
+
+// Helper: Send SMS with Twilio and Africa's Talking fallback
 async function sendSMS(to, message) {
+  // Standardize the 'to' number to E.164 format for both providers
+  let formattedTo = to.replace(/\D/g, ''); // Remove non-digits
+  if (formattedTo.startsWith('0')) {
+    formattedTo = '263' + formattedTo.substring(1);
+  }
+  if (!formattedTo.startsWith('+')) {
+    formattedTo = `+${formattedTo}`;
+  }
+  
+  // 1. Try Twilio first
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const fromNumber = process.env.TWILIO_PHONE_NUMBER;
 
-  if (!accountSid || !authToken || !fromNumber) {
-    console.error('Twilio environment variables are not set.');
-    return { success: false, error: 'SMS service not configured.' };
+  if (accountSid && authToken && fromNumber) {
+    const client = twilio(accountSid, authToken);
+    try {
+      const response = await client.messages.create({
+        body: message,
+        from: fromNumber,
+        to: formattedTo,
+      });
+      console.log('Twilio SMS sent successfully. SID:', response.sid);
+      return { success: true, provider: 'twilio', data: response };
+    } catch (err) {
+      console.error('--- Twilio SMS Error ---');
+      console.error('Timestamp:', new Date().toISOString());
+      console.error('Full Error Object:', err);
+      if (err.code === 'EAI_AGAIN') {
+        console.error('[VERBOSE ANALYSIS] The error code EAI_AGAIN suggests a DNS lookup failure. This means the server could not resolve api.twilio.com. This is typically a network connectivity issue on the server itself, not a problem with the Twilio credentials or the code logic. Check the server\'s internet connection and DNS settings.');
+      } else if (err.status === 401) {
+        console.error('[VERBOSE ANALYSIS] Received a 401 Unauthorized error. This indicates that the TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN is incorrect.');
+      }
+      console.error('--------------------------');
+      // Don't return yet, proceed to fallback
+    }
+  } else {
+    console.warn('Twilio environment variables are not fully set.');
+  }
+
+  // 2. Fallback to Africa's Talking
+  if (atSMS) {
+    try {
+      // The number is already formatted as international E.164
+      const response = await atSMS.send({
+        to: [formattedTo],
+        message: message,
+        from: process.env.AT_SENDER_ID // Optional: Your Sender ID
+      });
+      console.log("Africa's Talking SMS sent successfully:", response);
+      return { success: true, provider: 'africastalking', data: response };
+    } catch (err) {
+      console.error("--- Africa's Talking SMS Error ---");
+      console.error('Timestamp:', new Date().toISOString());
+      console.error('Full Error Object:', err);
+      if (typeof err.message === 'string' && err.message.includes('401')) {
+          console.error('[VERBOSE ANALYSIS] The error message contains "401". This points to an authentication issue. Please verify your AT_USERNAME and AT_API_KEY.');
+      }
+      console.error('------------------------------------');
+    }
   }
   
-  const client = twilio(accountSid, authToken);
-
-  try {
-    const response = await client.messages.create({
-      body: message,
-      from: fromNumber,
-      to: to,
-    });
-    console.log('Twilio SMS sent successfully. SID:', response.sid);
-    return { success: true, data: response };
-  } catch (err) {
-    console.error('Twilio SMS error:', err.message);
-    return { success: false, error: err.message };
-  }
+  // 3. If both fail
+  console.error('Both Twilio and Africa\'s Talking failed to send SMS.');
+  return { success: false, error: "All SMS providers failed." };
 }
 
 // Session middleware with updated error handling
@@ -313,8 +387,11 @@ app.post('/deliveries', authenticateSession, async (req, res) => {
         const newDelivery = result.rows[0];
 
         // 4. Construct and send an enhanced SMS to the customer
-        const progressMessage = `Progress: ${parseFloat(booking.completed_tonnage) + parseFloat(tonnage)}/${booking.total_tonnage} tons dispatched.`;
-        const smsMessage = `New delivery for booking ${booking.booking_code}. Tracking ID: ${tracking_id}. ${progressMessage}`;
+        const trackingId = newDelivery.tracking_id;
+        const trackingBaseUrl = process.env.FRONTEND_URL || 'https://morres-logistics.vercel.app';
+
+        // Send SMS notification
+        const smsMessage = `Hi ${customer_name}, your delivery with tracking ID ${trackingId} has been dispatched. Track its progress here: ${trackingBaseUrl}/track-delivery?id=${trackingId}`;
         const smsRes = await sendSMS(phone_number, smsMessage);
 
         // 5. Audit log
@@ -563,14 +640,13 @@ app.get('/me', authenticateSession, (req, res) => {
 
 // Parent Booking Routes
 app.post('/parent-bookings', authenticateSession, async (req, res) => {
-  // Handle both camelCase and snake_case field names
-  const { 
-    customerName, customer_name,
-    phoneNumber, phone_number,
-    totalTonnage, total_tonnage,
+  const {
+    customer_name,
+    phone_number,
+    total_tonnage,
     mineral_type,
     mineral_grade,
-    loadingPoint, loading_point,
+    loading_point,
     destination,
     deadline,
     notes,
@@ -581,133 +657,72 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
     environmental_concerns
   } = req.body;
 
-  // Use the first non-null value for each field
-  const data = {
-    customerName: customerName || customer_name,
-    phoneNumber: phoneNumber || phone_number,
-    totalTonnage: totalTonnage || total_tonnage,
-    mineral_type,
-    mineral_grade,
-    loadingPoint: loadingPoint || loading_point,
-    destination,
-    deadline,
-    notes,
-    moisture_content,
-    particle_size,
-    requires_analysis,
-    special_handling_notes,
-    environmental_concerns
-  };
-
   try {
-    console.log('Received parent booking request:', data);
-
     // Generate booking code first
     const bookingCode = generateBookingCode();
-    console.log('Generated booking code:', bookingCode);
-
+    
     // Validate required fields
-    if (!data.customerName || !data.phoneNumber || !data.totalTonnage || !data.mineral_type || !data.loadingPoint || !data.destination || !data.deadline) {
-      console.log('Missing required fields:', {
-        customerName: !data.customerName,
-        phoneNumber: !data.phoneNumber,
-        totalTonnage: !data.totalTonnage,
-        mineral_type: !data.mineral_type,
-        loadingPoint: !data.loadingPoint,
-        destination: !data.destination,
-        deadline: !data.deadline
-      });
+    if (!customer_name || !phone_number || !total_tonnage || !mineral_type || !loading_point || !destination || !deadline) {
       return res.status(400).json({ error: 'Missing required fields.' });
     }
 
     // Validate phone number
-    const isValidPhone = validateZimPhone(data.phoneNumber);
-    console.log('Phone validation result:', { phoneNumber: data.phoneNumber, isValid: isValidPhone });
-    if (!isValidPhone) {
+    if (!validateZimPhone(phone_number)) {
       return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
     }
 
     // Validate tonnage
-    if (data.totalTonnage <= 0) {
-      console.log('Invalid tonnage:', data.totalTonnage);
+    if (total_tonnage <= 0) {
       return res.status(400).json({ error: 'Total tonnage must be greater than 0.' });
     }
 
     // Validate deadline
-    const deadlineDate = new Date(data.deadline);
-    const now = new Date();
-    console.log('Deadline validation:', { deadline: data.deadline, deadlineDate, now, isValid: deadlineDate > now });
-    if (deadlineDate <= now) {
+    const deadlineDate = new Date(deadline);
+    if (deadlineDate <= new Date()) {
       return res.status(400).json({ error: 'Deadline must be in the future.' });
     }
 
     // Validate moisture content if provided
-    if (data.moisture_content !== undefined && (data.moisture_content < 0 || data.moisture_content > 100)) {
-      console.log('Invalid moisture content:', data.moisture_content);
+    if (moisture_content !== undefined && moisture_content !== null && (moisture_content < 0 || moisture_content > 100)) {
       return res.status(400).json({ error: 'Moisture content must be between 0 and 100%.' });
     }
-
-    // Validate mineral type
-    const validMineralTypes = ['Coal', 'Iron Ore', 'Copper Ore', 'Gold Ore', 'Bauxite', 'Limestone', 'Phosphate', 'Manganese', 'Other'];
-    console.log('Mineral type validation:', { mineral_type: data.mineral_type, isValid: validMineralTypes.includes(data.mineral_type) });
-    if (!validMineralTypes.includes(data.mineral_type)) {
-      return res.status(400).json({ error: 'Invalid mineral type.' });
-    }
-
-    // Validate mineral grade if provided
-    const validGrades = ['Premium', 'Standard', 'Low Grade', 'Mixed', 'Ungraded'];
-    if (data.mineral_grade && !validGrades.includes(data.mineral_grade)) {
-      console.log('Invalid mineral grade:', data.mineral_grade);
-      return res.status(400).json({ error: 'Invalid mineral grade.' });
-    }
-
+    
     const result = await pool.query(
       `INSERT INTO parent_bookings (
-        customer_name, 
-        phone_number, 
-        total_tonnage, 
-        mineral_type, 
-        mineral_grade, 
-        loading_point, 
-        destination, 
-        deadline, 
-        booking_code, 
-        notes,
-        moisture_content,
-        particle_size,
-        requires_analysis,
-        special_handling_notes,
-        environmental_concerns,
-        remaining_tonnage,
-        status,
-        created_by_user_id
+        customer_name, phone_number, total_tonnage, mineral_type, mineral_grade, 
+        loading_point, destination, deadline, booking_code, notes,
+        moisture_content, particle_size, requires_analysis,
+        special_handling_notes, environmental_concerns,
+        remaining_tonnage, status, created_by_user_id
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
       RETURNING *`,
       [
-        data.customerName, 
-        data.phoneNumber, 
-        data.totalTonnage, 
-        data.mineral_type, 
-        data.mineral_grade || 'Ungraded', 
-        data.loadingPoint,
-        data.destination, 
-        data.deadline, 
-        bookingCode, 
-        data.notes || '',
-        data.moisture_content,
-        data.particle_size,
-        data.requires_analysis || false,
-        data.special_handling_notes,
-        data.environmental_concerns,
-        data.totalTonnage, // Initially, remaining_tonnage equals total_tonnage
+        customer_name,
+        phone_number,
+        total_tonnage,
+        mineral_type,
+        mineral_grade || 'Ungraded',
+        loading_point,
+        destination,
+        deadline,
+        bookingCode,
+        notes || '',
+        moisture_content,
+        particle_size,
+        requires_analysis || false,
+        special_handling_notes,
+        environmental_concerns,
+        total_tonnage, // Initially, remaining_tonnage equals total_tonnage
         'Active',  // Default status
-        req.user.id // Add the user ID from the authenticated session
+        req.user.id
       ]
     );
 
+    const newBooking = result.rows[0];
+
     // Send SMS notification
-    const smsMessage = `Your booking is confirmed. Booking Code: ${bookingCode}. Total Tonnage: ${data.totalTonnage}. We will notify you as deliveries are dispatched.`;
-    const smsRes = await sendSMS(data.phoneNumber, smsMessage);
+    const smsMessage = `Your booking is confirmed. Booking Code: ${bookingCode}. Total Tonnage: ${total_tonnage}. We will notify you as deliveries are dispatched.`;
+    const smsRes = await sendSMS(phone_number, smsMessage);
 
     // Audit log
     console.log(`[AUDIT] Parent booking created by ${req.user.username} at ${new Date().toISOString()} | BookingCode: ${bookingCode}`);
@@ -716,15 +731,19 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
       return res.status(207).json({
         success: true,
         warning: 'Booking created, but SMS failed',
-        booking: result.rows[0],
+        booking: newBooking,
         smsError: smsRes.error
       });
     }
 
-    res.json({ success: true, booking: result.rows[0] });
+    res.json({ success: true, booking: newBooking });
   } catch (err) {
-    console.error('Create parent booking error:', err);
-    res.status(500).json({ error: err.message });
+    console.error('Parent booking creation error:', err);
+    // Check for specific database errors, like invalid enum value
+    if (err.message.includes('invalid input value for enum mineral_type')) {
+      return res.status(400).json({ error: 'Invalid mineral type.' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -868,6 +887,75 @@ app.delete('/admin/users/:id', authenticateSession, adminOnly, async (req, res) 
     console.error('Admin delete user error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// Endpoint to provide the VAPID public key to the client
+app.get('/vapidPublicKey', (req, res) => {
+  res.json({ publicKey: vapidKeys.publicKey });
+});
+
+// Subscribe to push notifications
+app.post('/subscribe', authenticateSession, async (req, res) => {
+  const subscription = req.body;
+  const userId = req.user.id;
+
+  if (!subscription || !userId) {
+    return res.status(400).json({ error: 'Subscription and user ID are required.' });
+  }
+
+  try {
+    // Store subscription in the database
+    await pool.query(
+      'INSERT INTO push_subscriptions (user_id, subscription_info) VALUES ($1, $2) ON CONFLICT (user_id, subscription_info) DO NOTHING',
+      [userId, JSON.stringify(subscription)]
+    );
+
+    res.status(201).json({ success: true, message: 'Subscribed successfully.' });
+  } catch (err) {
+    console.error('Subscription error:', err);
+    res.status(500).json({ error: 'Failed to subscribe.' });
+  }
+});
+
+// Send a test notification (placeholder)
+app.post('/send-notification', authenticateSession, async (req, res) => {
+    const { userId, message } = req.body;
+  
+    if (!userId || !message) {
+      return res.status(400).json({ error: 'User ID and message are required.' });
+    }
+  
+    try {
+      const result = await pool.query(
+        'SELECT subscription_info FROM push_subscriptions WHERE user_id = $1',
+        [userId]
+      );
+  
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'No push subscriptions found for this user.' });
+      }
+  
+      const notificationPayload = JSON.stringify({
+        title: 'Morres Logistics',
+        body: message,
+        icon: '/pwa-192x192.png',
+      });
+  
+      const promises = result.rows.map(row =>
+        webPush.sendNotification(row.subscription_info, notificationPayload)
+      );
+  
+      await Promise.all(promises);
+  
+      res.status(200).json({ success: true, message: 'Notification sent.' });
+    } catch (err) {
+      console.error('Failed to send notification:', err);
+      // Check for specific error types, e.g., 'gone' for expired subscriptions
+      if (err.statusCode === 410) {
+        // You might want to remove the expired subscription from the database here
+      }
+      res.status(500).json({ error: 'Failed to send notification.' });
+    }
 });
 
 const PORT = process.env.PORT || 3000;

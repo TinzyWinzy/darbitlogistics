@@ -118,7 +118,7 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
         </h2>
         
         {/* Search and Filter Controls */}
-        <div className="d-flex flex-wrap gap-2 mb-3">
+        <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
           <div className="input-group flex-grow-1">
             <span className="input-group-text bg-white" style={{ color: '#D2691E' }}>
               <span className="material-icons-outlined">search</span>
@@ -133,37 +133,45 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
             />
           </div>
           
-          <select 
-            className="form-select form-select-sm" 
-            style={{ flexBasis: '150px' }}
-            value={progressFilter}
-            onChange={(e) => setProgressFilter(e.target.value)}
-          >
-            <option value="all">All Statuses</option>
-            <option value="completed">Completed</option>
-            <option value="in-progress">In Progress</option>
-            <option value="not-started">Not Started</option>
-            <option value="overdue">Overdue</option>
-          </select>
+          <div className="d-flex align-items-center gap-2">
+            <label htmlFor="progressFilter" className="form-label text-muted mb-0 small">Status:</label>
+            <select 
+              id="progressFilter"
+              className="form-select form-select-sm" 
+              style={{ flexBasis: '150px' }}
+              value={progressFilter}
+              onChange={(e) => setProgressFilter(e.target.value)}
+            >
+              <option value="all">All</option>
+              <option value="completed">Completed</option>
+              <option value="in-progress">In Progress</option>
+              <option value="not-started">Not Started</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
 
-          <select 
-            className="form-select form-select-sm" 
-            style={{ flexBasis: '150px' }}
-            value={progressSort}
-            onChange={(e) => setProgressSort(e.target.value)}
-          >
-            <option value="deadline">Sort: Deadline</option>
-            <option value="progress">Sort: Progress</option>
-            <option value="tonnage">Sort: Tonnage</option>
-            <option value="customer">Sort: Customer</option>
-          </select>
-
-          <button 
-            className="btn btn-sm btn-outline-secondary" 
-            onClick={() => setProgressSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
-          >
-            {progressSortOrder === 'asc' ? '↑' : '↓'}
-          </button>
+          <div className="d-flex align-items-center gap-2">
+            <label htmlFor="progressSort" className="form-label text-muted mb-0 small">Sort by:</label>
+            <select 
+              id="progressSort"
+              className="form-select form-select-sm" 
+              style={{ flexBasis: '150px' }}
+              value={progressSort}
+              onChange={(e) => setProgressSort(e.target.value)}
+            >
+              <option value="deadline">Deadline</option>
+              <option value="progress">Progress</option>
+              <option value="tonnage">Tonnage</option>
+              <option value="customer">Customer</option>
+            </select>
+            <button 
+              className="btn btn-sm btn-outline-secondary" 
+              onClick={() => setProgressSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
+              aria-label="Toggle sort order"
+            >
+              {progressSortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -186,6 +194,9 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
                       <div>
                         <strong style={{ color: '#a14e13' }}>{booking.customerName}</strong>
                         <small className="text-muted ms-2">({booking.bookingCode})</small>
+                        <div className="text-muted small mt-1">
+                          {booking.loadingPoint} &rarr; {booking.destination}
+                        </div>
                       </div>
                       <span className={`badge ${getDeadlineBadgeClass(booking.deadline)}`}>
                         {getTimeLeft(booking.deadline)}
@@ -210,6 +221,10 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
                       >
                         {booking.completionPercentage}%
                       </div>
+                    </div>
+                    <div className="row g-2 text-muted small mb-3">
+                      <div className="col"><strong>From:</strong> {booking.loadingPoint}</div>
+                      <div className="col"><strong>To:</strong> {booking.destination}</div>
                     </div>
                     <div className="row g-2 text-muted small mb-3">
                       <div className="col"><strong>Total:</strong> {booking.totalTonnage}t</div>

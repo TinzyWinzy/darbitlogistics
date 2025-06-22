@@ -170,6 +170,28 @@ export const deliveryApi = {
     }
   },
 
+  // Get VAPID public key
+  getVapidPublicKey: async () => {
+    try {
+      const res = await api.get('/vapidPublicKey');
+      return res.data;
+    } catch (error) {
+      console.error('Failed to fetch VAPID public key:', error);
+      throw error;
+    }
+  },
+
+  // Subscribe to push notifications
+  subscribe: async (subscription) => {
+    try {
+      const res = await api.post('/subscribe', subscription);
+      return res.data;
+    } catch (error) {
+      console.error('Failed to subscribe:', error);
+      throw error;
+    }
+  },
+
   // Send initial SMS
   sendInitialSms: async (to, message) => {
     try {

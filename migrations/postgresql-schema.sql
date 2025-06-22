@@ -1,21 +1,55 @@
 -- Create UUID extension for better IDs
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create ENUM for mineral types
+-- Drop and recreate ENUM for mineral types to include a comprehensive list
+-- This is done in a transaction to ensure data integrity during migration
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'mineral_type') THEN
-        CREATE TYPE mineral_type AS ENUM (
-            'Coal',
-            'Iron Ore',
-            'Copper Ore',
-            'Gold Ore',
-            'Bauxite',
-            'Limestone',
-            'Phosphate',
-            'Manganese',
-            'Other'
-        );
+    -- Step 0: Drop the dependent view
+    DROP VIEW IF EXISTS booking_progress;
+
+    -- Step 1: Temporarily convert the column to TEXT
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'parent_bookings' AND column_name = 'mineral_type'
+    ) THEN
+        ALTER TABLE parent_bookings ALTER COLUMN mineral_type TYPE TEXT;
+    END IF;
+
+    -- Step 1.5: Drop the default value
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'parent_bookings' AND column_name = 'mineral_type'
+    ) THEN
+        ALTER TABLE parent_bookings ALTER COLUMN mineral_type DROP DEFAULT;
+    END IF;
+
+    -- Step 2: Drop the old ENUM type if it exists
+    DROP TYPE IF EXISTS mineral_type;
+
+    -- Step 3: Create the new, comprehensive ENUM type
+    CREATE TYPE mineral_type AS ENUM (
+        'Agate', 'Adamite', 'Andalusite', 'Anhydrite', 'Angelisite', 'Anthophyllite', 'Antimony', 'Aragonite', 'Arucite', 'Arsenic', 
+        'Bauxite', 'Beryl', 'Bismuth', 'Bornite', 'Calcite', 'Chalcocite', 'Chalcopyrite', 'Chromite', 'Coal', 'Cobalt', 'Copper', 
+        'Copper Ore', 'Corundum', 'Diamond', 'Dolomite', 'Fireclay', 'Galena', 'Gold', 'Gold Ore', 'Graphite', 'Gypsum', 'Hematite', 
+        'Iron Ore', 'Jasper', 'Kaolinite Clay', 'Kyanite', 'Lead', 'Lepidolite', 'Limestone', 'Limonite Clay', 'Magnesite', 'Manganese', 
+        'Marble', 'Mercury', 'Molybdenum', 'Monazite', 'Mtorolite', 'Muscovite', 'Nickel', 'Orthoclase', 'PGMs', 'Phosphate', 'Phyllite', 
+        'Platinum', 'Pollucite', 'Pyrite', 'Quartz', 'Rutile', 'Scheelite', 'Schorl', 'Serpentine', 'Sillimanite', 'Silver', 'Slates', 
+        'Sphalerite', 'Tantalite-columbite', 'Titanium', 'Tungsten', 'Wolfram', 'Other'
+    );
+
+    -- Step 4: Convert the column back to the new ENUM type with a default
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'parent_bookings' AND column_name = 'mineral_type'
+    ) THEN
+        ALTER TABLE parent_bookings 
+        ALTER COLUMN mineral_type TYPE mineral_type 
+        USING mineral_type::mineral_type;
+        
+        -- Reset the default value
+        ALTER TABLE parent_bookings 
+        ALTER COLUMN mineral_type SET DEFAULT 'Other';
     END IF;
 END$$;
 
@@ -412,8 +446,7 @@ CREATE TRIGGER update_parent_bookings_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Drop and recreate the view for progress tracking
-DROP VIEW IF EXISTS booking_progress;
+-- Recreate the view after all table modifications
 CREATE OR REPLACE VIEW booking_progress AS
 SELECT 
     pb.id as parent_booking_id,
@@ -628,6 +661,15 @@ CREATE INDEX IF NOT EXISTS idx_environmental_incidents_delivery ON environmental
 CREATE INDEX IF NOT EXISTS idx_environmental_incidents_status ON environmental_incidents(status);
 CREATE INDEX IF NOT EXISTS idx_sampling_records_delivery ON sampling_records(delivery_tracking_id);
 CREATE INDEX IF NOT EXISTS idx_sampling_records_status ON sampling_records(analysis_status);
+
+-- Create push_subscriptions table for web push notifications
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    subscription_info JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, subscription_info)
+);
 
 -- Insert the admin and operator users with pre-hashed passwords.
 INSERT INTO users (username, role, password)

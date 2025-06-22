@@ -10,6 +10,79 @@ import axios from 'axios';
 import ParentBookingDetails from './ParentBookingDetails';
 import ConsignmentMonitor from './ConsignmentMonitor';
 
+const mineralTypes = [
+  'Agate', 'Adamite', 'Andalusite', 'Anhydrite', 'Angelisite', 'Anthophyllite', 'Antimony', 'Aragonite', 'Arucite', 'Arsenic',
+  'Bauxite', 'Beryl', 'Bismuth', 'Bornite', 'Calcite', 'Chalcocite', 'Chalcopyrite', 'Chromite', 'Coal', 'Cobalt', 'Copper',
+  'Copper Ore', 'Corundum', 'Diamond', 'Dolomite', 'Fireclay', 'Galena', 'Gold', 'Gold Ore', 'Graphite', 'Gypsum', 'Hematite',
+  'Iron Ore', 'Jasper', 'Kaolinite Clay', 'Kyanite', 'Lead', 'Lepidolite', 'Limestone', 'Limonite Clay', 'Magnesite', 'Manganese',
+  'Marble', 'Mercury', 'Molybdenum', 'Monazite', 'Mtorolite', 'Muscovite', 'Nickel', 'Orthoclase', 'PGMs', 'Phosphate', 'Phyllite',
+  'Platinum', 'Pollucite', 'Pyrite', 'Quartz', 'Rutile', 'Scheelite', 'Schorl', 'Serpentine', 'Sillimanite', 'Silver', 'Slates',
+  'Sphalerite', 'Tantalite-columbite', 'Titanium', 'Tungsten', 'Wolfram', 'Other'
+];
+
+const mineralLocations = {
+  'Agate': ['Battlefields'],
+  'Adamite': ['Sanyati mine'],
+  'Angelisite': ['Sanyati mine'],
+  'Andalusite': ['Karoi'],
+  'Anhydrite': ['Norah mine'],
+  'Anthophyllite': ['Sanyati'],
+  'Arucite': ['Ethel Mine', 'Mutorashanga'],
+  'Aragonite': ['Mangula Mine', 'Mhangura'],
+  'Antimony': ['Kadoma'],
+  'Arsenic': ['Kadoma'],
+  'Beryl': ['Hurungwe'],
+  'Bornite': ['Mangula Mine'],
+  'Bismuth': ['Kadoma'],
+  'Coal': ['Strange\'s deposits', 'Mashambanzou'],
+  'Cobalt': ['Great dyke', 'Mhangura mines'],
+  'Copper': ['Mangula Mine', 'Mhangura', 'Great Dyke'],
+  'Chalcocite': ['Mangula Mine', 'Mhangura'],
+  'Calcite': ['Miriam Mine (Norah Mine)', 'Mhangura'],
+  'Corundum': ['Chegutu area'],
+  'Chromite': ['Mutorashanga', 'Ngezi', 'Great Dyke'],
+  'Dolomite': ['Sanyati mine', 'Tengwe'],
+  'Gold': ['Kadoma', 'Chegutu', 'Chinhoyi', 'Karoi', 'Banket', 'Zimplats'],
+  'Gypsum': ['Sanyati'],
+  'Galena (Lead)': ['Hurungwe', 'Kadoma'],
+  'Graphite': ['Hurungwe', 'Makonde', 'Sanyati'],
+  'Fireclay': ['Mac farm Kadoma'],
+  'Hematite (Iron ore)': ['Miriam mine(Sanyati district)'],
+  'Jasper': ['Battlefields'],
+  'Kaolinite Clay': ['St Annes mine', 'Mwami', 'Kadoma'],
+  'Kyanite': ['Hurungwe'],
+  'Corndian': ['Battlefields'],
+  'Limonite Clay': ['Sanyati mine', 'Kadoma'],
+  'Limestone': ['Chidamoyo-hurungwe area', 'Makonde', 'Chegutu'],
+  'Muscovite': ['Hurungwe'],
+  'Manganese': ['Makonde', 'Kadoma'],
+  'Molybdenum': ['Makonde'],
+  'Mercury': ['Kadoma', 'Battlefields'],
+  'Mtorolite': ['Mutorashanga area'],
+  'Magnesite': ['Kadoma'],
+  'Modalite': ['Karoi', 'Mwami'],
+  'Monazite': ['Hurungwe', 'Sanyati'],
+  'Lepidolite': ['Hurungwe'],
+  'Slates': ['Makonde'],
+  'Phyllite': ['Hurungwe'],
+  'Nickel': ['Great Dyke', 'Mhangura', 'Makonde', 'Sanyati'],
+  'Sphalerite': ['Zinc'],
+  'Pollucite': ['Hurungwe'],
+  'Orthoclase': ['Hurungwe district'],
+  'Platinum/PGMs': ['Makwiro'],
+  'Pyrite': ['Mangula mine', 'Sanyati'],
+  'Quartz': ['Mwami', 'Karoi district'],
+  'Rutile (Titanium)': ['Hurungwe'],
+  'Sillimanite': ['Hurungwe'],
+  'Schorl': ['Ethel mine Mtorashanga', 'Mwami karoi'],
+  'Serpentine': ['Great dyke'],
+  'Silver': ['All gold mines'],
+  'Scheelite': ['Kadoma', 'Battlefields'],
+  'Tungsten': ['Hurungwe', 'Makonde', 'Sanyati'],
+  'Tantalite-columbite': ['Hurungwe'],
+  'Wolfram': ['Hurungwe'],
+};
+
 // Spinner component
 function Spinner() {
   return (
@@ -64,7 +137,9 @@ export default function OperatorDashboard() {
     containerCount: '',
     tonnage: '',
     vehicleType: 'Standard Truck',
-    vehicleCapacity: 30.00
+    vehicleCapacity: 30.00,
+    loadingPoint: '',
+    destination: ''
   });
   const [creating, setCreating] = useState(false);
   const [createFeedback, setCreateFeedback] = useState('');
@@ -96,9 +171,35 @@ export default function OperatorDashboard() {
   const [selectedParentBooking, setSelectedParentBooking] = useState(null);
   const [showParentDetails, setShowParentDetails] = useState(false);
   const [showCreateParentBookingModal, setShowCreateParentBookingModal] = useState(false);
+  const [suggestedLocations, setSuggestedLocations] = useState([]);
 
   const [deliveries, setLocalDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const handleParentFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    
+    setParentForm(prev => {
+      const newState = {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      };
+
+      // When mineral type changes, update suggestions
+      if (name === 'mineral_type') {
+        const locations = mineralLocations[value] || [];
+        setSuggestedLocations(locations);
+        // Optional: auto-select the first location
+        if (locations.length > 0) {
+          newState.loadingPoint = locations[0];
+        } else {
+          newState.loadingPoint = '';
+        }
+      }
+      
+      return newState;
+    });
+  };
 
   useEffect(() => {
     if (!user) {
@@ -245,7 +346,9 @@ export default function OperatorDashboard() {
           driverDetails: {
             name: '',
             vehicleReg: ''
-          }
+          },
+          loadingPoint: '',
+          destination: ''
         });
 
         // Refresh parent bookings to update remaining tonnage
@@ -452,6 +555,7 @@ export default function OperatorDashboard() {
       if (res.success) {
         setShowToast(true);
         setToastMsg(`Consignment logged successfully! Booking Code: ${res.booking.booking_code}`);
+        setShowCreateParentBookingModal(false);
         
         // Reset form
         setParentForm({
@@ -515,7 +619,9 @@ export default function OperatorDashboard() {
         tonnage: '',
         containerCount: '',
         vehicleType: 'Standard Truck',
-        vehicleCapacity: 30.00
+        vehicleCapacity: 30.00,
+        loadingPoint: '',
+        destination: ''
       }));
       return;
     }
@@ -539,7 +645,9 @@ export default function OperatorDashboard() {
       driverDetails: {
         name: '',
         vehicleReg: ''
-      }
+      },
+      loadingPoint: '',
+      destination: ''
     }));
   };
 
@@ -645,214 +753,210 @@ export default function OperatorDashboard() {
                 <div className="modal-body">
                   <form onSubmit={handleCreateParentBooking} className="row g-3" autoComplete="off">
                     <div className="col-md-6">
-              <label className="form-label">Customer Name *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                value={parentForm.customerName}
-                onChange={e => setParentForm(prev => ({ ...prev, customerName: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-            
+                      <label className="form-label">Customer Name</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="customerName"
+                        placeholder="e.g., John Doe"
+                        value={parentForm.customerName}
+                        onChange={handleParentFormChange}
+                        required
+                      />
+                    </div>
                     <div className="col-md-6">
-              <label className="form-label">Phone Number *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required 
-                placeholder="e.g. 0771234567"
-                value={parentForm.phoneNumber}
-                onChange={e => setParentForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-            
-                    <div className="col-md-6">
-              <label className="form-label">Total Tonnage *</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                required 
-                min="0.01"
-                step="0.01"
-                value={parentForm.totalTonnage}
-                onChange={e => setParentForm(prev => ({ ...prev, totalTonnage: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+                      <label className="form-label">Phone Number</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="phoneNumber"
+                        placeholder="e.g., 0772123456"
+                        value={parentForm.phoneNumber}
+                        onChange={handleParentFormChange}
+                        required
+                      />
+                    </div>
 
                     <div className="col-md-6">
-              <label className="form-label">Mineral Type *</label>
-              <select 
-                className="form-select"
-                required
-                value={parentForm.mineral_type}
-                onChange={e => setParentForm(prev => ({ ...prev, mineral_type: e.target.value }))}
-                disabled={creating}
-              >
-                <option value="">Select type...</option>
-                <option value="Coal">Coal</option>
-                <option value="Iron Ore">Iron Ore</option>
-                <option value="Copper Ore">Copper Ore</option>
-                <option value="Gold Ore">Gold Ore</option>
-                <option value="Bauxite">Bauxite</option>
-                <option value="Limestone">Limestone</option>
-                <option value="Phosphate">Phosphate</option>
-                <option value="Manganese">Manganese</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
+                      <label className="form-label">Mineral Type</label>
+                      <select
+                        className="form-select"
+                        name="mineral_type"
+                        value={parentForm.mineral_type}
+                        onChange={handleParentFormChange}
+                        required
+                      >
+                        {mineralTypes.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label">Mineral Grade</label>
+                      <select
+                        className="form-select"
+                        name="mineral_grade"
+                        value={parentForm.mineral_grade}
+                        onChange={handleParentFormChange}
+                      >
+                        <option value="Ungraded">Ungraded</option>
+                        <option value="Premium">Premium</option>
+                        <option value="Standard">Standard</option>
+                        <option value="Low Grade">Low Grade</option>
+                        <option value="Mixed">Mixed</option>
+                      </select>
+                    </div>
 
                     <div className="col-md-6">
-              <label className="form-label">Mineral Grade</label>
-              <select 
-                className="form-select"
-                value={parentForm.mineral_grade}
-                onChange={e => setParentForm(prev => ({ ...prev, mineral_grade: e.target.value }))}
-                disabled={creating}
-              >
-                <option value="Ungraded">Ungraded</option>
-                <option value="Premium">Premium</option>
-                <option value="Standard">Standard</option>
-                <option value="Low Grade">Low Grade</option>
-                <option value="Mixed">Mixed</option>
-              </select>
-            </div>
-
+                      <label className="form-label">Total Tonnage</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        name="totalTonnage"
+                        placeholder="e.g., 1000"
+                        value={parentForm.totalTonnage}
+                        onChange={handleParentFormChange}
+                        required
+                      />
+                    </div>
                     <div className="col-md-6">
-              <label className="form-label">Loading Point *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required
-                value={parentForm.loadingPoint}
-                onChange={e => setParentForm(prev => ({ ...prev, loadingPoint: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-
+                      <label className="form-label">Moisture Content (%)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-control"
+                        name="moisture_content"
+                        placeholder="e.g., 12.5"
+                        value={parentForm.moisture_content}
+                        onChange={handleParentFormChange}
+                      />
+                    </div>
+                    
                     <div className="col-md-6">
-              <label className="form-label">Destination *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required
-                value={parentForm.destination}
-                onChange={e => setParentForm(prev => ({ ...prev, destination: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-
+                      <label className="form-label">Particle Size</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="particle_size"
+                        placeholder="e.g., 10-50mm"
+                        value={parentForm.particle_size}
+                        onChange={handleParentFormChange}
+                      />
+                    </div>
                     <div className="col-md-6">
-              <label className="form-label">Deadline *</label>
+                      <label className="form-label">Deadline</label>
                       <DatePicker
                         selected={parentForm.deadline}
                         onChange={date => setParentForm(prev => ({ ...prev, deadline: date }))}
+                        className="form-control"
                         showTimeSelect
-                        dateFormat="yyyy-MM-dd HH:mm"
-                className="form-control" 
-                        minDate={new Date()}
+                        dateFormat="Pp"
                         placeholderText="Select deadline"
-                required
-                disabled={creating}
-              />
-            </div>
+                        required
+                      />
+                    </div>
 
                     <div className="col-md-6">
-              <label className="form-label">Moisture Content (%)</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                min="0"
-                max="100"
-                step="0.01"
-                value={parentForm.moisture_content}
-                onChange={e => setParentForm(prev => ({ ...prev, moisture_content: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-
+                      <label className="form-label">Loading Point</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="loadingPoint"
+                        placeholder="e.g., Zimplats Mine"
+                        value={parentForm.loadingPoint}
+                        onChange={handleParentFormChange}
+                        required
+                        list="loading-point-suggestions"
+                      />
+                      <datalist id="loading-point-suggestions">
+                        {suggestedLocations.map(loc => (
+                          <option key={loc} value={loc} />
+                        ))}
+                      </datalist>
+                    </div>
                     <div className="col-md-6">
-              <label className="form-label">Particle Size</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="e.g. 0-50mm"
-                value={parentForm.particle_size}
-                onChange={e => setParentForm(prev => ({ ...prev, particle_size: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+                      <label className="form-label">Destination</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="destination"
+                        placeholder="e.g., Durban Port"
+                        value={parentForm.destination}
+                        onChange={handleParentFormChange}
+                        required
+                      />
+                    </div>
 
-            <div className="col-md-12">
-              <div className="form-check">
-                <input 
-                  type="checkbox" 
-                  className="form-check-input" 
-                  id="requires_analysis"
-                  checked={parentForm.requires_analysis}
-                  onChange={e => setParentForm(prev => ({ ...prev, requires_analysis: e.target.checked }))}
-                  disabled={creating}
-                />
-                <label className="form-check-label" htmlFor="requires_analysis">
-                  Requires Analysis
-                </label>
-              </div>
-            </div>
+                    <div className="col-12">
+                      <label className="form-label">Special Handling Notes</label>
+                      <textarea
+                        className="form-control"
+                        name="special_handling_notes"
+                        placeholder="e.g., Fragile, keep dry"
+                        value={parentForm.special_handling_notes}
+                        onChange={handleParentFormChange}
+                      />
+                    </div>
 
-            <div className="col-md-12">
-              <label className="form-label">Special Handling Notes</label>
-              <textarea 
-                className="form-control" 
-                rows="2"
-                value={parentForm.special_handling_notes}
-                onChange={e => setParentForm(prev => ({ ...prev, special_handling_notes: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+                    <div className="col-12">
+                      <label className="form-label">Environmental Concerns</label>
+                      <textarea
+                        className="form-control"
+                        name="environmental_concerns"
+                        placeholder="e.g., Low dust emission required"
+                        value={parentForm.environmental_concerns}
+                        onChange={handleParentFormChange}
+                      />
+                    </div>
+                    
+                    <div className="col-12">
+                      <label className="form-label">Other Notes</label>
+                      <textarea
+                        className="form-control"
+                        name="notes"
+                        placeholder="e.g., Call upon arrival"
+                        value={parentForm.notes}
+                        onChange={handleParentFormChange}
+                      />
+                    </div>
 
-            <div className="col-md-12">
-              <label className="form-label">Environmental Concerns</label>
-              <textarea 
-                className="form-control" 
-                rows="2"
-                value={parentForm.environmental_concerns}
-                onChange={e => setParentForm(prev => ({ ...prev, environmental_concerns: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
-
-            <div className="col-md-12">
-              <label className="form-label">Notes</label>
-              <textarea 
-                className="form-control" 
-                rows="2"
-                value={parentForm.notes}
-                onChange={e => setParentForm(prev => ({ ...prev, notes: e.target.value }))}
-                disabled={creating}
-              />
-            </div>
+                    <div className="col-12">
+                      <div className="form-check">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          id="requires_analysis"
+                          name="requires_analysis"
+                          checked={parentForm.requires_analysis}
+                          onChange={handleParentFormChange}
+                        />
+                        <label className="form-check-label" htmlFor="requires_analysis">Requires Analysis</label>
+                      </div>
+                    </div>
 
                     <div className="col-12 mt-4">
-              <button 
-                type="submit" 
-                        className="btn btn-primary fw-bold w-100" 
-                style={{ background: '#D2691E', border: 'none' }} 
-                disabled={creating}
-              >
-                {creating ? 'Creating...' : 'Log Consignment'}
-              </button>
-            </div>
-          </form>
-          {createFeedback && (
-            <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
-              {createFeedback}
-            </div>
-          )}
-        </div>
-      </div>
+                      <button
+                        type="submit"
+                        className="btn btn-primary fw-bold w-100"
+                        style={{ background: '#D2691E', border: 'none' }}
+                        disabled={creating}
+                      >
+                        {creating ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Creating...
+                          </>
+                        ) : 'Log Consignment'}
+                      </button>
+                    </div>
+                  </form>
+                  {createFeedback && (
+                    <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
+                      {createFeedback}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
           <div className="modal-backdrop fade show" onClick={() => setShowCreateParentBookingModal(false)}></div>
@@ -913,6 +1017,16 @@ export default function OperatorDashboard() {
                 ))}
               </select>
             </div>
+
+            {createForm.selectedBookingId && (
+              <div className="col-12 mt-2 mb-2">
+                <div className="alert alert-light p-2" style={{ borderLeft: '3px solid #D2691E' }}>
+                  <small className="text-muted d-block">
+                    <strong>Route:</strong> {createForm.loadingPoint} &rarr; {createForm.destination}
+                  </small>
+                </div>
+              </div>
+            )}
 
             <div className="col-md-4">
               <label className="form-label">Container Count *</label>
