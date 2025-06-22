@@ -125,16 +125,46 @@ export default function TrackDelivery() {
                       <StatusBadge status={delivery.currentStatus} />
                     </div>
                     <div className="card-body">
+                      {/* Consignment Details */}
+                      <h3 className="h6 fw-bold" style={{ color: '#a14e13' }}>Consignment Details</h3>
                       <div className="row text-muted small mb-3">
-                        <div className="col-md-6"><strong>Customer:</strong> {delivery.customerName}</div>
-                        <div className="col-md-6"><strong>Booking Ref:</strong> {delivery.bookingReference}</div>
-                        <div className="col-md-6"><strong>From:</strong> {delivery.loadingPoint}</div>
-                        <div className="col-md-6"><strong>To:</strong> {delivery.destination}</div>
-                        <div className="col-md-6"><strong>Mineral:</strong> {delivery.mineralType} ({delivery.mineralGrade})</div>
-                        <div className="col-md-6"><strong>Tonnage:</strong> {delivery.tonnage} tons</div>
+                        <div className="col-md-6 mb-2"><strong>Customer:</strong> {delivery.customerName}</div>
+                        <div className="col-md-6 mb-2"><strong>Booking Ref:</strong> {delivery.bookingReference}</div>
+                        <div className="col-md-6 mb-2"><strong>Route:</strong> {delivery.loadingPoint} &rarr; {delivery.destination}</div>
+                        <div className="col-md-6 mb-2"><strong>Mineral:</strong> {delivery.mineralType} ({delivery.mineralGrade})</div>
+                        <div className="col-md-6 mb-2"><strong>Tonnage:</strong> {delivery.tonnage} tons</div>
+                        <div className="col-md-6 mb-2"><strong>Container Count:</strong> {delivery.containerCount}</div>
+                        {delivery.samplingStatus && (
+                          <div className="col-md-6 mb-2"><strong>Sampling Status:</strong> {delivery.samplingStatus}</div>
+                        )}
                       </div>
+
+                      {/* Vehicle & Driver Details */}
+                      <h3 className="h6 fw-bold" style={{ color: '#a14e13' }}>Vehicle & Driver</h3>
+                      <div className="row text-muted small mb-3">
+                        {delivery.driverDetails && (
+                          <>
+                            <div className="col-md-6 mb-2"><strong>Driver:</strong> {delivery.driverDetails.name}</div>
+                            <div className="col-md-6 mb-2"><strong>Vehicle Reg:</strong> {delivery.driverDetails.vehicleReg}</div>
+                          </>
+                        )}
+                        <div className="col-md-6 mb-2"><strong>Vehicle Type:</strong> {delivery.vehicleType}</div>
+                      </div>
+
+                      {/* Environmental Incidents */}
+                      {delivery.environmental_incidents && (
+                        <>
+                          <h3 className="h6 fw-bold" style={{ color: '#dc3545' }}>Important Updates</h3>
+                          <div className="alert alert-danger p-2">
+                            <strong className="d-block">Environmental Incident Reported:</strong>
+                            <span className="small">{delivery.environmental_incidents}</span>
+                          </div>
+                        </>
+                      )}
+                      
                       <hr />
-                      <h3 className="h6 mt-4">Tracking History</h3>
+
+                      <h3 className="h6 mt-4 fw-bold" style={{ color: '#a14e13' }}>Tracking History</h3>
                       {delivery.checkpoints && delivery.checkpoints.length > 0 ? (
                         <div className="timeline-container mt-3">
                           {delivery.checkpoints.slice().reverse().map((cp, index) => (

@@ -139,7 +139,9 @@ export default function OperatorDashboard() {
     vehicleType: 'Standard Truck',
     vehicleCapacity: 30.00,
     loadingPoint: '',
-    destination: ''
+    destination: '',
+    environmentalIncidents: '',
+    samplingStatus: ''
   });
   const [creating, setCreating] = useState(false);
   const [createFeedback, setCreateFeedback] = useState('');
@@ -321,7 +323,9 @@ export default function OperatorDashboard() {
         driver_details: {
           name: createForm.driverDetails.name.trim(),
           vehicleReg: createForm.driverDetails.vehicleReg.trim()
-        }
+        },
+        environmental_incidents: createForm.environmentalIncidents || null,
+        sampling_status: createForm.samplingStatus || 'Not Sampled'
       };
 
       const res = await createDelivery(deliveryData);
@@ -348,7 +352,9 @@ export default function OperatorDashboard() {
             vehicleReg: ''
           },
           loadingPoint: '',
-          destination: ''
+          destination: '',
+          environmentalIncidents: '',
+          samplingStatus: ''
         });
 
         // Refresh parent bookings to update remaining tonnage
@@ -621,7 +627,9 @@ export default function OperatorDashboard() {
         vehicleType: 'Standard Truck',
         vehicleCapacity: 30.00,
         loadingPoint: '',
-        destination: ''
+        destination: '',
+        environmentalIncidents: '',
+        samplingStatus: ''
       }));
       return;
     }
@@ -647,7 +655,9 @@ export default function OperatorDashboard() {
         vehicleReg: ''
       },
       loadingPoint: '',
-      destination: ''
+      destination: '',
+      environmentalIncidents: '',
+      samplingStatus: ''
     }));
   };
 
