@@ -78,6 +78,20 @@ if (atUsername && atApiKey) {
   console.warn("Africa's Talking credentials not set. SMS fallback will not work.");
 }
 
+// === Cookie Options for Cross-Platform Auth ===
+const cookieOptions = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'none',
+  path: '/', // Explicit for all endpoints
+};
+
+// NOTE: For iOS/Safari compatibility, cookies with SameSite=None must also have Secure=true and be served over HTTPS.
+// For local development, use HTTPS (e.g., mkcert) or test on a deployed HTTPS environment.
+if (process.env.NODE_ENV !== 'production' && !process.env.LOCAL_HTTPS) {
+  console.warn('WARNING: Cookies with Secure flag require HTTPS. iOS/Safari will not persist cookies over HTTP.');
+}
+
 // Helper: Send SMS with Twilio and Africa's Talking fallback
 async function sendSMS(to, message) {
   // Standardize the 'to' number to E.164 format for both providers
@@ -167,12 +181,7 @@ async function authenticateSession(req, res, next) {
     
     if (result.rows.length === 0) {
       console.log('Invalid or expired session');
-      res.clearCookie('session_id', {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        path: '/'
-      });
+      res.clearCookie('session_id', cookieOptions);
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
     
@@ -301,7 +310,8 @@ app.post('/login', async (req, res) => {
       role: user.role
     };
 
-    res.cookie('session_id', sessionId, { httpOnly: true, secure: true, sameSite: 'none', expires: expiresAt });
+    // Use shared cookie options, add expires for login
+    res.cookie('session_id', sessionId, { ...cookieOptions, expires: expiresAt });
     res.json({ success: true, user: userForClient });
   } catch (err) {
     console.error('Login error:', err);
@@ -712,7 +722,7 @@ app.post('/logout', authenticateSession, async (req, res) => {
   const sessionId = req.cookies.session_id;
   try {
     await pool.query('DELETE FROM sessions WHERE session_id = $1', [sessionId]);
-    res.clearCookie('session_id');
+    res.clearCookie('session_id', cookieOptions);
     res.json({ success: true });
   } catch (err) {
     console.error('Logout error:', err);
