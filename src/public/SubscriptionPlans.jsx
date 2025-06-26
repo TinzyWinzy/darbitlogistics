@@ -14,7 +14,7 @@ export default function SubscriptionPlans() {
   return (
     <div className="container py-5">
       <div className="text-center mb-5">
-        <h1 className="display-6 fw-bold" style={{ color: '#D2691E' }}>Our Subscription Plans</h1>
+        <h1 className="display-6 fw-bold" style={{ color: '#1F2120' }}>Our Subscription Plans</h1>
         <p className="lead text-muted">Choose the plan that fits your logistics needs.</p>
       </div>
       <div className="row g-4 justify-content-center">
@@ -52,6 +52,7 @@ export default function SubscriptionPlans() {
                       onClick={() => handleSelectPlan(tierKey)}
                       className="btn btn-primary w-100 fw-bold"
                       style={{ background: '#D2691E', border: 'none' }}
+                      aria-label={`Select ${subscriptionTiers[tierKey].name} plan`}
                     >
                       Choose Plan
                     </button>

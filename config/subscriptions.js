@@ -29,4 +29,9 @@ const subscriptionTiers = {
   },
 };
 
-export { subscriptionTiers }; 
+const trialSettings = {
+  tier: 'starter',
+  durationDays: 7
+};
+
+export { subscriptionTiers, trialSettings }; 

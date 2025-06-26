@@ -66,6 +66,10 @@ const AdminDashboard = () => {
 
   return (
     <div className="container mt-4">
+      {/* Internal Use Only Banner */}
+      <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
+        INTERNAL USE ONLY
+      </div>
       <h2>Admin Dashboard: User Management</h2>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -173,6 +177,12 @@ const AdminDashboard = () => {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="text-center text-muted small mt-5">
+        For support: <a href="mailto:info@morres.com" style={{ color: '#1F2120' }}>info@morres.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+        <br />
+        <span className="text-danger">For authorized personnel only.</span>
       </div>
     </div>
   );

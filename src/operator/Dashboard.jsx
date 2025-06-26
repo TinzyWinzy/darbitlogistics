@@ -9,6 +9,9 @@ import "react-datepicker/dist/react-datepicker.css";
 import axios from 'axios';
 import ParentBookingDetails from './ParentBookingDetails';
 import ConsignmentMonitor from './ConsignmentMonitor';
+import ParentBookingForm from './ParentBookingForm';
+import DeliveryDispatchForm from './DeliveryDispatchForm';
+import CheckpointLoggerForm from './CheckpointLoggerForm';
 
 const mineralTypes = [
   'Agate', 'Adamite', 'Andalusite', 'Anhydrite', 'Angelisite', 'Anthophyllite', 'Antimony', 'Aragonite', 'Arucite', 'Arsenic',
@@ -87,7 +90,7 @@ const mineralLocations = {
 function Spinner() {
   return (
     <div className="d-flex justify-content-center align-items-center py-4">
-      <div className="spinner-border" style={{ color: '#D2691E' }} role="status">
+      <div className="spinner-border" style={{ color: '#1F2120' }} role="status">
         <span className="visually-hidden">Loading...</span>
       </div>
     </div>
@@ -100,7 +103,13 @@ export default function OperatorDashboard() {
     loading: loadingDeliveries, 
     error: deliveriesError, 
     createDelivery,
-    setDeliveries
+    setDeliveries,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    total,
+    fetchDeliveries
   } = useDeliveries();
   
   const { 
@@ -108,22 +117,15 @@ export default function OperatorDashboard() {
     loading: parentBookingsLoading, 
     error: parentBookingsError, 
     createParentBooking,
-    fetchParentBookings
+    fetchParentBookings,
+    page: parentBookingsPage,
+    setPage: setParentBookingsPage,
+    pageSize: parentBookingsPageSize,
+    setPageSize: setParentBookingsPageSize,
+    total: parentBookingsTotal
   } = useParentBookings();
 
   const [selectedId, setSelectedId] = useState('');
-  const [form, setForm] = useState({
-    location: '',
-    operator: '',
-    comment: '',
-    status: '',
-    coordinates: '',
-    timestamp: new Date(),
-    hasIssue: false,
-    issueDetails: ''
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState('');
   const [customers, setCustomers] = useState([]);
   const [selectedCustomerBookings, setSelectedCustomerBookings] = useState([]);
   const [createForm, setCreateForm] = useState({
@@ -143,8 +145,6 @@ export default function OperatorDashboard() {
     environmentalIncidents: '',
     samplingStatus: ''
   });
-  const [creating, setCreating] = useState(false);
-  const [createFeedback, setCreateFeedback] = useState('');
   const navigate = useNavigate();
   const { setUser, user } = useContext(AuthContext);
   const customerNameRef = useRef();
@@ -154,54 +154,16 @@ export default function OperatorDashboard() {
   const [smsPreview, setSmsPreview] = useState('');
   
   const [selectedParentId, setSelectedParentId] = useState(null);
-  const [parentForm, setParentForm] = useState({
-    customerName: '',
-    phoneNumber: '',
-    totalTonnage: '',
-    mineral_type: 'Other',
-    mineral_grade: 'Ungraded',
-    moisture_content: '',
-    particle_size: '',
-    loadingPoint: '',
-    destination: '',
-    deadline: null,
-    requires_analysis: false,
-    special_handling_notes: '',
-    environmental_concerns: '',
-    notes: ''
-  });
   const [selectedParentBooking, setSelectedParentBooking] = useState(null);
   const [showParentDetails, setShowParentDetails] = useState(false);
   const [showCreateParentBookingModal, setShowCreateParentBookingModal] = useState(false);
-  const [suggestedLocations, setSuggestedLocations] = useState([]);
 
   const [deliveries, setLocalDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [feedback, setFeedback] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleParentFormChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    
-    setParentForm(prev => {
-      const newState = {
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value
-      };
-
-      // When mineral type changes, update suggestions
-      if (name === 'mineral_type') {
-        const locations = mineralLocations[value] || [];
-        setSuggestedLocations(locations);
-        // Optional: auto-select the first location
-        if (locations.length > 0) {
-          newState.loadingPoint = locations[0];
-        } else {
-          newState.loadingPoint = '';
-        }
-      }
-      
-      return newState;
-    });
-  };
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -227,7 +189,7 @@ export default function OperatorDashboard() {
 
   useEffect(() => {
     if (user) {
-      setForm(prevForm => ({ ...prevForm, operator: user.username }));
+      setCreateForm(prevForm => ({ ...prevForm, operator: user.username }));
     }
   }, [user]);
 
@@ -250,122 +212,6 @@ export default function OperatorDashboard() {
       cleaned.length === 13 && cleaned.startsWith('2637')
     );
   }
-
-  const handleCreateDelivery = async (e) => {
-    e.preventDefault();
-    setCreating(true);
-    setCreateFeedback('');
-
-    try {
-      if (!createForm.customerId) {
-        setCreateFeedback('Please select a customer.');
-        setCreating(false);
-        return;
-      }
-
-      if (!createForm.selectedBookingId) {
-        setCreateFeedback('Please select a booking.');
-        setCreating(false);
-        return;
-      }
-
-      const selectedBooking = parentBookings.find(b => b.id === createForm.selectedBookingId);
-      
-      if (!selectedBooking) {
-        setCreateFeedback('Invalid booking selection.');
-        setCreating(false);
-        return;
-      }
-
-      if (!createForm.tonnage || createForm.tonnage <= 0) {
-        setCreateFeedback('Tonnage must be greater than 0.');
-        setCreating(false);
-        return;
-      }
-
-      if (selectedBooking.remainingTonnage < createForm.tonnage) {
-        setCreateFeedback(`Insufficient remaining tonnage. Available: ${selectedBooking.remainingTonnage} tons`);
-        setCreating(false);
-        return;
-      }
-
-      if (!createForm.containerCount || createForm.containerCount < 1) {
-        setCreateFeedback('Container Count must be at least 1.');
-        setCreating(false);
-        return;
-      }
-
-      if (!createForm.driverDetails.name?.trim()) {
-        setCreateFeedback('Driver Name is required.');
-        setCreating(false);
-        return;
-      }
-
-      if (!createForm.driverDetails.vehicleReg?.trim()) {
-        setCreateFeedback('Vehicle Registration is required.');
-        setCreating(false);
-        return;
-      }
-
-      const deliveryData = {
-        parent_booking_id: selectedBooking.id,
-        customer_name: selectedBooking.customerName,
-        phone_number: selectedBooking.phoneNumber,
-        current_status: createForm.currentStatus || 'Pending',
-        loading_point: selectedBooking.loadingPoint,
-        destination: selectedBooking.destination,
-        mineral_type: selectedBooking.mineral_type,
-        mineral_grade: selectedBooking.mineral_grade,
-        container_count: parseInt(createForm.containerCount),
-        tonnage: parseFloat(createForm.tonnage),
-        vehicle_type: createForm.vehicleType || 'Standard Truck',
-        vehicle_capacity: parseFloat(createForm.vehicleCapacity) || 30.00,
-        driver_details: {
-          name: createForm.driverDetails.name.trim(),
-          vehicleReg: createForm.driverDetails.vehicleReg.trim()
-        },
-        environmental_incidents: createForm.environmentalIncidents || null,
-        sampling_status: createForm.samplingStatus || 'Not Sampled'
-      };
-
-      const res = await createDelivery(deliveryData);
-
-      if (res.success) {
-        setShowToast(true);
-        setToastMsg(`Delivery created successfully! Tracking ID: ${res.trackingId}`);
-        
-        // Add new delivery to local state to trigger UI update
-        const newDelivery = res.delivery;
-        setLocalDeliveries(prev => [newDelivery, ...prev]);
-        
-        // Reset form
-        setCreateForm({
-          customerId: '',
-          selectedBookingId: '',
-          currentStatus: '',
-          containerCount: '',
-          tonnage: '',
-          vehicleType: 'Standard Truck',
-          vehicleCapacity: 30.00,
-          driverDetails: {
-            name: '',
-            vehicleReg: ''
-          },
-          loadingPoint: '',
-          destination: '',
-          environmentalIncidents: '',
-          samplingStatus: ''
-        });
-
-        // Refresh parent bookings to update remaining tonnage
-        await fetchParentBookings();
-      }
-    } catch (error) {
-      console.error('Create delivery error:', error);
-      setCreateFeedback(error.response?.data?.error || 'Failed to create delivery');
-    }
-    setCreating(false);
-  };
 
   const handleUpdateCheckpoint = async (trackingId, newCheckpoint) => {
     const delivery = deliveries.find(d => d.trackingId === trackingId);
@@ -404,7 +250,7 @@ export default function OperatorDashboard() {
       await fetchParentBookings();
       setFeedback('Checkpoint logged successfully!');
       
-      setForm({
+      setCreateForm({
         location: '',
         operator: user?.username || '',
         comment: '',
@@ -434,176 +280,13 @@ export default function OperatorDashboard() {
     }
   };
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setFeedback('');
-    
-    const delivery = deliveries.find(d => d.trackingId === selectedId);
-    if (!delivery) {
-      setFeedback('No delivery selected.');
-      return;
-    }
-
-    if (!form.location || !form.status) {
-      setFeedback('Location and Status are required.');
-      return;
-    }
-
-    const checkpoint = {
-      location: form.location.trim(),
-      status: form.status,
-      operator_id: user.id,
-      operator_username: user.username,
-      comment: form.comment.trim(),
-      timestamp: form.timestamp.toISOString(),
-      coordinates: form.coordinates.trim(),
-      hasIssue: form.hasIssue,
-      issueDetails: form.hasIssue ? form.issueDetails.trim() : ''
-    };
-
-    await handleUpdateCheckpoint(selectedId, checkpoint);
-  }
-
-  const handleCreateParentBooking = async (e) => {
-    e.preventDefault();
-    setCreating(true);
-    setCreateFeedback('');
-
-    try {
-      // Format phone number first
-      let formattedPhone = parentForm.phoneNumber;
-      if (formattedPhone.startsWith('0')) {
-        formattedPhone = '263' + formattedPhone.substring(1);
-      } else if (formattedPhone.startsWith('+')) {
-        formattedPhone = formattedPhone.substring(1);
-      } else if (formattedPhone.startsWith('7')) {
-        formattedPhone = '263' + formattedPhone;
-      }
-
-      // Validate required fields
-      if (!parentForm.customerName?.trim()) {
-        setCreateFeedback('Customer Name is required.');
-        setCreating(false);
-        return;
-      }
-
-      if (!formattedPhone) {
-        setCreateFeedback('Phone Number is required.');
-        setCreating(false);
-        return;
-      }
-
-      if (!validateZimPhone(formattedPhone)) {
-        setCreateFeedback('Please enter a valid Zimbabwean phone number.');
-        setCreating(false);
-        return;
-      }
-
-      if (!parentForm.totalTonnage || parentForm.totalTonnage <= 0) {
-        setCreateFeedback('Total tonnage must be greater than 0.');
-        setCreating(false);
-        return;
-      }
-
-      if (!parentForm.loadingPoint?.trim()) {
-        setCreateFeedback('Loading Point is required.');
-        setCreating(false);
-        return;
-      }
-
-      if (!parentForm.destination?.trim()) {
-        setCreateFeedback('Destination is required.');
-        setCreating(false);
-        return;
-      }
-
-      if (!parentForm.deadline) {
-        setCreateFeedback('Deadline is required.');
-        setCreating(false);
-        return;
-      }
-
-      const deadline = new Date(parentForm.deadline);
-      if (deadline <= new Date()) {
-        setCreateFeedback('Deadline must be in the future.');
-        setCreating(false);
-        return;
-      }
-
-      // Validate mineral type
-      if (!parentForm.mineral_type?.trim()) {
-        setCreateFeedback('Mineral Type is required.');
-        setCreating(false);
-        return;
-      }
-
-      const parentBookingData = {
-        customer_name: parentForm.customerName.trim(),
-        phone_number: formattedPhone,
-        total_tonnage: parseFloat(parentForm.totalTonnage),
-        mineral_type: parentForm.mineral_type.trim(),
-        mineral_grade: parentForm.mineral_grade?.trim() || 'Ungraded',
-        moisture_content: parentForm.moisture_content ? parseFloat(parentForm.moisture_content) : null,
-        particle_size: parentForm.particle_size?.trim() || null,
-        loading_point: parentForm.loadingPoint.trim(),
-        destination: parentForm.destination.trim(),
-        deadline: deadline.toISOString(),
-        requires_analysis: Boolean(parentForm.requires_analysis),
-        special_handling_notes: parentForm.special_handling_notes?.trim() || null,
-        environmental_concerns: parentForm.environmental_concerns?.trim() || null,
-        notes: parentForm.notes?.trim() || null
-      };
-
-      console.log('Sending parent booking data:', parentBookingData);
-
-      const res = await createParentBooking(parentBookingData);
-      
-      if (res.success) {
-        setShowToast(true);
-        setToastMsg(`Consignment logged successfully! Booking Code: ${res.booking.booking_code}`);
-        setShowCreateParentBookingModal(false);
-        
-        // Reset form
-        setParentForm({
-          customerName: '',
-          phoneNumber: '',
-          totalTonnage: '',
-          mineral_type: 'Other',
-          mineral_grade: 'Ungraded',
-          moisture_content: '',
-          particle_size: '',
-          loadingPoint: '',
-          destination: '',
-          deadline: null,
-          requires_analysis: false,
-          special_handling_notes: '',
-          environmental_concerns: '',
-          notes: ''
-        });
-
-        // The hook already refreshes the list, no need to do it here.
-      }
-    } catch (error) {
-      console.error('Create parent booking error:', error);
-      setCreateFeedback(error.response?.data?.error || 'Failed to create parent booking');
-    }
-    setCreating(false);
-  };
-
-  // Function to generate a unique booking code
-  const generateBookingCode = () => {
-    const prefix = 'MB'; // MB for Morres Booking
-    const timestamp = Date.now().toString().slice(-6);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `${prefix}${timestamp}${random}`;
-  };
-
   // Function to fetch unique customers from parent bookings
   const updateCustomersList = (bookings) => {
     const uniqueCustomers = bookings.reduce((acc, booking) => {
-      if (!acc.find(c => c.name === booking.customerName)) {
+      const compositeId = `${booking.customerName}|${booking.phoneNumber}`;
+      if (!acc.find(c => c.id === compositeId)) {
         acc.push({
-          id: booking.id,
+          id: compositeId,
           name: booking.customerName,
           phone: booking.phoneNumber
         });
@@ -614,51 +297,17 @@ export default function OperatorDashboard() {
   };
 
   // Update customer bookings when a customer is selected
-  const handleCustomerSelect = (customerId) => {
-    const selectedCustomer = customers.find(c => c.id === customerId);
-    if (!selectedCustomer) {
-      setSelectedCustomerBookings([]);
-      setCreateForm(prev => ({
-        ...prev,
-        customerId: '',
-        selectedBookingId: '',
-        tonnage: '',
-        containerCount: '',
-        vehicleType: 'Standard Truck',
-        vehicleCapacity: 30.00,
-        loadingPoint: '',
-        destination: '',
-        environmentalIncidents: '',
-        samplingStatus: ''
-      }));
-      return;
-    }
-
+  const handleCustomerSelect = (compositeId) => {
+    setSelectedCustomerId(compositeId);
+    const [customerName, phoneNumber] = compositeId.split('|');
     const customerBookings = parentBookings.filter(
-      booking => 
-        booking.customerName === selectedCustomer.name && 
+      booking =>
+        booking.customerName === customerName &&
+        booking.phoneNumber === phoneNumber &&
         booking.status === 'Active' &&
         booking.remainingTonnage > 0
     );
-
     setSelectedCustomerBookings(customerBookings);
-    setCreateForm(prev => ({
-      ...prev,
-      customerId,
-      selectedBookingId: '',
-      tonnage: '',
-      containerCount: '',
-      vehicleType: 'Standard Truck',
-      vehicleCapacity: 30.00,
-      driverDetails: {
-        name: '',
-        vehicleReg: ''
-      },
-      loadingPoint: '',
-      destination: '',
-      environmentalIncidents: '',
-      samplingStatus: ''
-    }));
   };
 
   // Update form when a booking is selected
@@ -703,10 +352,10 @@ export default function OperatorDashboard() {
 
     return (
       <div className="checkpoint-history mt-3">
-        <h6 className="mb-3 fw-bold" style={{ color: '#a14e13' }}>Audit Log</h6>
+        <h6 className="mb-3 fw-bold" style={{ color: '#1F2120' }}>Audit Log</h6>
         <ul className="list-unstyled">
           {checkpoints.slice().reverse().map((cp, index) => (
-            <li key={index} className="checkpoint-item mb-3 border-start border-3 ps-3" style={{ borderColor: '#D2691E' }}>
+            <li key={index} className="checkpoint-item mb-3 border-start border-3 ps-3" style={{ borderColor: '#1F2120' }}>
               <div className="d-flex justify-content-between align-items-center">
                 <strong className="text-dark">{cp.location}</strong>
                 <span className={`badge ${cp.hasIssue ? 'bg-danger' : 'bg-secondary'}`}>{cp.status}</span>
@@ -727,20 +376,31 @@ export default function OperatorDashboard() {
     );
   };
 
+  // Add this handler to reset selects after form submission
+  const handleFormReset = () => {
+    setSelectedCustomerId('');
+    setSelectedCustomerBookings([]);
+  };
+
   return (
     <div className="container py-5">
-      <h1 className="display-6 fw-bold mb-4" style={{ color: '#D2691E' }}>Morres Logistics - Operations Hub</h1>
+      {/* Internal Use Only Banner */}
+      <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
+        INTERNAL USE ONLY
+      </div>
+      <h1 className="display-6 fw-bold mb-4" style={{ color: '#1F2120' }}>Morres Logistics - Operations Hub</h1>
       
       {/* Trigger button for Parent Booking Modal */}
       <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
-              <span className="material-icons-outlined align-middle me-2" style={{ color: '#D2691E' }}>apps</span>
+          <h2 className="h5 fw-bold mb-0" style={{ color: '#1F2120' }}>
+              <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>apps</span>
               Dashboard
           </h2>
           <button
               className="btn btn-primary fw-bold"
-              style={{ background: '#D2691E', border: 'none' }}
+              style={{ background: '#1F2120', border: 'none', color: '#EBD3AD' }}
               onClick={() => setShowCreateParentBookingModal(true)}
+              aria-label="Log new consignment"
           >
               <span className="material-icons-outlined align-middle me-1">add_box</span>
               Log New Consignment
@@ -749,233 +409,19 @@ export default function OperatorDashboard() {
       
       {/* Parent Booking Form Modal */}
       {showCreateParentBookingModal && (
-        <>
-          <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
-            <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h2 className="h5 fw-bold mb-0" style={{ color: '#a14e13' }}>
-            <span className="material-icons-outlined align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
-            Log New Consignment
-          </h2>
-                  <button type="button" className="btn-close" onClick={() => setShowCreateParentBookingModal(false)}></button>
-                </div>
-                <div className="modal-body">
-                  <form onSubmit={handleCreateParentBooking} className="row g-3" autoComplete="off">
-                    <div className="col-md-6">
-                      <label className="form-label">Customer Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="customerName"
-                        placeholder="e.g., John Doe"
-                        value={parentForm.customerName}
-                        onChange={handleParentFormChange}
-                        required
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Phone Number</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="phoneNumber"
-                        placeholder="e.g., 0772123456"
-                        value={parentForm.phoneNumber}
-                        onChange={handleParentFormChange}
-                        required
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label">Mineral Type</label>
-                      <select
-                        className="form-select"
-                        name="mineral_type"
-                        value={parentForm.mineral_type}
-                        onChange={handleParentFormChange}
-                        required
-                      >
-                        {mineralTypes.map(type => (
-                          <option key={type} value={type}>{type}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Mineral Grade</label>
-                      <select
-                        className="form-select"
-                        name="mineral_grade"
-                        value={parentForm.mineral_grade}
-                        onChange={handleParentFormChange}
-                      >
-                        <option value="Ungraded">Ungraded</option>
-                        <option value="Premium">Premium</option>
-                        <option value="Standard">Standard</option>
-                        <option value="Low Grade">Low Grade</option>
-                        <option value="Mixed">Mixed</option>
-                      </select>
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label">Total Tonnage</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="totalTonnage"
-                        placeholder="e.g., 1000"
-                        value={parentForm.totalTonnage}
-                        onChange={handleParentFormChange}
-                        required
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Moisture Content (%)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="form-control"
-                        name="moisture_content"
-                        placeholder="e.g., 12.5"
-                        value={parentForm.moisture_content}
-                        onChange={handleParentFormChange}
-                      />
-                    </div>
-                    
-                    <div className="col-md-6">
-                      <label className="form-label">Particle Size</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="particle_size"
-                        placeholder="e.g., 10-50mm"
-                        value={parentForm.particle_size}
-                        onChange={handleParentFormChange}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Deadline</label>
-                      <DatePicker
-                        selected={parentForm.deadline}
-                        onChange={date => setParentForm(prev => ({ ...prev, deadline: date }))}
-                        className="form-control"
-                        showTimeSelect
-                        dateFormat="Pp"
-                        placeholderText="Select deadline"
-                        required
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label">Loading Point</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="loadingPoint"
-                        placeholder="e.g., Zimplats Mine"
-                        value={parentForm.loadingPoint}
-                        onChange={handleParentFormChange}
-                        required
-                        list="loading-point-suggestions"
-                      />
-                      <datalist id="loading-point-suggestions">
-                        {suggestedLocations.map(loc => (
-                          <option key={loc} value={loc} />
-                        ))}
-                      </datalist>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Destination</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="destination"
-                        placeholder="e.g., Durban Port"
-                        value={parentForm.destination}
-                        onChange={handleParentFormChange}
-                        required
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label">Special Handling Notes</label>
-                      <textarea
-                        className="form-control"
-                        name="special_handling_notes"
-                        placeholder="e.g., Fragile, keep dry"
-                        value={parentForm.special_handling_notes}
-                        onChange={handleParentFormChange}
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label">Environmental Concerns</label>
-                      <textarea
-                        className="form-control"
-                        name="environmental_concerns"
-                        placeholder="e.g., Low dust emission required"
-                        value={parentForm.environmental_concerns}
-                        onChange={handleParentFormChange}
-                      />
-                    </div>
-                    
-                    <div className="col-12">
-                      <label className="form-label">Other Notes</label>
-                      <textarea
-                        className="form-control"
-                        name="notes"
-                        placeholder="e.g., Call upon arrival"
-                        value={parentForm.notes}
-                        onChange={handleParentFormChange}
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <div className="form-check">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          id="requires_analysis"
-                          name="requires_analysis"
-                          checked={parentForm.requires_analysis}
-                          onChange={handleParentFormChange}
-                        />
-                        <label className="form-check-label" htmlFor="requires_analysis">Requires Analysis</label>
-                      </div>
-                    </div>
-
-                    <div className="col-12 mt-4">
-                      <button
-                        type="submit"
-                        className="btn btn-primary fw-bold w-100"
-                        style={{ background: '#D2691E', border: 'none' }}
-                        disabled={creating}
-                      >
-                        {creating ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Creating...
-                          </>
-                        ) : 'Log Consignment'}
-                      </button>
-                    </div>
-                  </form>
-                  {createFeedback && (
-                    <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
-                      {createFeedback}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show" onClick={() => setShowCreateParentBookingModal(false)}></div>
-        </>
+        <ParentBookingForm
+          show={showCreateParentBookingModal}
+          onClose={() => setShowCreateParentBookingModal(false)}
+          onSuccess={fetchParentBookings}
+          createParentBooking={createParentBooking}
+          mineralTypes={mineralTypes}
+          mineralLocations={mineralLocations}
+        />
       )}
 
       {/* Parent Booking Details Modal */}
       {showParentDetails && selectedParentBooking && (
-        <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+        <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" role="dialog" aria-modal="true">
           <div className="modal-backdrop fade show" onClick={() => setShowParentDetails(false)}></div>
           <ParentBookingDetails 
             booking={selectedParentBooking} 
@@ -987,169 +433,25 @@ export default function OperatorDashboard() {
       {/* Modified Create Delivery Form */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body">
-          <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
-            <span className="material-icons-outlined align-middle me-2" style={{ color: '#D2691E' }}>add_box</span>
+          <h2 className="h5 fw-bold mb-3" style={{ color: '#1F2120' }}>
+            <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>add_box</span>
             Dispatch New Load
           </h2>
-          <form onSubmit={handleCreateDelivery} className="row g-3 align-items-end" autoComplete="off">
-            <div className="col-md-4">
-              <label className="form-label">Select Customer *</label>
-              <select 
-                className="form-select"
-                value={createForm.customerId}
-                onChange={(e) => handleCustomerSelect(e.target.value)}
-                disabled={creating}
-                required
-              >
-                <option value="">Choose customer...</option>
-                {customers.map(customer => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name} ({customer.phone})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="col-md-4">
-              <label className="form-label">Select Consignment *</label>
-              <select 
-                className="form-select"
-                value={createForm.selectedBookingId}
-                onChange={(e) => handleBookingSelect(e.target.value)}
-                disabled={creating || !createForm.customerId}
-                required
-              >
-                <option value="">Choose consignment...</option>
-                {selectedCustomerBookings.map(booking => (
-                  <option key={booking.id} value={booking.id}>
-                    {booking.bookingCode} - {booking.mineral_type} ({booking.mineral_grade}) - {booking.remainingTonnage} tons available
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {createForm.selectedBookingId && (
-              <div className="col-12 mt-2 mb-2">
-                <div className="alert alert-light p-2" style={{ borderLeft: '3px solid #D2691E' }}>
-                  <small className="text-muted d-block">
-                    <strong>Route:</strong> {createForm.loadingPoint} &rarr; {createForm.destination}
-                  </small>
-                </div>
-              </div>
-            )}
-
-            <div className="col-md-4">
-              <label className="form-label">Container Count *</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                required 
-                min="1"
-                value={createForm.containerCount}
-                onChange={e => setCreateForm(prev => ({ ...prev, containerCount: e.target.value }))}
-                disabled={creating || !createForm.selectedBookingId}
-              />
-            </div>
-
-            <div className="col-md-4">
-              <label className="form-label">Tonnage *</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                required 
-                min="0.01"
-                step="0.01"
-                value={createForm.tonnage}
-                onChange={e => setCreateForm(prev => ({ ...prev, tonnage: e.target.value }))}
-                disabled={creating || !createForm.selectedBookingId}
-              />
-            </div>
-
-            <div className="col-md-4">
-              <label className="form-label">Driver Name *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required
-                value={createForm.driverDetails.name}
-                onChange={e => setCreateForm(prev => ({
-                  ...prev,
-                  driverDetails: { ...prev.driverDetails, name: e.target.value }
-                }))}
-                disabled={creating || !createForm.selectedBookingId}
-              />
-            </div>
-
-            <div className="col-md-4">
-              <label className="form-label">Vehicle Registration *</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                required
-                value={createForm.driverDetails.vehicleReg}
-                onChange={e => setCreateForm(prev => ({
-                  ...prev,
-                  driverDetails: { ...prev.driverDetails, vehicleReg: e.target.value }
-                }))}
-                disabled={creating || !createForm.selectedBookingId}
-              />
-            </div>
-
-            <div className="col-md-4">
-              <label className="form-label">Initial Status</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="e.g., Pending"
-                value={createForm.currentStatus}
-                onChange={e => setCreateForm(prev => ({ ...prev, currentStatus: e.target.value }))}
-                disabled={creating || !createForm.selectedBookingId}
-              />
-            </div>
-
-            <div className="col-md-4">
-              <label className="form-label">Environmental Incidents</label>
-              <textarea
-                className="form-control"
-                rows="2"
-                placeholder="Enter any environmental incidents"
-                value={createForm.environmentalIncidents}
-                onChange={e => setCreateForm(prev => ({ ...prev, environmentalIncidents: e.target.value }))}
-                disabled={creating || !createForm.selectedBookingId}
-              />
-            </div>
-
-            <div className="col-md-4">
-              <label className="form-label">Sampling Status</label>
-              <select
-                className="form-select"
-                value={createForm.samplingStatus}
-                onChange={e => setCreateForm(prev => ({ ...prev, samplingStatus: e.target.value }))}
-                disabled={creating || !createForm.selectedBookingId}
-              >
-                <option value="">Select status...</option>
-                <option value="Not Sampled">Not Sampled</option>
-                <option value="Sampled">Sampled</option>
-                <option value="Pending">Pending</option>
-              </select>
-            </div>
-
-            <div className="col-12">
-              <button 
-                type="submit" 
-                className="btn btn-primary fw-bold" 
-                style={{ background: '#D2691E', border: 'none' }} 
-                disabled={creating || !createForm.selectedBookingId}
-              >
-                {creating ? 'Creating...' : 'Dispatch Load'}
-              </button>
-            </div>
-          </form>
-          {createFeedback && (
-            <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
-              {createFeedback}
-            </div>
-          )}
+          <DeliveryDispatchForm
+            customers={customers}
+            parentBookings={parentBookings}
+            selectedCustomerId={selectedCustomerId}
+            selectedCustomerBookings={selectedCustomerBookings}
+            onCustomerSelect={handleCustomerSelect}
+            createDelivery={createDelivery}
+            fetchParentBookings={fetchParentBookings}
+            onSuccess={async () => {
+              await fetchParentBookings();
+              await fetchDeliveries();
+            }}
+            onFeedback={setFeedback}
+            onReset={handleFormReset}
+          />
         </div>
       </div>
       <div className="row g-4">
@@ -1161,13 +463,66 @@ export default function OperatorDashboard() {
             error={error}
             selectedId={selectedId}
             onSelectDelivery={(id) => setSelectedId(selectedId === id ? null : id)}
+            page={parentBookingsPage}
+            setPage={setParentBookingsPage}
+            pageSize={parentBookingsPageSize}
+            setPageSize={setParentBookingsPageSize}
+            total={parentBookingsTotal}
           />
+          {/* Pagination Controls for Deliveries */}
+          <div className="d-flex justify-content-between align-items-center mt-3">
+            <div className="small text-muted">
+              {parentBookingsTotal > 0 && (
+                <span>
+                  Showing {Math.min((parentBookingsPage - 1) * parentBookingsPageSize + 1, parentBookingsTotal)}-
+                  {Math.min(parentBookingsPage * parentBookingsPageSize, parentBookingsTotal)} of {parentBookingsTotal} deliveries
+                </span>
+              )}
+            </div>
+            <div className="btn-group" role="group" aria-label="Pagination controls">
+              <button
+                className="btn btn-outline-secondary btn-sm"
+                onClick={() => setParentBookingsPage(parentBookingsPage - 1)}
+                disabled={parentBookingsPage === 1}
+                aria-label="Previous page"
+              >
+                &laquo; Prev
+              </button>
+              <span className="mx-2 align-self-center small">
+                Page {parentBookingsPage} of {Math.max(1, Math.ceil(parentBookingsTotal / parentBookingsPageSize))}
+              </span>
+              <button
+                className="btn btn-outline-secondary btn-sm"
+                onClick={() => setParentBookingsPage(parentBookingsPage + 1)}
+                disabled={parentBookingsPage * parentBookingsPageSize >= parentBookingsTotal}
+                aria-label="Next page"
+              >
+                Next &raquo;
+              </button>
+            </div>
+            <div className="ms-3">
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 'auto', display: 'inline-block' }}
+                value={parentBookingsPageSize}
+                onChange={e => {
+                  setParentBookingsPageSize(Number(e.target.value));
+                  setParentBookingsPage(1);
+                }}
+                aria-label="Select page size"
+              >
+                {[10, 20, 50, 100].map(size => (
+                  <option key={size} value={size}>{size} / page</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
         <div className="col-12 col-lg-6">
           <div className="card shadow-sm border-0">
             <div className="card-body">
-              <h2 className="h5 fw-bold mb-3" style={{ color: '#a14e13' }}>
-                <span className="material-icons-outlined align-middle me-2" style={{ color: '#D2691E' }}>edit_location_alt</span>
+              <h2 className="h5 fw-bold mb-3" style={{ color: '#1F2120' }}>
+                <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>edit_location_alt</span>
                 Log Checkpoint
               </h2>
               {selectedId && (() => {
@@ -1182,129 +537,25 @@ export default function OperatorDashboard() {
                   </div>
                 );
               })()}
-              <form onSubmit={handleSubmit} className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label">Location *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={form.location}
-                    onChange={e => setForm(prev => ({ ...prev, location: e.target.value }))}
-                    required
-                    disabled={submitting}
-                  />
-                </div>
-                
-                <div className="col-md-6">
-                  <div className="form-floating mb-3">
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      id="operator" 
-                      name="operator" 
-                      value={form.operator}
-                      readOnly
-                      onChange={(e) => setForm({ ...form, operator: e.target.value })} 
-                    />
-                    <label htmlFor="operator" className="form-label">Operator</label>
-                  </div>
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label">Status *</label>
-                  <select
-                    className="form-select"
-                    value={form.status}
-                    onChange={e => setForm(prev => ({ ...prev, status: e.target.value }))}
-                    required
-                    disabled={submitting}
-                  >
-                    <option value="">Select status...</option>
-                    {statusOptions.map(status => (
-                      <option key={status} value={status}>{status}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label">GPS Coordinates</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={form.coordinates}
-                    onChange={e => setForm(prev => ({ ...prev, coordinates: e.target.value }))}
-                    placeholder="e.g., -17.824858, 31.053028"
-                    disabled={submitting}
-                  />
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label">Comments</label>
-                  <textarea
-                    className="form-control"
-                    value={form.comment}
-                    onChange={e => setForm(prev => ({ ...prev, comment: e.target.value }))}
-                    rows="2"
-                    disabled={submitting}
-                  />
-                </div>
-
-                <div className="col-12">
-                  <div className="form-check">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id="hasIssue"
-                      checked={form.hasIssue}
-                      onChange={e => setForm(prev => ({ ...prev, hasIssue: e.target.checked }))}
-                      disabled={submitting}
-                    />
-                    <label className="form-check-label" htmlFor="hasIssue">
-                      Report an issue at this checkpoint
-                    </label>
-                  </div>
-                </div>
-
-                {form.hasIssue && (
-                  <div className="col-12">
-                    <label className="form-label">Issue Details *</label>
-                    <textarea
-                      className="form-control"
-                      value={form.issueDetails}
-                      onChange={e => setForm(prev => ({ ...prev, issueDetails: e.target.value }))}
-                      rows="2"
-                      required
-                      disabled={submitting}
-                    />
-                  </div>
-                )}
-
-                <div className="col-12">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={submitting}
-                    style={{ background: '#D2691E', border: 'none' }}
-                  >
-                    {submitting ? 'Updating...' : 'Log Checkpoint'}
-                  </button>
-                </div>
-
-                {feedback && (
-                  <div className={`col-12 alert ${feedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
-                    {feedback}
-                  </div>
-                )}
-              </form>
-
-              {selectedId && deliveries.find(d => d.trackingId === selectedId) && (
-                <div className="mt-4">
-                  {renderCheckpointHistory(deliveries.find(d => d.trackingId === selectedId))}
-                </div>
-              )}
+              <CheckpointLoggerForm
+                deliveries={deliveries}
+                user={user}
+                onSubmitCheckpoint={handleUpdateCheckpoint}
+                onSuccess={async () => {
+                  await fetchParentBookings();
+                  await fetchDeliveries();
+                }}
+                onFeedback={setFeedback}
+                selectedId={selectedId}
+                setSelectedId={setSelectedId}
+              />
             </div>
           </div>
         </div>
+      </div>
+      {/* Internal Support Contact */}
+      <div className="text-center text-muted small mt-5">
+        For support: <a href="mailto:info@morres.com" style={{ color: '#1F2120' }}>info@morres.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
       </div>
     </div>
   );

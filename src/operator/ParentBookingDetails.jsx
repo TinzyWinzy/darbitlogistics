@@ -149,18 +149,21 @@ export default function ParentBookingDetails({ booking, onClose }) {
                   <button 
                     className="btn btn-sm btn-outline-secondary" 
                     onClick={() => handleSort('createdAt')}
+                    aria-label="Sort by date"
                   >
                     Date {sortField === 'createdAt' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </button>
                   <button 
                     className="btn btn-sm btn-outline-secondary" 
                     onClick={() => handleSort('tonnage')}
+                    aria-label="Sort by tonnage"
                   >
                     Tonnage {sortField === 'tonnage' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </button>
                   <button 
                     className="btn btn-sm btn-outline-secondary" 
                     onClick={() => handleSort('status')}
+                    aria-label="Sort by status"
                   >
                     Status {sortField === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </button>

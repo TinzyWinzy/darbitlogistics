@@ -102,6 +102,10 @@ export default function TrackParentBooking() {
 
   return (
     <div className="container py-5">
+      {/* Internal Use Only Banner for staff */}
+      <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
+        INTERNAL USE ONLY
+      </div>
       <div className="row justify-content-center">
         <div className="col-12 col-lg-10">
           {/* Header Section */}
@@ -183,6 +187,17 @@ export default function TrackParentBooking() {
           {deliveries.map(delivery => (
             <DeliveryCard key={delivery.trackingId} delivery={delivery} />
           ))}
+        </div>
+      </div>
+      {/* Internal Support Contact */}
+      <div className="text-center text-muted small mb-4">
+        For support: <a href="mailto:info@morres.com" style={{ color: '#1F2120' }}>info@morres.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+      </div>
+      {/* Internal Escalation/Notes Placeholder */}
+      <div className="card border-0 shadow-sm mb-4" style={{ background: '#fffbe6' }}>
+        <div className="card-body p-3">
+          <strong>Internal Escalation/Notes:</strong>
+          <div className="text-muted small">(For internal updates, escalation, or comments. Coming soon.)</div>
         </div>
       </div>
     </div>

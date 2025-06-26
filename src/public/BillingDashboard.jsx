@@ -70,7 +70,11 @@ export default function BillingDashboard() {
 
   return (
     <div className="container py-5">
-      <h1 className="display-6 fw-bold mb-4" style={{ color: '#D2691E' }}>Billing & Subscription</h1>
+      {/* Internal Use Only Banner */}
+      <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
+        INTERNAL USE ONLY
+      </div>
+      <h1 className="display-6 fw-bold mb-4" style={{ color: '#1F2120' }}>Billing & Subscription</h1>
 
       {error && <div className="alert alert-danger">{error}</div>}
 
@@ -81,9 +85,9 @@ export default function BillingDashboard() {
       )}
       
       {subscription && (
-        <div className="card shadow-sm border-0">
+        <div className="card shadow-sm border-0 mb-4">
           <div className="card-header bg-light d-flex justify-content-between align-items-center">
-            <h2 className="h5 mb-0 fw-bold" style={{ color: '#a14e13' }}>Your Current Plan</h2>
+            <h2 className="h5 mb-0 fw-bold" style={{ color: '#1F2120' }}>Your Current Plan</h2>
             <span className={`badge bg-${subscription.status === 'active' ? 'success' : 'warning'} text-uppercase`}>
               {subscription.tierDetails.name} Plan ({subscription.status})
             </span>
@@ -95,7 +99,7 @@ export default function BillingDashboard() {
               </div>
             )}
             
-            <div className="row g-4">
+            <div className="row g-4 mb-4">
               {/* Delivery Quota */}
               <div className="col-md-6">
                 <div className="mb-3">
@@ -143,7 +147,7 @@ export default function BillingDashboard() {
 
             <hr className="my-4" />
             
-            <div className="text-center">
+            <div className="text-center mb-3">
               <h5 className="mb-3">Need more capacity?</h5>
               <button 
                 className="btn btn-primary fw-bold"
@@ -155,6 +159,13 @@ export default function BillingDashboard() {
               <p className="text-muted mt-2 small">
                 Our team will contact you to discuss your needs.
               </p>
+            </div>
+            {/* Internal Contact Info */}
+            <div className="alert alert-secondary text-center small mb-0" style={{ background: '#fffbe6', color: '#1F2120' }}>
+              <strong>Contact Finance:</strong> info@morres.com | +263 242 303 123
+            </div>
+            <div className="text-center text-muted mt-2 small">
+              For internal operations. Not for public distribution.
             </div>
           </div>
         </div>

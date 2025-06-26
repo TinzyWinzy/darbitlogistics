@@ -24,36 +24,101 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="navbar navbar-expand-lg" style={{ background: '#D2691E', borderRadius: '0.75rem', margin: '1.5rem 0 2rem 0', boxShadow: '0 2px 8px rgba(210, 105, 30, 0.08)' }}>
-      <div className="container-fluid">
-        <Link className="navbar-brand fw-bold text-white d-flex align-items-center" to="/">
-          <span style={{ fontSize: '1.7em', marginRight: 8 }} role="img" aria-label="logo">🚚</span>
+    <nav
+      className="navbar navbar-expand-lg shadow-sm"
+      style={{
+        background: '#1F2120',
+        borderRadius: '0.75rem',
+        margin: '1.5rem 0 2rem 0',
+        boxShadow: '0 2px 8px rgba(31, 33, 32, 0.08)',
+        padding: '0.75rem 0',
+      }}
+    >
+      <div className="container-fluid px-4">
+        <Link className="navbar-brand fw-bold d-flex align-items-center" to="/" style={{ color: '#EBD3AD', letterSpacing: '0.5px' }}>
+          <span style={{ fontSize: '1.7em', marginRight: 10 }} role="img" aria-label="logo">🚚</span>
           Morres Logistics
         </Link>
-        <button className="navbar-toggler" type="button" onClick={handleNavCollapse} aria-expanded={!isNavCollapsed} aria-label="Toggle navigation">
+        <button
+          className="navbar-toggler"
+          type="button"
+          onClick={handleNavCollapse}
+          aria-expanded={!isNavCollapsed}
+          aria-label="Toggle navigation"
+        >
           <span className="navbar-toggler-icon"></span>
         </button>
         <div className={`${isNavCollapsed ? 'collapse' : ''} navbar-collapse`} id="mainNavbar">
-          <ul className="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center gap-lg-2">
+          <ul className="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center gap-lg-3 gap-2">
             <li className="nav-item">
-              <NavLink to="/" className={({ isActive }) => 'nav-link' + (isActive ? ' active text-white fw-bold' : ' text-white')}>Home</NavLink>
+              <NavLink
+                to="/"
+                className={({ isActive }) =>
+                  'nav-link px-3 py-2 rounded' +
+                  (isActive
+                    ? ' fw-bold text-light'
+                    : ' text-light opacity-85')
+                }
+                style={{ color: '#EBD3AD' }}
+              >
+                Home
+              </NavLink>
             </li>
             <li className="nav-item">
-              <NavLink to="/offerings" className={({ isActive }) => 'nav-link' + (isActive ? ' active text-white fw-bold' : ' text-white')}>Offerings</NavLink>
+              <NavLink
+                to="/offerings"
+                className={({ isActive }) =>
+                  'nav-link px-3 py-2 rounded' +
+                  (isActive
+                    ? ' fw-bold text-light'
+                    : ' text-light opacity-85')
+                }
+                style={{ color: '#EBD3AD' }}
+              >
+                Offerings
+              </NavLink>
             </li>
             <li className="nav-item">
-              <NavLink to="/track" className={({ isActive }) => 'nav-link' + (isActive ? ' active text-white fw-bold' : ' text-white')}>Track Delivery</NavLink>
+              <NavLink
+                to="/track"
+                className={({ isActive }) =>
+                  'nav-link px-3 py-2 rounded' +
+                  (isActive
+                    ? ' fw-bold text-light'
+                    : ' text-light opacity-85')
+                }
+                style={{ color: '#EBD3AD' }}
+              >
+                Track Delivery
+              </NavLink>
             </li>
             {user && (
               <>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/operator/dashboard">Dashboard</Link>
+                  <Link className="nav-link px-3 py-2 rounded text-light" to="/operator/dashboard" style={{ color: '#EBD3AD' }}>
+                    Dashboard
+                  </Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/billing">Billing</Link>
+                  <Link className="nav-link px-3 py-2 rounded text-light" to="/billing" style={{ color: '#EBD3AD' }}>
+                    Billing
+                  </Link>
                 </li>
-                <li className="nav-item ms-lg-2">
-                  <button className="btn btn-outline-light fw-bold px-4 py-2" style={{ color: '#D2691E' }} onClick={handleLogout}>Logout</button>
+                <li className="nav-item ms-lg-2 mt-2 mt-lg-0">
+                  <button
+                    className="btn fw-bold px-4 py-2"
+                    style={{
+                      background: '#EBD3AD',
+                      color: '#1F2120',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 1px 4px rgba(31,33,32,0.06)',
+                      letterSpacing: '0.5px',
+                    }}
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </button>
                 </li>
               </>
             )}

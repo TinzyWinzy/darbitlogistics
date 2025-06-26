@@ -1,15 +1,15 @@
 /* UnoCSS: Utility classes are available globally via Vite plugin. */
 
 :root {
-  --primary: #D2691E;
-  --primary-dark: #a14e13;
-  --primary-light: #e88a3a;
+  --primary: #1F2120;
+  --primary-dark: #1F2120;
+  --primary-light: #EBD3AD;
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
+  color: #1F2120;
   background-color: var(--primary-light);
 
   font-synthesis: none;
@@ -29,13 +29,13 @@ body {
 
 nav {
   background: var(--primary);
-  color: #fff;
+  color: #EBD3AD;
   border-radius: 0.5rem;
-  box-shadow: 0 2px 8px rgba(210, 105, 30, 0.08);
+  box-shadow: 0 2px 8px rgba(31, 33, 32, 0.08);
 }
 
 nav a {
-  color: #fff;
+  color: #EBD3AD;
   font-weight: 600;
   padding: 0.5rem 1rem;
   border-radius: 0.25rem;
@@ -43,7 +43,7 @@ nav a {
 }
 nav a:hover {
   background: var(--primary-dark);
-  color: #fff;
+  color: #EBD3AD;
 }
 
 button {
@@ -54,10 +54,10 @@ button {
   font-weight: 600;
   font-family: inherit;
   background-color: var(--primary);
-  color: #fff;
+  color: #EBD3AD;
   cursor: pointer;
   transition: background 0.25s, border-color 0.25s;
-  box-shadow: 0 1px 4px rgba(210, 105, 30, 0.08);
+  box-shadow: 0 1px 4px rgba(31, 33, 32, 0.08);
 }
 button:hover {
   background-color: var(--primary-dark);
@@ -77,16 +77,16 @@ button:focus-visible {
 
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
-    background-color: #fffbe6;
+    color: #1F2120;
+    background-color: #EBD3AD;
   }
   nav {
     background: var(--primary);
-    color: #fff;
+    color: #EBD3AD;
   }
   button {
     background-color: var(--primary);
-    color: #fff;
+    color: #EBD3AD;
   }
   button:hover {
     background-color: var(--primary-dark);

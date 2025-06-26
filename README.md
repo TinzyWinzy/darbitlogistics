@@ -106,3 +106,80 @@ git push -u origin main
 
 ## License
 MIT
+
+## CI/CD & App Pipeline
+
+### Branching & Update Flow
+- **Feature branches** (e.g., `feature/xyz`) are created from `main` for new work.
+- After development, feature branches are merged into `main` via pull request or direct merge.
+- `main` is the production branch and should always be deployable.
+- After merging, always push `main` to remote: `git push origin main`.
+- Delete feature branches after merge to keep repo clean.
+
+### Deployment Pipeline
+- **Frontend**: Vercel auto-deploys on push to `main`.
+- **Backend**: Render auto-deploys on push to `main`.
+- **Environment variables** are managed in Vercel/Render dashboards and `.env.local` (local only).
+- **Database migrations** are managed via scripts in `/migrations`.
+
+### Update/Release Steps
+1. Pull latest `main`: `git pull origin main`
+2. Create feature branch: `git checkout -b feature/your-feature`
+3. Make changes, commit, push: `git push origin feature/your-feature`
+4. Merge to `main` (PR or direct): `git checkout main && git merge feature/your-feature`
+5. Push `main`: `git push origin main`
+6. Vercel/Render auto-deploys
+7. Delete feature branch: `git branch -d feature/your-feature` and `git push origin --delete feature/your-feature`
+
+## Branching & Release Workflow
+
+### Branch Purposes
+- **feature/tracking-updates**: Default development branch. All new features and bugfixes are merged here first.
+- **staging**: Pre-production branch. Used for integration testing and QA before production. Only code that has passed review and basic tests is merged here.
+- **prod**: Production branch. Only thoroughly tested, production-ready code is merged here. This branch is deployed to live environments.
+- **stable**: Last known good, stable version. Updated only after a successful production deployment and verification.
+
+### Workflow Steps
+1. **Development**
+   - Create a feature branch from `feature/tracking-updates` (e.g., `feature/your-feature`).
+   - Work, commit, and push to your feature branch.
+   - Open a pull request (PR) to merge into `feature/tracking-updates`.
+   - After review, merge PR into `feature/tracking-updates`.
+
+2. **Staging Preparation**
+   - When ready for QA/testing, merge `feature/tracking-updates` into `staging`:
+     ```bash
+     git checkout staging
+     git merge feature/tracking-updates
+     git push origin staging
+     ```
+   - Deploy/verify on staging environment.
+   - Run integration and acceptance tests.
+
+3. **Production Release**
+   - When staging passes all tests, merge `staging` into `prod`:
+     ```bash
+     git checkout prod
+     git merge staging
+     git push origin prod
+     ```
+   - Deploy to production/live environment.
+   - Monitor for issues.
+
+4. **Stable Update**
+   - After production is verified stable, update the `stable` branch:
+     ```bash
+     git checkout stable
+     git merge prod
+     git push origin stable
+     ```
+   - Tag the release if desired (e.g., `v1.0.0`).
+
+### Notes
+- Never commit directly to `prod` or `stable`.
+- Always use PRs for merging into `feature/tracking-updates`.
+- Only merge into `staging` after code review and local tests.
+- Only merge into `prod` after successful staging tests.
+- Only update `stable` after production is confirmed healthy.
+
+---

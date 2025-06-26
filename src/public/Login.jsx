@@ -48,10 +48,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
+    <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light" role="main">
       <div className="card shadow-sm border-0" style={{ maxWidth: '400px', width: '100%' }}>
         <div className="card-body p-4 p-md-5">
-          <h2 className="card-title text-center fw-bold mb-1" style={{ color: '#D2691E' }}>
+          <h2 className="card-title text-center fw-bold mb-1" style={{ color: '#1F2120' }}>
             Sign In
           </h2>
           <p className="text-center text-muted mb-4">Morres Logistics Operator Hub</p>
@@ -90,7 +90,8 @@ export default function Login() {
                 type="submit"
                 disabled={loading}
                 className="btn btn-primary fw-bold"
-                style={{ background: '#D2691E', border: 'none' }}
+                style={{ background: '#1F2120', border: 'none', color: '#EBD3AD' }}
+                aria-label="Sign in"
               >
                 {loading ? (
                   <>

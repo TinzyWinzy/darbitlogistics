@@ -67,13 +67,17 @@ export default function TrackDelivery() {
     if (delivery.currentStatus === 'Delivered') {
       return <span className="material-icons-outlined" style={{ color: '#198754', fontSize: '4rem' }}>task_alt</span>;
     }
-    return <span className="material-icons-outlined" style={{ color: '#D2691E', fontSize: '4rem' }}>local_shipping</span>;
+    return <span className="material-icons-outlined" style={{ color: '#1F2120', fontSize: '4rem' }}>local_shipping</span>;
   };
 
   return (
-    <div className="bg-gradient" style={{ minHeight: '90vh', background: 'linear-gradient(135deg, #e88a3a 0%, #fffbe6 100%)' }}>
+    <div className="bg-gradient" style={{ minHeight: '90vh', background: 'linear-gradient(135deg, #EBD3AD 0%, #fffbe6 100%)' }} role="main">
+      {/* Internal Use Only Banner */}
+      <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
+        INTERNAL USE ONLY
+      </div>
       <div className="container py-5">
-        <h1 className="display-6 fw-bold text-center mb-4" style={{ color: '#D2691E' }}>
+        <h1 className="display-6 fw-bold text-center mb-4" style={{ color: '#1F2120' }}>
           Track Your Consignment
         </h1>
         <div className="row justify-content-center">
@@ -87,7 +91,7 @@ export default function TrackDelivery() {
 
                 <form onSubmit={handleSubmit} className="mb-4">
                   <div className="input-group">
-                    <span className="input-group-text bg-white border-end-0">
+                    <span className="input-group-text bg-white border-end-0" id="trackingId-label">
                       <span className="material-icons-outlined me-2">local_shipping</span>
                     </span>
                     <input
@@ -98,12 +102,15 @@ export default function TrackDelivery() {
                       className="form-control border-start-0"
                       maxLength="7"
                       style={{ boxShadow: 'none' }}
+                      aria-label="Tracking ID"
+                      aria-describedby="trackingId-label"
                     />
                     <button
                       type="submit"
                       disabled={loading}
                       className="btn text-white px-4"
-                      style={{ background: '#D2691E' }}
+                      style={{ background: '#1F2120' }}
+                      aria-label="Track consignment"
                     >
                       {loading ? (
                         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -115,10 +122,22 @@ export default function TrackDelivery() {
                   </div>
                 </form>
 
+                {/* Internal Support Contact */}
+                <div className="text-center text-muted small mb-4">
+                  For delivery issues, contact: <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+                </div>
+                {/* Operator/Internal Notes Placeholder */}
+                <div className="card border-0 shadow-sm mb-4" style={{ background: '#fffbe6' }}>
+                  <div className="card-body p-3">
+                    <strong>Operator/Internal Notes:</strong>
+                    <div className="text-muted small">(For internal updates, escalation, or comments. Coming soon.)</div>
+                  </div>
+                </div>
+
                 {delivery && (
-                  <div className="card shadow-sm mt-4 border-0">
+                  <div className="card shadow-sm mt-4 border-0" aria-live="polite">
                     <div className="card-header bg-white d-flex justify-content-between align-items-center">
-                      <h2 className="h5 mb-0" style={{ color: '#a14e13' }}>
+                      <h2 className="h5 mb-0" style={{ color: '#1F2120' }}>
                         <span className="material-icons-outlined align-middle me-2">receipt_long</span>
                         Tracking ID: {delivery.trackingId}
                       </h2>
@@ -126,7 +145,7 @@ export default function TrackDelivery() {
                     </div>
                     <div className="card-body">
                       {/* Consignment Details */}
-                      <h3 className="h6 fw-bold" style={{ color: '#a14e13' }}>Consignment Details</h3>
+                      <h3 className="h6 fw-bold" style={{ color: '#1F2120' }}>Consignment Details</h3>
                       <div className="row text-muted small mb-3">
                         <div className="col-md-6 mb-2"><strong>Customer:</strong> {delivery.customerName}</div>
                         <div className="col-md-6 mb-2"><strong>Booking Ref:</strong> {delivery.bookingReference}</div>
@@ -140,7 +159,7 @@ export default function TrackDelivery() {
                       </div>
 
                       {/* Vehicle & Driver Details */}
-                      <h3 className="h6 fw-bold" style={{ color: '#a14e13' }}>Vehicle & Driver</h3>
+                      <h3 className="h6 fw-bold" style={{ color: '#1F2120' }}>Vehicle & Driver</h3>
                       <div className="row text-muted small mb-3">
                         {delivery.driverDetails && (
                           <>
@@ -164,7 +183,7 @@ export default function TrackDelivery() {
                       
                       <hr />
 
-                      <h3 className="h6 mt-4 fw-bold" style={{ color: '#a14e13' }}>Tracking History</h3>
+                      <h3 className="h6 mt-4 fw-bold" style={{ color: '#1F2120' }}>Tracking History</h3>
                       {delivery.checkpoints && delivery.checkpoints.length > 0 ? (
                         <div className="timeline-container mt-3">
                           {delivery.checkpoints.slice().reverse().map((cp, index) => (

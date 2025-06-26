@@ -1,29 +1,26 @@
 export default function Footer() {
   return (
-    <footer className="bg-white border-top mt-5 py-4" style={{ background: 'rgba(255,255,255,0.95)' }}>
+    <footer className="bg-white border-top mt-5 py-5" style={{ background: 'rgba(255,255,255,0.95)' }}>
       <div className="container">
         <div className="row align-items-center gy-3">
-          <div className="col-12 col-md-4 text-center text-md-start">
-            <span className="fw-bold" style={{ color: '#D2691E' }}>Morres Logistics &copy; {new Date().getFullYear()}</span>
+          <div className="col-12 col-md-6 text-center text-md-start mb-2 mb-md-0">
+            <span className="fw-bold" style={{ color: '#1F2120' }}>Morres Logistics &copy; {new Date().getFullYear()}</span>
+            <span className="ms-3 badge bg-warning text-dark small align-middle">INTERNAL USE ONLY</span>
           </div>
-          <div className="col-12 col-md-4 text-center">
-            <span className="me-2">Contact:</span>
-            <a href="mailto:info@morreslogistics.com" className="text-decoration-underline" style={{ color: '#a14e13' }}>info@morreslogistics.com</a>
+          <div className="col-12 col-md-6 text-center text-md-end">
+            <span className="me-2">Support:</span>
+            <a href="mailto:info@morres.com" className="text-decoration-underline" style={{ color: '#1F2120' }}>info@morres.com</a>
             <span className="mx-2">|</span>
-            <a href="tel:+263771234567" className="text-decoration-underline" style={{ color: '#a14e13' }}>+263 77 123 4567</a>
-          </div>
-          <div className="col-12 col-md-4 text-center text-md-end">
-            <h5 className="text-uppercase fw-bold" style={{ color: '#a14e13' }}>Follow Us</h5>
-            <div className="mt-3">
-              <a href="mailto:info@morreslogistics.com" className="me-3" style={{ color: '#D2691E' }}><span className="material-icons-outlined align-middle">alternate_email</span></a>
-              <a href="https://facebook.com/" target="_blank" rel="noopener noreferrer" className="me-3" style={{ color: '#D2691E' }}><span className="material-icons-outlined align-middle">facebook</span></a>
-              <a href="https://linkedin.com/" target="_blank" rel="noopener noreferrer" style={{ color: '#D2691E' }}><span className="material-icons-outlined align-middle">linkedin</span></a>
-            </div>
+            <a href="tel:+263242303123" className="text-decoration-underline" style={{ color: '#1F2120' }}>+263 242 303 123</a>
           </div>
         </div>
         <div className="row mt-2">
           <div className="col text-center text-muted small">
-            All rights reserved. | <a href="/legal" className="text-decoration-underline" style={{ color: '#a14e13' }}>Legal</a>
+            All rights reserved. | <a href="/legal" className="text-decoration-underline" style={{ color: '#1F2120' }}>Legal</a>
+            <span className="mx-2">|</span>
+            <span className="text-secondary" style={{ opacity: 0.5 }}>
+              Social links disabled for internal version
+            </span>
           </div>
         </div>
       </div>
