@@ -1105,19 +1105,25 @@ app.get('/api/subscriptions/me', authenticateSession, async (req, res) => {
       if (hasHistory) {
         return res.status(404).json({ error: 'No active subscription found. Please upgrade your plan.' });
       }
-      // Atomic upsert for trial subscription
-      const { trialSettings } = await import('./config/subscriptions.js');
-      const now = new Date();
-      const trialEndDate = new Date(now);
-      trialEndDate.setDate(trialEndDate.getDate() + trialSettings.durationDays);
-      await pool.query(
-        `INSERT INTO subscriptions (user_id, tier, status, start_date, end_date)
-         VALUES ($1, $2, 'trial', $3, $4)
-         ON CONFLICT (user_id)
-         WHERE status IN ('active', 'trial')
-         DO NOTHING`,
-        [req.user.id, trialSettings.tier, now, trialEndDate]
+      // Check for existing active/trial subscription (should be none, but double-check for safety)
+      const activeTrialResult = await pool.query(
+        "SELECT * FROM subscriptions WHERE user_id = $1 AND status IN ('active', 'trial')",
+        [req.user.id]
       );
+      if (activeTrialResult.rows.length === 0) {
+        // Atomic insert for trial subscription
+        const { trialSettings } = await import('./config/subscriptions.js');
+        const now = new Date();
+        const trialEndDate = new Date(now);
+        trialEndDate.setDate(trialEndDate.getDate() + trialSettings.durationDays);
+        await pool.query(
+          `INSERT INTO subscriptions (user_id, tier, status, start_date, end_date)
+           VALUES ($1, $2, 'trial', $3, $4)`,
+          [req.user.id, trialSettings.tier, now, trialEndDate]
+        );
+        // Audit log
+        console.log(`[SUBSCRIPTION] Auto-created trial for user ${req.user.id} at ${now.toISOString()}`);
+      }
       // Always fetch the latest subscription after insert
       const latestResult = await pool.query(
         'SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1',
@@ -1126,8 +1132,6 @@ app.get('/api/subscriptions/me', authenticateSession, async (req, res) => {
       const subscription = latestResult.rows[0];
       const { subscriptionTiers } = await import('./config/subscriptions.js');
       const tierDetails = subscriptionTiers[subscription.tier];
-      // Audit log
-      console.log(`[SUBSCRIPTION] Auto-created trial for user ${req.user.id} at ${now.toISOString()}`);
       return res.json({ ...subscription, tierDetails });
     }
     

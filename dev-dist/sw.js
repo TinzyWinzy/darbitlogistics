@@ -39,7 +39,7 @@ if (!self.define) {
       .then(() => {
         let promise = registry[uri];
         if (!promise) {
-          throw new Error(`Module ${uri} didn't register its module`);
+          throw new Error(`Module ${uri} didn’t register its module`);
         }
         return promise;
       })
@@ -82,7 +82,7 @@ define(['./workbox-a959eb95'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "/index.html",
-    "revision": "0.ivffehi8j0o"
+    "revision": "0.nmqdcrp2iao"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
@@ -90,7 +90,7 @@ define(['./workbox-a959eb95'], (function (workbox) { 'use strict';
   }));
   workbox.registerRoute(({
     url
-  }) => url.origin === 'http://localhost:3000', new workbox.NetworkFirst({
+  }) => url.origin === env.VITE_API_URL, new workbox.NetworkFirst({
     "cacheName": "api-cache",
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 50,
