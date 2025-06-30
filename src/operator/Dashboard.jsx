@@ -163,8 +163,6 @@ export default function OperatorDashboard() {
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
-
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -435,9 +433,6 @@ export default function OperatorDashboard() {
           <DeliveryDispatchForm
             customers={customers}
             parentBookings={parentBookings}
-            selectedCustomerId={selectedCustomerId}
-            selectedCustomerBookings={selectedCustomerBookings}
-            onCustomerSelect={handleCustomerSelect}
             createDelivery={createDelivery}
             fetchParentBookings={fetchParentBookings}
             onSuccess={async () => {
@@ -445,7 +440,6 @@ export default function OperatorDashboard() {
               await fetchDeliveries();
             }}
             onFeedback={setFeedback}
-            onReset={handleFormReset}
           />
         </div>
       </div>

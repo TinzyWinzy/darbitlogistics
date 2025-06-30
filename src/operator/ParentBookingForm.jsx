@@ -132,28 +132,28 @@ export default function ParentBookingForm({
     };
     try {
       const res = await createParentBooking(parentBookingData);
-      if (res.success) {
-        setCreateFeedback('Consignment logged successfully!');
-        setParentForm({
-          customerName: '',
-          phoneNumber: '',
-          totalTonnage: '',
-          mineral_type: 'Other',
-          mineral_grade: 'Ungraded',
-          moisture_content: '',
-          particle_size: '',
-          loadingPoint: '',
-          destination: '',
-          deadline: null,
-          requires_analysis: false,
-          special_handling_notes: '',
-          environmental_concerns: '',
-          notes: ''
-        });
-        setSuggestedLocations([]);
-        if (onSuccess) onSuccess(res);
+      setCreateFeedback(res.success ? 'Consignment logged successfully!' : 'Submission complete.');
+      setParentForm({
+        customerName: '',
+        phoneNumber: '',
+        totalTonnage: '',
+        mineral_type: 'Other',
+        mineral_grade: 'Ungraded',
+        moisture_content: '',
+        particle_size: '',
+        loadingPoint: '',
+        destination: '',
+        deadline: null,
+        requires_analysis: false,
+        special_handling_notes: '',
+        environmental_concerns: '',
+        notes: ''
+      });
+      setSuggestedLocations([]);
+      if (onSuccess) onSuccess(res);
+      setTimeout(() => {
         if (onClose) onClose();
-      }
+      }, 800);
     } catch (error) {
       setCreateFeedback(error.response?.data?.error || 'Failed to create parent booking');
     }

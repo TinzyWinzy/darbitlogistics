@@ -3,14 +3,10 @@ import { useState } from 'react';
 export default function DeliveryDispatchForm({
   customers,
   parentBookings,
-  selectedCustomerId,
-  selectedCustomerBookings,
-  onCustomerSelect,
   createDelivery,
   fetchParentBookings,
   onSuccess,
-  onFeedback,
-  onReset
+  onFeedback
 }) {
   const [createForm, setCreateForm] = useState({
     customerId: '',
@@ -31,6 +27,34 @@ export default function DeliveryDispatchForm({
   });
   const [creating, setCreating] = useState(false);
   const [createFeedback, setCreateFeedback] = useState('');
+  const [selectedCustomerBookings, setSelectedCustomerBookings] = useState([]);
+
+  const handleCustomerSelect = (customerId) => {
+    setCreateForm(prev => ({
+      ...prev,
+      customerId,
+      selectedBookingId: '',
+      tonnage: '',
+      containerCount: '',
+      vehicleType: 'Standard Truck',
+      vehicleCapacity: 30.00,
+      driverDetails: { name: '', vehicleReg: '' },
+      loadingPoint: '',
+      destination: '',
+      environmentalIncidents: '',
+      samplingStatus: ''
+    }));
+    // Filter bookings for this customer
+    const [customerName, phoneNumber] = customerId.split('|');
+    const bookings = parentBookings.filter(
+      booking =>
+        booking.customerName === customerName &&
+        booking.phoneNumber === phoneNumber &&
+        booking.status === 'Active' &&
+        booking.remainingTonnage > 0
+    );
+    setSelectedCustomerBookings(bookings);
+  };
 
   const handleBookingSelect = (bookingId) => {
     const selectedBooking = parentBookings.find(b => b.id === bookingId);
@@ -163,7 +187,6 @@ export default function DeliveryDispatchForm({
           environmentalIncidents: '',
           samplingStatus: ''
         });
-        if (onReset) onReset();
         if (fetchParentBookings) await fetchParentBookings();
         if (onSuccess) onSuccess(res);
       }
@@ -194,23 +217,9 @@ export default function DeliveryDispatchForm({
         <label className="form-label">Select Customer *</label>
         <select 
           className="form-select"
-          value={selectedCustomerId}
+          value={createForm.customerId}
           onChange={(e) => {
-            onCustomerSelect(e.target.value);
-            setCreateForm(prev => ({
-              ...prev,
-              customerId: e.target.value,
-              selectedBookingId: '',
-              tonnage: '',
-              containerCount: '',
-              vehicleType: 'Standard Truck',
-              vehicleCapacity: 30.00,
-              driverDetails: { name: '', vehicleReg: '' },
-              loadingPoint: '',
-              destination: '',
-              environmentalIncidents: '',
-              samplingStatus: ''
-            }));
+            handleCustomerSelect(e.target.value);
           }}
           disabled={creating}
           required
@@ -232,7 +241,7 @@ export default function DeliveryDispatchForm({
             setCreateForm(prev => ({ ...prev, selectedBookingId: e.target.value }));
             handleBookingSelect(e.target.value);
           }}
-          disabled={creating || !selectedCustomerId}
+          disabled={creating || !createForm.customerId}
           required
         >
           <option value="">Choose consignment...</option>
