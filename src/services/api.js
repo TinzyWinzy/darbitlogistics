@@ -9,16 +9,45 @@ const api = axios.create({
   }
 });
 
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function subscribeTokenRefresh(cb) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token) {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+}
+
 // Response interceptor for error handling
 api.interceptors.response.use(
   response => response,
-  error => {
-    if (error.response) {
-      // Only redirect for 401 (unauthenticated)
-      if (error.response.status === 401) {
-        window.location.href = '/login';
+  async error => {
+    const originalRequest = error.config;
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      if (!isRefreshing) {
+        isRefreshing = true;
+        try {
+          const res = await api.post('/api/auth/refresh');
+          const newToken = res.data.token;
+          localStorage.setItem('jwt_token', newToken);
+          onRefreshed(newToken);
+          isRefreshing = false;
+        } catch (refreshError) {
+          isRefreshing = false;
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+        }
       }
-      // For 403 (forbidden/quota), let the form handle it (do not redirect)
+      return new Promise((resolve, reject) => {
+        subscribeTokenRefresh(token => {
+          originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          resolve(api(originalRequest));
+        });
+      });
     }
     return Promise.reject(error);
   }
@@ -317,5 +346,17 @@ export const deliveryApi = {
     }
   }
 };
+
+// Request interceptor to attach JWT token
+api.interceptors.request.use(
+  config => {
+    const token = localStorage.getItem('jwt_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  error => Promise.reject(error)
+);
 
 export default api; 

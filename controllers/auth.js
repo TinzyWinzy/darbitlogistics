@@ -26,22 +26,42 @@ export async function loginUser(req, res) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const sessionId = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 12); // 12 hours
-    
-    await pool.query(
-      'INSERT INTO sessions (session_id, username, expires_at) VALUES ($1, $2, $3)',
-      [sessionId, user.username, expiresAt]
-    );
-    
     const userForClient = {
       id: user.id,
       username: user.username,
       role: user.role
     };
 
-    res.cookie('session_id', sessionId, { httpOnly: true, secure: true, sameSite: 'none', expires: expiresAt });
-    res.json({ success: true, user: userForClient });
+    // Generate JWT (access token)
+    const jwt = (await import('jsonwebtoken')).default;
+    const jwtSecret = process.env.JWT_SECRET || 'your-very-secret-key';
+    const accessToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      jwtSecret,
+      { expiresIn: '15m' }
+    );
+
+    // Generate refresh token
+    const refreshToken = crypto.randomBytes(64).toString('hex');
+    const refreshExpires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
+
+    // Store refresh token in DB
+    await pool.query(
+      `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) DO UPDATE SET token = $2, expires_at = $3`,
+      [user.id, refreshToken, refreshExpires]
+    );
+
+    // Set refresh token as HttpOnly cookie
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      expires: refreshExpires,
+      path: '/api/auth',
+    });
+
+    res.json({ success: true, user: userForClient, token: accessToken });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -49,10 +69,14 @@ export async function loginUser(req, res) {
 }
 
 export async function logoutUser(req, res) {
-  const sessionId = req.cookies.session_id;
+  // JWT logout is handled client-side by removing the token
+  // Invalidate refresh token in DB and clear cookie
   try {
-    await pool.query('DELETE FROM sessions WHERE session_id = $1', [sessionId]);
-    res.clearCookie('session_id');
+    const refreshToken = req.cookies.refresh_token;
+    if (refreshToken) {
+      await pool.query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
+    }
+    res.clearCookie('refresh_token', { path: '/api/auth' });
     res.json({ success: true });
   } catch (err) {
     console.error('Logout error:', err);
@@ -65,5 +89,55 @@ export function getMe(req, res) {
     res.json(req.user);
   } else {
     res.status(401).json({ error: 'Not authenticated' });
+  }
+}
+
+export async function refreshToken(req, res) {
+  const refreshToken = req.cookies.refresh_token;
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'No refresh token' });
+  }
+  try {
+    // Find refresh token in DB
+    const result = await pool.query(
+      'SELECT * FROM refresh_tokens WHERE token = $1 AND expires_at > NOW()',
+      [refreshToken]
+    );
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
+    const userId = result.rows[0].user_id;
+    // Get user
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    const user = userResult.rows[0];
+    // Issue new access token
+    const jwt = (await import('jsonwebtoken')).default;
+    const jwtSecret = process.env.JWT_SECRET || 'your-very-secret-key';
+    const accessToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      jwtSecret,
+      { expiresIn: '15m' }
+    );
+    // Rotate refresh token
+    const newRefreshToken = crypto.randomBytes(64).toString('hex');
+    const refreshExpires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
+    await pool.query(
+      'UPDATE refresh_tokens SET token = $1, expires_at = $2 WHERE user_id = $3',
+      [newRefreshToken, refreshExpires, user.id]
+    );
+    res.cookie('refresh_token', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      expires: refreshExpires,
+      path: '/api/auth',
+    });
+    res.json({ token: accessToken });
+  } catch (err) {
+    console.error('Refresh token error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 } 

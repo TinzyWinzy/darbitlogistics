@@ -2,7 +2,6 @@ import { Link, NavLink } from 'react-router-dom';
 import { useContext, useState } from 'react';
 import { AuthContext } from '../App';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 
 export default function Navbar() {
   const { user, setUser } = useContext(AuthContext);
@@ -13,9 +12,7 @@ export default function Navbar() {
 
   async function handleLogout() {
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/logout`, {}, {
-        withCredentials: true,
-      });
+      localStorage.removeItem('jwt_token');
       setUser(null);
       navigate('/login');
     } catch (error) {

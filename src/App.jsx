@@ -53,11 +53,26 @@ export default function App() {
 
   useEffect(() => {
     const checkAuth = async () => {
+      let token = localStorage.getItem('jwt_token');
+      if (!token) {
+        // Try to refresh
+        try {
+          const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/refresh`, {}, { withCredentials: true });
+          token = res.data.token;
+          localStorage.setItem('jwt_token', token);
+        } catch (err) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+      }
+      // Now check /me with the (possibly new) token
       try {
-        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/me`, {
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
           withCredentials: true,
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
           }
         });
         setUser(data);
@@ -67,7 +82,6 @@ export default function App() {
         setLoading(false);
       }
     };
-    
     checkAuth();
   }, []);
 

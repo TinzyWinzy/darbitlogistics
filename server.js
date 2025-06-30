@@ -3,13 +3,13 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
-import twilio from 'twilio'; // Import Twilio
-import AfricasTalking from 'africastalking'; // Import Africa's Talking
 import webPush from 'web-push'; // Import web-push
 import bcrypt from 'bcrypt';
 import pool from './config/database.js';
+import jwt from 'jsonwebtoken';
+import axios from 'axios';
+import authRouter from './routes/auth.js';
 
 dotenv.config();
 
@@ -27,7 +27,6 @@ webPush.setVapidDetails(
 
 const app = express();
 app.use(bodyParser.json());
-app.use(cookieParser());
 
 const allowedOrigins = [
   'https://morres-logistics.vercel.app',
@@ -51,8 +50,6 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-  exposedHeaders: ['set-cookie'],
 };
 
 app.use(cors(corsOptions));
@@ -60,41 +57,11 @@ app.use(cors(corsOptions));
 // Ensure only the correct preflight handler is present
 app.options('/{*any}', cors(corsOptions));
 
-// Initialize Africa's Talking
-let atSMS;
-const atApiKey = process.env.AT_API_KEY;
-const atEnv = process.env.AT_ENV || 'production';
-const atUsername = atEnv === 'sandbox' ? 'sandbox' : process.env.AT_USERNAME;
+const jwtSecret = process.env.JWT_SECRET || 'your-very-secret-key'; // Store securely in .env
 
-if (atUsername && atApiKey) {
-  const africasTalking = AfricasTalking({
-    username: atUsername,
-    apiKey: atApiKey,
-  });
-  atSMS = africasTalking.SMS;
-  console.log(`Africa's Talking initialized in ${atEnv} mode.`);
-  console.log(`[DEBUG] AT Username Loaded: ${atUsername}`);
-} else {
-  console.warn("Africa's Talking credentials not set. SMS fallback will not work.");
-}
-
-// === Cookie Options for Cross-Platform Auth ===
-const cookieOptions = {
-  httpOnly: true,
-  secure: true,
-  sameSite: 'none',
-  path: '/', // Explicit for all endpoints
-};
-
-// NOTE: For iOS/Safari compatibility, cookies with SameSite=None must also have Secure=true and be served over HTTPS.
-// For local development, use HTTPS (e.g., mkcert) or test on a deployed HTTPS environment.
-if (process.env.NODE_ENV !== 'production' && !process.env.LOCAL_HTTPS) {
-  console.warn('WARNING: Cookies with Secure flag require HTTPS. iOS/Safari will not persist cookies over HTTP.');
-}
-
-// Helper: Send SMS with Twilio and Africa's Talking fallback
+// Replace sendSMS with TextBee implementation
 async function sendSMS(to, message) {
-  // Standardize the 'to' number to E.164 format for both providers
+  // Standardize the 'to' number to E.164 format
   let formattedTo = to.replace(/\D/g, ''); // Remove non-digits
   if (formattedTo.startsWith('0')) {
     formattedTo = '263' + formattedTo.substring(1);
@@ -102,98 +69,36 @@ async function sendSMS(to, message) {
   if (!formattedTo.startsWith('+')) {
     formattedTo = `+${formattedTo}`;
   }
-  
-  // 1. Try Twilio first
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
 
-  if (accountSid && authToken && fromNumber) {
-    const client = twilio(accountSid, authToken);
-    try {
-      const response = await client.messages.create({
-        body: message,
-        from: fromNumber,
-        to: formattedTo,
-      });
-      console.log('Twilio SMS sent successfully. SID:', response.sid);
-      return { success: true, provider: 'twilio', data: response };
-    } catch (err) {
-      console.error('--- Twilio SMS Error ---');
-      console.error('Timestamp:', new Date().toISOString());
-      console.error('Full Error Object:', err);
-      if (err.code === 'EAI_AGAIN') {
-        console.error('[VERBOSE ANALYSIS] The error code EAI_AGAIN suggests a DNS lookup failure. This means the server could not resolve api.twilio.com. This is typically a network connectivity issue on the server itself, not a problem with the Twilio credentials or the code logic. Check the server\'s internet connection and DNS settings.');
-      } else if (err.status === 401) {
-        console.error('[VERBOSE ANALYSIS] Received a 401 Unauthorized error. This indicates that the TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN is incorrect.');
-      }
-      console.error('--------------------------');
-      // Don't return yet, proceed to fallback
-    }
-  } else {
-    console.warn('Twilio environment variables are not fully set.');
+  const textbeeApiKey = process.env.TEXTBEE_API_KEY;
+  const deviceId = process.env.TEXTBEE_DEVICE_ID;
+  if (!deviceId) {
+    throw new Error('TEXTBEE_DEVICE_ID is not set in environment variables');
   }
-
-  // 2. Fallback to Africa's Talking
-  if (atSMS) {
-    try {
-      // The number is already formatted as international E.164
-      const response = await atSMS.send({
-        to: [formattedTo],
-        message: message,
-        from: process.env.AT_SENDER_ID // Optional: Your Sender ID
-      });
-      console.log("Africa's Talking SMS sent successfully:", response);
-      return { success: true, provider: 'africastalking', data: response };
-    } catch (err) {
-      console.error("--- Africa's Talking SMS Error ---");
-      console.error('Timestamp:', new Date().toISOString());
-      console.error('Full Error Object:', err);
-      if (typeof err.message === 'string' && err.message.includes('401')) {
-          console.error('[VERBOSE ANALYSIS] The error message contains "401". This points to an authentication issue. Please verify your AT_USERNAME and AT_API_KEY.');
-      }
-      console.error('------------------------------------');
-    }
-  }
-  
-  // 3. If both fail
-  console.error('Both Twilio and Africa\'s Talking failed to send SMS.');
-  return { success: false, error: "All SMS providers failed." };
-}
-
-// Session middleware with updated error handling
-async function authenticateSession(req, res, next) {
-  const sessionId = req.cookies.session_id;
-  
-  if (!sessionId) {
-    console.log('No session cookie found');
-    return res.status(401).json({ error: 'Missing session cookie' });
-  }
-  
   try {
-    const result = await pool.query(
-      `SELECT u.id, u.username, u.role
-       FROM sessions s
-       JOIN users u ON s.username = u.username
-       WHERE s.session_id = $1 AND s.expires_at > NOW()`,
-      [sessionId]
+    const response = await axios.post(
+      `https://api.textbee.dev/api/v1/gateway/devices/${deviceId}/send-sms`,
+      {
+        recipients: [formattedTo],
+        message
+      },
+      {
+        headers: {
+          'x-api-key': textbeeApiKey,
+          'Content-Type': 'application/json'
+        }
+      }
     );
-    
-    if (result.rows.length === 0) {
-      console.log('Invalid or expired session');
-      res.clearCookie('session_id', cookieOptions);
-      return res.status(401).json({ error: 'Invalid or expired session' });
+    if (response.data && response.data.data && response.data.data.success) {
+      console.log('TextBee SMS sent:', response.data);
+      return { success: true, provider: 'textbee', data: response.data };
+    } else {
+      console.error('TextBee SMS error:', response.data);
+      return { success: false, error: response.data };
     }
-    
-    req.user = result.rows[0]; // { id, username, role }
-    next();
   } catch (err) {
-    console.error('Session auth error:', err);
-    // Send more detailed error in development
-    const errorMessage = process.env.NODE_ENV === 'development' 
-      ? err.message 
-      : 'Internal server error';
-    res.status(500).json({ error: errorMessage });
+    console.error('TextBee SMS exception:', err.response?.data || err.message);
+    return { success: false, error: err.response?.data || err.message };
   }
 }
 
@@ -270,49 +175,54 @@ function checkQuota(resource) {
   };
 }
 
-// Updated login endpoint with proper cookie settings
+// JWT authentication middleware
+function authenticateJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, jwtSecret);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// Updated login endpoint with JWT support
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
-  
   try {
     const result = await pool.query(
       'SELECT * FROM users WHERE username = $1',
       [username]
     );
-    
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    
     const user = result.rows[0];
     const passwordMatch = await bcrypt.compare(password, user.password);
-
     if (!passwordMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-
-    const sessionId = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 12); // 12 hours
-    
-    await pool.query(
-      'INSERT INTO sessions (session_id, username, expires_at) VALUES ($1, $2, $3)',
-      [sessionId, user.username, expiresAt]
-    );
-    
     // Sanitize the user object to send to the client
     const userForClient = {
       id: user.id,
       username: user.username,
       role: user.role
     };
-
-    // Use shared cookie options, add expires for login
-    res.cookie('session_id', sessionId, { ...cookieOptions, expires: expiresAt });
-    res.json({ success: true, user: userForClient });
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      jwtSecret,
+      { expiresIn: '12h' }
+    );
+    res.json({ success: true, user: userForClient, token });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -354,8 +264,206 @@ function generateBookingReference() {
   return `REF-${year}${month}-${random}`;
 }
 
-// Improved delivery creation route
-app.post('/deliveries', authenticateSession, checkQuota('delivery'), async (req, res) => {
+// Parent Booking Routes
+app.post('/parent-bookings', authenticateJWT, async (req, res) => {
+  const {
+    customer_name,
+    phone_number,
+    total_tonnage,
+    mineral_type,
+    mineral_grade,
+    loading_point,
+    destination,
+    deadline,
+    notes,
+    moisture_content,
+    particle_size,
+    requires_analysis,
+    special_handling_notes,
+    environmental_concerns
+  } = req.body;
+
+  try {
+    // Generate booking code first
+    const bookingCode = generateBookingCode();
+    
+    // Validate required fields
+    if (!customer_name || !phone_number || !total_tonnage || !mineral_type || !loading_point || !destination || !deadline) {
+      return res.status(400).json({ error: 'Missing required fields.' });
+    }
+
+    // Validate phone number
+    if (!validateZimPhone(phone_number)) {
+      return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
+    }
+
+    // Validate tonnage
+    if (total_tonnage <= 0) {
+      return res.status(400).json({ error: 'Total tonnage must be greater than 0.' });
+    }
+
+    // Validate deadline
+    const deadlineDate = new Date(deadline);
+    if (deadlineDate <= new Date()) {
+      return res.status(400).json({ error: 'Deadline must be in the future.' });
+    }
+
+    // Validate moisture content if provided
+    if (moisture_content !== undefined && moisture_content !== null && (moisture_content < 0 || moisture_content > 100)) {
+      return res.status(400).json({ error: 'Moisture content must be between 0 and 100%.' });
+    }
+    
+    const result = await pool.query(
+      `INSERT INTO parent_bookings (
+        customer_name, phone_number, total_tonnage, mineral_type, mineral_grade, 
+        loading_point, destination, deadline, booking_code, notes,
+        moisture_content, particle_size, requires_analysis,
+        special_handling_notes, environmental_concerns,
+        remaining_tonnage, status, created_by_user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
+      RETURNING *`,
+      [
+        customer_name,
+        phone_number,
+        total_tonnage,
+        mineral_type,
+        mineral_grade || 'Ungraded',
+        loading_point,
+        destination,
+        deadline,
+        bookingCode,
+        notes || '',
+        moisture_content,
+        particle_size,
+        requires_analysis || false,
+        special_handling_notes,
+        environmental_concerns,
+        total_tonnage, // Initially, remaining_tonnage equals total_tonnage
+        'Active',  // Default status
+        req.user.id
+      ]
+    );
+
+    const newBooking = result.rows[0];
+
+    // Send SMS notification
+    const smsMessage = `Your booking is confirmed. Booking Code: ${bookingCode}. Total Tonnage: ${total_tonnage}. We will notify you as deliveries are dispatched.`;
+    const smsRes = await sendSMS(phone_number, smsMessage);
+
+    // Audit log
+    console.log(`[AUDIT] Parent booking created by ${req.user.username} at ${new Date().toISOString()} | BookingCode: ${bookingCode}`);
+
+    if (!smsRes.success) {
+      return res.status(207).json({
+        success: true,
+        warning: 'Booking created, but SMS failed',
+        booking: newBooking,
+        smsError: smsRes.error
+      });
+    }
+
+    res.json({ success: true, booking: newBooking });
+  } catch (err) {
+    console.error('Parent booking creation error:', err);
+    // Check for specific database errors, like invalid enum value
+    if (err.message.includes('invalid input value for enum mineral_type')) {
+      return res.status(400).json({ error: 'Invalid mineral type.' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/parent-bookings', authenticateJWT, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const offset = parseInt(req.query.offset, 10) || 0;
+    let baseQuery = `
+      SELECT pb.*, bp.completion_percentage, bp.completed_tonnage, bp.total_deliveries
+      FROM parent_bookings pb
+      LEFT JOIN booking_progress bp ON pb.id = bp.parent_booking_id
+    `;
+    let countQuery = `
+      SELECT COUNT(*) AS total
+      FROM parent_bookings pb
+    `;
+    const params = [];
+    const countParams = [];
+
+    if (req.user.username === 'hanzo' || req.user.role === 'admin') {
+      // No additional WHERE clause, return all
+    } else if (req.user.role === 'operator') {
+      baseQuery += ' WHERE pb.created_by_user_id = $1';
+      countQuery += ' WHERE pb.created_by_user_id = $1';
+      params.push(req.user.id);
+      countParams.push(req.user.id);
+    }
+
+    baseQuery += ' ORDER BY pb.deadline ASC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    params.push(limit, offset);
+
+    const [result, countResult] = await Promise.all([
+      pool.query(baseQuery, params),
+      pool.query(countQuery, countParams)
+    ]);
+    const total = parseInt(countResult.rows[0].total, 10);
+    res.json({ total, parentBookings: result.rows });
+  } catch (err) {
+    console.error('Get parent bookings error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/parent-bookings/:id', authenticateJWT, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM booking_progress WHERE parent_booking_id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Parent booking not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Get parent booking error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/parent-bookings/:id/deliveries', authenticateJWT, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM deliveries WHERE parent_booking_id = $1', [req.params.id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get parent booking deliveries error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/parent-bookings/:id/status', authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ error: 'Status is required.' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE parent_bookings SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Parent booking not found.' });
+    }
+
+    console.log(`[AUDIT] Parent booking ${id} status updated to ${status} by ${req.user.username}`);
+    res.json({ success: true, booking: result.rows[0] });
+  } catch (err) {
+    console.error(`Update parent booking status error for id ${id}:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delivery Routes
+app.post('/deliveries', authenticateJWT, checkQuota('delivery'), async (req, res) => {
   let { 
     customer_name, 
     phone_number, 
@@ -507,7 +615,52 @@ app.post('/deliveries', authenticateSession, checkQuota('delivery'), async (req,
   }
 });
 
-app.post('/updateCheckpoint', authenticateSession, checkQuota('sms'), async (req, res) => {
+app.get('/deliveries', authenticateJWT, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const offset = parseInt(req.query.offset, 10) || 0;
+    let baseQuery = `
+      SELECT 
+        d.*,
+        pb.mineral_type,
+        pb.mineral_grade,
+        pb.created_by_user_id
+      FROM 
+        deliveries d
+      LEFT JOIN 
+        parent_bookings pb ON d.parent_booking_id = pb.id
+    `;
+    let countQuery = `
+      SELECT COUNT(*) AS total
+      FROM deliveries d
+      LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id
+    `;
+    const params = [];
+    const countParams = [];
+
+    if (req.user.role === 'operator') {
+      baseQuery += ' WHERE pb.created_by_user_id = $1';
+      countQuery += ' WHERE pb.created_by_user_id = $1';
+      params.push(req.user.id);
+      countParams.push(req.user.id);
+    }
+
+    baseQuery += ' ORDER BY d.created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    params.push(limit, offset);
+
+    const [result, countResult] = await Promise.all([
+      pool.query(baseQuery, params),
+      pool.query(countQuery, countParams)
+    ]);
+    const total = parseInt(countResult.rows[0].total, 10);
+    res.json({ total, deliveries: result.rows });
+  } catch (err) {
+    console.error('Get deliveries error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/updateCheckpoint', authenticateJWT, checkQuota('sms'), async (req, res) => {
   console.log('UpdateCheckpoint body:', req.body);
   const { trackingId, checkpoints, currentStatus } = req.body;
   
@@ -642,397 +795,17 @@ app.post('/updateCheckpoint', authenticateSession, checkQuota('sms'), async (req
   }
 });
 
-app.get('/deliveries', authenticateSession, async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
-    const offset = parseInt(req.query.offset, 10) || 0;
-    let baseQuery = `
-      SELECT 
-        d.*,
-        pb.mineral_type,
-        pb.mineral_grade,
-        pb.created_by_user_id
-      FROM 
-        deliveries d
-      LEFT JOIN 
-        parent_bookings pb ON d.parent_booking_id = pb.id
-    `;
-    let countQuery = `
-      SELECT COUNT(*) AS total
-      FROM deliveries d
-      LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id
-    `;
-    const params = [];
-    const countParams = [];
-
-    if (req.user.role === 'operator') {
-      baseQuery += ' WHERE pb.created_by_user_id = $1';
-      countQuery += ' WHERE pb.created_by_user_id = $1';
-      params.push(req.user.id);
-      countParams.push(req.user.id);
-    }
-
-    baseQuery += ' ORDER BY d.created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-    params.push(limit, offset);
-
-    const [result, countResult] = await Promise.all([
-      pool.query(baseQuery, params),
-      pool.query(countQuery, countParams)
-    ]);
-    const total = parseInt(countResult.rows[0].total, 10);
-    res.json({ total, deliveries: result.rows });
-  } catch (err) {
-    console.error('Get deliveries error:', err);
-    res.status(500).json({ error: err.message });
-  }
+// Billing/Subscription
+app.get('/billing', authenticateJWT, async (req, res) => {
+  // ... existing code ...
 });
 
-// Get delivery by trackingId
-app.get('/deliveries/:trackingId', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT * FROM deliveries WHERE tracking_id = $1',
-      [req.params.trackingId]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Delivery not found' });
-    }
-    
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('Get delivery error:', err);
-    res.status(500).json({ error: err.message });
-  }
+app.get('/plans', authenticateJWT, async (req, res) => {
+  // ... existing code ...
 });
 
-// Add a /send-initial-sms endpoint
-app.post('/send-initial-sms', async (req, res) => {
-  const { to, message } = req.body;
-  if (!to || !message) return res.status(400).json({ error: 'Missing to or message' });
-  const smsRes = await sendSMS(to, message);
-  if (!smsRes.success) {
-    return res.status(500).json({ error: smsRes.error || 'Failed to send SMS' });
-  }
-  res.json({ success: true });
-});
-
-// Add logout endpoint
-app.post('/logout', authenticateSession, async (req, res) => {
-  const sessionId = req.cookies.session_id;
-  try {
-    await pool.query('DELETE FROM sessions WHERE session_id = $1', [sessionId]);
-    res.clearCookie('session_id', cookieOptions);
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Logout error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/me', authenticateSession, (req, res) => {
-  if (req.user) {
-    res.json(req.user);
-  } else {
-    res.status(401).json({ error: 'Not authenticated' });
-  }
-});
-
-// Parent Booking Routes
-app.post('/parent-bookings', authenticateSession, async (req, res) => {
-  const {
-    customer_name,
-    phone_number,
-    total_tonnage,
-    mineral_type,
-    mineral_grade,
-    loading_point,
-    destination,
-    deadline,
-    notes,
-    moisture_content,
-    particle_size,
-    requires_analysis,
-    special_handling_notes,
-    environmental_concerns
-  } = req.body;
-
-  try {
-    // Generate booking code first
-    const bookingCode = generateBookingCode();
-    
-    // Validate required fields
-    if (!customer_name || !phone_number || !total_tonnage || !mineral_type || !loading_point || !destination || !deadline) {
-      return res.status(400).json({ error: 'Missing required fields.' });
-    }
-
-    // Validate phone number
-    if (!validateZimPhone(phone_number)) {
-      return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
-    }
-
-    // Validate tonnage
-    if (total_tonnage <= 0) {
-      return res.status(400).json({ error: 'Total tonnage must be greater than 0.' });
-    }
-
-    // Validate deadline
-    const deadlineDate = new Date(deadline);
-    if (deadlineDate <= new Date()) {
-      return res.status(400).json({ error: 'Deadline must be in the future.' });
-    }
-
-    // Validate moisture content if provided
-    if (moisture_content !== undefined && moisture_content !== null && (moisture_content < 0 || moisture_content > 100)) {
-      return res.status(400).json({ error: 'Moisture content must be between 0 and 100%.' });
-    }
-    
-    const result = await pool.query(
-      `INSERT INTO parent_bookings (
-        customer_name, phone_number, total_tonnage, mineral_type, mineral_grade, 
-        loading_point, destination, deadline, booking_code, notes,
-        moisture_content, particle_size, requires_analysis,
-        special_handling_notes, environmental_concerns,
-        remaining_tonnage, status, created_by_user_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
-      RETURNING *`,
-      [
-        customer_name,
-        phone_number,
-        total_tonnage,
-        mineral_type,
-        mineral_grade || 'Ungraded',
-        loading_point,
-        destination,
-        deadline,
-        bookingCode,
-        notes || '',
-        moisture_content,
-        particle_size,
-        requires_analysis || false,
-        special_handling_notes,
-        environmental_concerns,
-        total_tonnage, // Initially, remaining_tonnage equals total_tonnage
-        'Active',  // Default status
-        req.user.id
-      ]
-    );
-
-    const newBooking = result.rows[0];
-
-    // Send SMS notification
-    const smsMessage = `Your booking is confirmed. Booking Code: ${bookingCode}. Total Tonnage: ${total_tonnage}. We will notify you as deliveries are dispatched.`;
-    const smsRes = await sendSMS(phone_number, smsMessage);
-
-    // Audit log
-    console.log(`[AUDIT] Parent booking created by ${req.user.username} at ${new Date().toISOString()} | BookingCode: ${bookingCode}`);
-
-    if (!smsRes.success) {
-      return res.status(207).json({
-        success: true,
-        warning: 'Booking created, but SMS failed',
-        booking: newBooking,
-        smsError: smsRes.error
-      });
-    }
-
-    res.json({ success: true, booking: newBooking });
-  } catch (err) {
-    console.error('Parent booking creation error:', err);
-    // Check for specific database errors, like invalid enum value
-    if (err.message.includes('invalid input value for enum mineral_type')) {
-      return res.status(400).json({ error: 'Invalid mineral type.' });
-    }
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/parent-bookings', authenticateSession, async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
-    const offset = parseInt(req.query.offset, 10) || 0;
-    let baseQuery = `
-      SELECT pb.*, bp.completion_percentage, bp.completed_tonnage, bp.total_deliveries
-      FROM parent_bookings pb
-      LEFT JOIN booking_progress bp ON pb.id = bp.parent_booking_id
-    `;
-    let countQuery = `
-      SELECT COUNT(*) AS total
-      FROM parent_bookings pb
-    `;
-    const params = [];
-    const countParams = [];
-
-    if (req.user.username === 'hanzo' || req.user.role === 'admin') {
-      // No additional WHERE clause, return all
-    } else if (req.user.role === 'operator') {
-      baseQuery += ' WHERE pb.created_by_user_id = $1';
-      countQuery += ' WHERE pb.created_by_user_id = $1';
-      params.push(req.user.id);
-      countParams.push(req.user.id);
-    }
-
-    baseQuery += ' ORDER BY pb.deadline ASC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-    params.push(limit, offset);
-
-    const [result, countResult] = await Promise.all([
-      pool.query(baseQuery, params),
-      pool.query(countQuery, countParams)
-    ]);
-    const total = parseInt(countResult.rows[0].total, 10);
-    res.json({ total, parentBookings: result.rows });
-  } catch (err) {
-    console.error('Get parent bookings error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/parent-bookings/:id', authenticateSession, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM booking_progress WHERE parent_booking_id = $1', [req.params.id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Parent booking not found' });
-    }
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('Get parent booking error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/parent-bookings/:id/deliveries', authenticateSession, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM deliveries WHERE parent_booking_id = $1', [req.params.id]);
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Get parent booking deliveries error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.patch('/parent-bookings/:id/status', authenticateSession, async (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-
-  if (!status) {
-    return res.status(400).json({ error: 'Status is required.' });
-  }
-
-  try {
-    const result = await pool.query(
-      'UPDATE parent_bookings SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
-      [status, id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Parent booking not found.' });
-    }
-
-    console.log(`[AUDIT] Parent booking ${id} status updated to ${status} by ${req.user.username}`);
-    res.json({ success: true, booking: result.rows[0] });
-  } catch (err) {
-    console.error(`Update parent booking status error for id ${id}:`, err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Admin routes for user management
-app.get('/admin/users', authenticateSession, adminOnly, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Admin get users error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/admin/users', authenticateSession, adminOnly, async (req, res) => {
-  const { username, password, role } = req.body;
-
-  if (!username || !password || !role) {
-    return res.status(400).json({ error: 'Username, password, and role are required' });
-  }
-
-  if (role !== 'operator' && role !== 'admin' && role !== 'viewer') {
-    return res.status(400).json({ error: 'Invalid role. Must be "operator", "viewer", or "admin".' });
-  }
-  
-  const client = await pool.connect();
-
-  try {
-    await client.query('BEGIN');
-    
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-    // Insert the new user
-    const userResult = await client.query(
-      'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at',
-      [username, hashedPassword, role]
-    );
-    
-    const newUser = userResult.rows[0];
-
-    // Automatically create a trial subscription for the new user
-    const { trialSettings } = await import('./config/subscriptions.js');
-    const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + trialSettings.durationDays);
-
-    await client.query(
-      `INSERT INTO subscriptions (user_id, tier, status, end_date)
-       VALUES ($1, $2, 'trial', $3)`,
-      [newUser.id, trialSettings.tier, trialEndDate]
-    );
-
-    await client.query('COMMIT');
-
-    console.log(`[AUDIT] User ${username} created by admin ${req.user.username}`);
-    console.log(`[SUBSCRIPTION] Trial subscription created for user ${username}. Expires on ${trialEndDate.toISOString()}`);
-
-    res.status(201).json(newUser);
-  } catch (err) {
-    await client.query('ROLLBACK');
-    if (err.code === '23505') { // unique_violation
-      return res.status(409).json({ error: 'Username already exists' });
-    }
-    console.error('Admin create user error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  } finally {
-    client.release();
-  }
-});
-
-app.delete('/admin/users/:id', authenticateSession, adminOnly, async (req, res) => {
-  const { id } = req.params;
-
-  // Prevent admin from deleting themselves
-  if (parseInt(id, 10) === req.user.id) {
-    return res.status(400).json({ error: 'Cannot delete your own account.' });
-  }
-
-  try {
-    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING username', [id]);
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    console.log(`[AUDIT] User ${result.rows[0].username} deleted by admin ${req.user.username}`);
-    res.json({ success: true, message: `User ${result.rows[0].username} deleted.` });
-  } catch (err) {
-    console.error('Admin delete user error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Endpoint to provide the VAPID public key to the client
-app.get('/vapidPublicKey', (req, res) => {
-  res.json({ publicKey: vapidKeys.publicKey });
-});
-
-// Subscribe to push notifications
-app.post('/subscribe', authenticateSession, async (req, res) => {
+// Push Notifications
+app.post('/subscribe', authenticateJWT, async (req, res) => {
   const subscription = req.body;
   const userId = req.user.id;
 
@@ -1054,54 +827,51 @@ app.post('/subscribe', authenticateSession, async (req, res) => {
   }
 });
 
-// Send a test notification (placeholder)
-app.post('/send-notification', authenticateSession, async (req, res) => {
-    const { userId, message } = req.body;
+app.post('/send-notification', authenticateJWT, async (req, res) => {
+  const { userId, message } = req.body;
   
-    if (!userId || !message) {
-      return res.status(400).json({ error: 'User ID and message are required.' });
+  if (!userId || !message) {
+    return res.status(400).json({ error: 'User ID and message are required.' });
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT subscription_info FROM push_subscriptions WHERE user_id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No push subscriptions found for this user.' });
     }
-  
-    try {
-      const result = await pool.query(
-        'SELECT subscription_info FROM push_subscriptions WHERE user_id = $1',
-        [userId]
-      );
-  
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'No push subscriptions found for this user.' });
-      }
-  
-      const notificationPayload = JSON.stringify({
-        title: 'Morres Logistics',
-        body: message,
-        icon: '/pwa-192x192.png',
-      });
-  
-      const promises = result.rows.map(row =>
-        webPush.sendNotification(row.subscription_info, notificationPayload)
-      );
-  
-      await Promise.all(promises);
-  
-      res.status(200).json({ success: true, message: 'Notification sent.' });
-    } catch (err) {
-      console.error('Failed to send notification:', err);
-      // Check for specific error types, e.g., 'gone' for expired subscriptions
-      if (err.statusCode === 410) {
-        // You might want to remove the expired subscription from the database here
-      }
-      res.status(500).json({ error: 'Failed to send notification.' });
+
+    const notificationPayload = JSON.stringify({
+      title: 'Morres Logistics',
+      body: message,
+      icon: '/pwa-192x192.png',
+    });
+
+    const promises = result.rows.map(row =>
+      webPush.sendNotification(row.subscription_info, notificationPayload)
+    );
+
+    await Promise.all(promises);
+
+    res.status(200).json({ success: true, message: 'Notification sent.' });
+  } catch (err) {
+    console.error('Failed to send notification:', err);
+    // Check for specific error types, e.g., 'gone' for expired subscriptions
+    if (err.statusCode === 410) {
+      // You might want to remove the expired subscription from the database here
     }
+    res.status(500).json({ error: 'Failed to send notification.' });
+  }
 });
 
-// ==> Subscription Management Endpoints <==
-
-// Get current user's subscription details
-app.get('/api/subscriptions/me', authenticateSession, async (req, res) => {
+// Subscription Management
+app.get('/api/subscriptions/me', authenticateJWT, async (req, res) => {
   try {
     let result = await pool.query(
-      'SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1',
+      'SELECT * FROM subscriptions WHERE user_id = $1 AND status IN (\'active\', \'trial\') ORDER BY start_date DESC LIMIT 1',
       [req.user.id]
     );
 
@@ -1115,30 +885,34 @@ app.get('/api/subscriptions/me', authenticateSession, async (req, res) => {
       if (hasHistory) {
         return res.status(404).json({ error: 'No active subscription found. Please upgrade your plan.' });
       }
-      // Check for existing active/trial subscription (should be none, but double-check for safety)
-      const activeTrialResult = await pool.query(
-        "SELECT * FROM subscriptions WHERE user_id = $1 AND status IN ('active', 'trial')",
-        [req.user.id]
-      );
-      if (activeTrialResult.rows.length === 0) {
-        // Atomic insert for trial subscription
-        const { trialSettings } = await import('./config/subscriptions.js');
-        const now = new Date();
-        const trialEndDate = new Date(now);
-        trialEndDate.setDate(trialEndDate.getDate() + trialSettings.durationDays);
+      // Try to atomically insert a trial subscription if none exists
+      const { trialSettings } = await import('./config/subscriptions.js');
+      const now = new Date();
+      const trialEndDate = new Date(now);
+      trialEndDate.setDate(trialEndDate.getDate() + trialSettings.durationDays);
+      try {
         await pool.query(
           `INSERT INTO subscriptions (user_id, tier, status, start_date, end_date)
-           VALUES ($1, $2, 'trial', $3, $4)`,
+           VALUES ($1, $2, 'trial', $3, $4)
+           ON CONFLICT (user_id) WHERE status IN ('active', 'trial') DO NOTHING`,
           [req.user.id, trialSettings.tier, now, trialEndDate]
         );
         // Audit log
-        console.log(`[SUBSCRIPTION] Auto-created trial for user ${req.user.id} at ${now.toISOString()}`);
+        console.log(`[SUBSCRIPTION] Attempted auto-create trial for user ${req.user.id} at ${now.toISOString()}`);
+      } catch (insertErr) {
+        if (insertErr.code !== '23505') {
+          // Only ignore unique violation, otherwise throw
+          throw insertErr;
+        }
       }
-      // Always fetch the latest subscription after insert
+      // Always fetch the latest active/trial subscription after insert attempt
       const latestResult = await pool.query(
-        'SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1',
+        'SELECT * FROM subscriptions WHERE user_id = $1 AND status IN (\'active\', \'trial\') ORDER BY start_date DESC LIMIT 1',
         [req.user.id]
       );
+      if (latestResult.rows.length === 0) {
+        return res.status(500).json({ error: 'Failed to create or fetch trial subscription.' });
+      }
       const subscription = latestResult.rows[0];
       const { subscriptionTiers } = await import('./config/subscriptions.js');
       const tierDetails = subscriptionTiers[subscription.tier];
@@ -1157,8 +931,7 @@ app.get('/api/subscriptions/me', authenticateSession, async (req, res) => {
   }
 });
 
-// Get all user subscriptions (Admin only)
-app.get('/api/admin/subscriptions', authenticateSession, adminOnly, async (req, res) => {
+app.get('/api/admin/subscriptions', authenticateJWT, adminOnly, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
@@ -1175,8 +948,7 @@ app.get('/api/admin/subscriptions', authenticateSession, adminOnly, async (req, 
   }
 });
 
-// Manually update a user's subscription tier (Admin only)
-app.patch('/api/admin/subscriptions/:userId', authenticateSession, adminOnly, async (req, res) => {
+app.patch('/api/admin/subscriptions/:userId', authenticateJWT, adminOnly, async (req, res) => {
   const { userId } = req.params;
   const { newTier, newStatus, newEndDate } = req.body;
 
@@ -1245,6 +1017,22 @@ app.patch('/api/admin/subscriptions/:userId', authenticateSession, adminOnly, as
   }
 });
 
+app.use('/api/auth', authRouter);
+
+// Public delivery tracking endpoint
+app.get('/deliveries/:trackingId', async (req, res) => {
+  try {
+    const { trackingId } = req.params;
+    const result = await pool.query('SELECT * FROM deliveries WHERE tracking_id = $1', [trackingId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Track delivery error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

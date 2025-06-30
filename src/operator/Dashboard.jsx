@@ -269,15 +269,10 @@ export default function OperatorDashboard() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/logout`, {}, { withCredentials: true });
-      setUser(null);
-      navigate('/login');
-    } catch (error) {
-      console.error("Logout failed", error);
-      setFeedback('Logout failed');
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('jwt_token');
+    setUser(null);
+    navigate('/login');
   };
 
   // Function to fetch unique customers from parent bookings
