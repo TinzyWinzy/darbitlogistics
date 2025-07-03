@@ -37,40 +37,41 @@ function Spinner() {
 // Improved Pagination Bar Component
 function PaginationBar({ page, setPage, pageSize, setPageSize, total }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const pageNumbers = [];
-  let start = Math.max(1, page - 2);
-  let end = Math.min(totalPages, page + 2);
-  if (page <= 2) end = Math.min(5, totalPages);
-  if (page >= totalPages - 1) start = Math.max(1, totalPages - 4);
-  for (let i = start; i <= end; i++) pageNumbers.push(i);
+  const getPageNumbers = () => {
+    const delta = 2;
+    let start = Math.max(1, page - delta);
+    let end = Math.min(totalPages, page + delta);
+    if (page <= delta) end = Math.min(1 + 2 * delta, totalPages);
+    if (page > totalPages - delta) start = Math.max(1, totalPages - 2 * delta);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  };
 
-  const btnStyle = (disabled) => ({
-    background: disabled ? '#faf9f7' : '#fff',
-    color: disabled ? '#bbb' : '#1F2120',
+  const baseBtnStyle = {
     border: '1px solid #D2691E',
     borderRadius: 4,
     padding: '0.3em 0.7em',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    outline: 'none',
-    fontWeight: 500,
     minWidth: 32,
     margin: '0 2px',
     fontSize: '0.95em',
     boxShadow: 'none',
     transition: 'background 0.2s, color 0.2s',
-  });
+    fontWeight: 500,
+    outline: 'none',
+    background: '#fff',
+    color: '#1F2120',
+    cursor: 'pointer',
+  };
+  const disabledBtnStyle = {
+    ...baseBtnStyle,
+    background: '#faf9f7',
+    color: '#bbb',
+    cursor: 'not-allowed',
+  };
   const activeBtnStyle = {
+    ...baseBtnStyle,
     background: '#D2691E',
     color: '#fff',
-    border: '1px solid #D2691E',
-    borderRadius: 4,
-    padding: '0.3em 0.7em',
     fontWeight: 700,
-    minWidth: 32,
-    margin: '0 2px',
-    fontSize: '0.95em',
-    boxShadow: 'none',
-    transition: 'background 0.2s, color 0.2s',
   };
 
   return (
@@ -94,23 +95,23 @@ function PaginationBar({ page, setPage, pageSize, setPageSize, total }) {
         onClick={() => setPage(1)}
         disabled={page === 1}
         aria-label="First page"
-        style={btnStyle(page === 1)}
+        style={page === 1 ? disabledBtnStyle : baseBtnStyle}
       >«</button>
       <button
         className="pagination-btn"
         onClick={() => setPage(page - 1)}
         disabled={page === 1}
         aria-label="Previous page"
-        style={btnStyle(page === 1)}
+        style={page === 1 ? disabledBtnStyle : baseBtnStyle}
       >‹</button>
-      {pageNumbers.map(p => (
+      {getPageNumbers().map(p => (
         <button
           key={p}
           className="pagination-btn"
           onClick={() => setPage(p)}
           aria-label={`Go to page ${p}`}
           aria-current={p === page ? "page" : undefined}
-          style={p === page ? activeBtnStyle : btnStyle(false)}
+          style={p === page ? activeBtnStyle : baseBtnStyle}
         >{p}</button>
       ))}
       <button
@@ -118,14 +119,14 @@ function PaginationBar({ page, setPage, pageSize, setPageSize, total }) {
         onClick={() => setPage(page + 1)}
         disabled={page === totalPages}
         aria-label="Next page"
-        style={btnStyle(page === totalPages)}
+        style={page === totalPages ? disabledBtnStyle : baseBtnStyle}
       >›</button>
       <button
         className="pagination-btn"
         onClick={() => setPage(totalPages)}
         disabled={page === totalPages}
         aria-label="Last page"
-        style={btnStyle(page === totalPages)}
+        style={page === totalPages ? disabledBtnStyle : baseBtnStyle}
       >»</button>
       <div className="ms-2">
         <select

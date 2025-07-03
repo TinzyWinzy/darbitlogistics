@@ -12,6 +12,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { setUser } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,7 +25,7 @@ export default function Login() {
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/login`,
-        { username, password },
+        { username, password, rememberMe },
         {
           withCredentials: true,
           headers: { 'Content-Type': 'application/json' }
@@ -106,6 +107,19 @@ export default function Login() {
                   {showPassword ? 'visibility_off' : 'visibility'}
                 </span>
               </button>
+            </div>
+            <div className="form-check mb-2">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              <label className="form-check-label" htmlFor="rememberMe" style={{ fontSize: '0.97em', cursor: 'pointer' }}>
+                Remember Me
+              </label>
             </div>
             <div aria-live="polite" className="mb-2" style={{ minHeight: 28, fontSize: '0.97em' }}>
               {error && (

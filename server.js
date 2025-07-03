@@ -10,6 +10,8 @@ import pool from './config/database.js';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import authRouter from './routes/auth.js';
+import cookieParser from 'cookie-parser';
+import { authenticateJWT } from './middleware/auth.js';
 
 dotenv.config();
 
@@ -27,6 +29,7 @@ webPush.setVapidDetails(
 
 const app = express();
 app.use(bodyParser.json());
+app.use(cookieParser());
 
 const allowedOrigins = [
   'https://morres-logistics.vercel.app',
@@ -173,22 +176,6 @@ function checkQuota(resource) {
       res.status(500).json({ error: 'Internal server error while checking quotas.' });
     }
   };
-}
-
-// JWT authentication middleware
-function authenticateJWT(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
-  }
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, jwtSecret);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
 }
 
 // Updated login endpoint with JWT support

@@ -21,6 +21,7 @@ export default function CheckpointLoggerForm({
   });
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const statusOptions = [
     'Pending',
@@ -50,14 +51,23 @@ export default function CheckpointLoggerForm({
     e.preventDefault();
     setFeedback('');
     setSubmitting(true);
+    setFieldErrors({});
     const delivery = deliveries.find(d => d.trackingId === selectedId);
+    let errors = {};
     if (!delivery) {
       setFeedback('No delivery selected.');
       setSubmitting(false);
       return;
     }
-    if (!form.location || !form.status) {
-      setFeedback('Location and Status are required.');
+    if (!form.location) {
+      errors.location = 'Location is required.';
+    }
+    if (!form.status) {
+      errors.status = 'Status is required.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setFeedback('Please fill in all required fields.');
       setSubmitting(false);
       return;
     }
@@ -122,7 +132,7 @@ export default function CheckpointLoggerForm({
           <div className="form-floating mb-1">
             <input
               type="text"
-              className="form-control"
+              className={`form-control${fieldErrors.location ? ' error' : ''}`}
               id="locationInput"
               placeholder="Location"
               value={form.location}
@@ -131,13 +141,16 @@ export default function CheckpointLoggerForm({
               aria-required="true"
               style={{ fontSize: '0.97em', padding: '0.5em 0.7em' }}
             />
-            <label htmlFor="locationInput" style={{ fontSize: '0.95em' }}>Location *</label>
+            <label htmlFor="locationInput" style={{ fontSize: '0.95em' }}>Location <span className="required-asterisk">*</span></label>
+            {fieldErrors.location && (
+              <div className="field-error-msg">{fieldErrors.location}</div>
+            )}
           </div>
         </div>
         <div className="col-12 col-md-6">
-          <div className="form-floating mb-1">
+          <div className="form-floating mb-1 position-relative">
             <select
-              className="form-select"
+              className={`form-select${fieldErrors.status ? ' error' : ''}`}
               id="statusSelect"
               value={form.status}
               onChange={e => setForm(prev => ({ ...prev, status: e.target.value }))}
@@ -152,11 +165,14 @@ export default function CheckpointLoggerForm({
                 </option>
               ))}
             </select>
-            <label htmlFor="statusSelect" style={{ fontSize: '0.95em' }}>Status *</label>
+            <label htmlFor="statusSelect" style={{ fontSize: '0.95em' }}>Status <span className="required-asterisk">*</span></label>
             {form.status && (
               <span className="position-absolute top-50 end-0 translate-middle-y me-3" style={{ pointerEvents: 'none' }}>
                 <span className="material-icons-outlined" style={{ color: '#D2691E' }}>{statusIcons[form.status]}</span>
               </span>
+            )}
+            {fieldErrors.status && (
+              <div className="field-error-msg">{fieldErrors.status}</div>
             )}
           </div>
         </div>
@@ -165,10 +181,10 @@ export default function CheckpointLoggerForm({
             <textarea
               className="form-control"
               id="commentInput"
-              placeholder="Comment"
+              placeholder=" "
               value={form.comment}
               onChange={e => setForm(prev => ({ ...prev, comment: e.target.value }))}
-              style={{ minHeight: '54px', fontSize: '0.97em', padding: '0.5em 0.7em' }}
+              style={{ minHeight: '110px', fontSize: '0.97em', padding: '0.5em 0.7em', resize: 'vertical' }}
             />
             <label htmlFor="commentInput" style={{ fontSize: '0.95em' }}>Comment</label>
           </div>
@@ -263,23 +279,45 @@ export default function CheckpointLoggerForm({
         )}
       </form>
       <style>{`
-        .form-control, .form-select, .btn, .form-check-input {
-          border-radius: 5px !important;
-          border-color: #D2691E !important;
+        .form-control, .form-select {
+          background: #fff !important;
+          border-radius: 6px !important;
+          border: 1.5px solid #D2691E !important;
+          padding: 0.65em 0.9em !important;
+          font-size: 1em !important;
+          transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .form-control:focus-visible, .form-select:focus-visible, .btn:focus-visible, .form-check-input:focus-visible {
-          outline: 2px solid #D2691E !important;
-          outline-offset: 2px !important;
+        .form-control:focus, .form-select:focus {
+          border-color: #D2691E !important;
           box-shadow: 0 0 0 2px #EBD3AD !important;
-          z-index: 2;
+          outline: none !important;
+        }
+        .form-control::placeholder {
+          color: #b8a98a !important;
+          opacity: 1;
         }
         .form-floating > label {
           color: #7c6a4d !important;
+          font-weight: 500;
+          letter-spacing: 0.01em;
         }
-        .btn:disabled, .btn[disabled] {
-          background: #e5e1db !important;
+        .form-control:disabled, .form-select:disabled {
+          background: #f5f5f5 !important;
           color: #bbb !important;
-          border-color: #D2691E !important;
+        }
+        .form-control.error, .form-select.error {
+          border-color: #d9534f !important;
+          background: #fff0f0 !important;
+        }
+        .field-error-msg {
+          color: #d9534f;
+          font-size: 0.93em;
+          margin-top: 0.15em;
+          margin-left: 0.1em;
+        }
+        .form-control:hover, .form-select:hover {
+          border-color: #b86b1e !important;
+          background: #f9f6f2 !important;
         }
         @media (max-width: 600px) {
           .card-body.row.g-3 {
@@ -298,6 +336,14 @@ export default function CheckpointLoggerForm({
           color: #fff !important;
           box-shadow: 0 2px 8px rgba(210,105,30,0.13) !important;
           border-color: #D2691E !important;
+        }
+        .required-asterisk {
+          color: #D2691E;
+          font-weight: bold;
+          margin-left: 0.1em;
+        }
+        #commentInput.form-control {
+          padding-top: 2.1em !important;
         }
       `}</style>
     </div>

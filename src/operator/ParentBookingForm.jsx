@@ -151,9 +151,7 @@ export default function ParentBookingForm({
       });
       setSuggestedLocations([]);
       if (onSuccess) onSuccess(res);
-      setTimeout(() => {
-        if (onClose) onClose();
-      }, 800);
+      if (onClose) onClose();
     } catch (error) {
       setCreateFeedback(error.response?.data?.error || 'Failed to create parent booking');
     }
@@ -177,7 +175,7 @@ export default function ParentBookingForm({
             <div className="modal-body">
               <form onSubmit={handleSubmit} className="row g-3" autoComplete="off">
                 <div className="col-md-6">
-                  <label className="form-label">Customer Name</label>
+                  <label className="form-label">Customer Name <span className="required-asterisk">*</span></label>
                   <input
                     type="text"
                     className="form-control"
@@ -189,7 +187,7 @@ export default function ParentBookingForm({
                   />
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label">Phone Number</label>
+                  <label className="form-label">Phone Number <span className="required-asterisk">*</span></label>
                   <input
                     type="text"
                     className="form-control"
@@ -201,7 +199,7 @@ export default function ParentBookingForm({
                   />
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label">Mineral Type</label>
+                  <label className="form-label">Mineral Type <span className="required-asterisk">*</span></label>
                   <select
                     className="form-select"
                     name="mineral_type"
@@ -230,7 +228,7 @@ export default function ParentBookingForm({
                   </select>
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label">Total Tonnage</label>
+                  <label className="form-label">Total Tonnage <span className="required-asterisk">*</span></label>
                   <input
                     type="number"
                     className="form-control"
@@ -265,7 +263,7 @@ export default function ParentBookingForm({
                   />
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label">Deadline</label>
+                  <label className="form-label">Deadline <span className="required-asterisk">*</span></label>
                   <DatePicker
                     selected={parentForm.deadline}
                     onChange={date => setParentForm(prev => ({ ...prev, deadline: date }))}
@@ -277,7 +275,7 @@ export default function ParentBookingForm({
                   />
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label">Loading Point</label>
+                  <label className="form-label">Loading Point <span className="required-asterisk">*</span></label>
                   <input
                     type="text"
                     className="form-control"
@@ -295,7 +293,7 @@ export default function ParentBookingForm({
                   </datalist>
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label">Destination</label>
+                  <label className="form-label">Destination <span className="required-asterisk">*</span></label>
                   <input
                     type="text"
                     className="form-control"
@@ -376,6 +374,13 @@ export default function ParentBookingForm({
         </div>
       </div>
       <div className="modal-backdrop fade show" style={{ zIndex: 1050, position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)' }} onClick={onClose}></div>
+      <style>{`
+        .required-asterisk {
+          color: #D2691E;
+          font-weight: bold;
+          margin-left: 0.1em;
+        }
+      `}</style>
     </>
   );
 } 

@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import pool from '../config/database.js';
 
 export async function loginUser(req, res) {
-  const { username, password } = req.body;
+  const { username, password, rememberMe } = req.body;
   
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
@@ -43,13 +43,15 @@ export async function loginUser(req, res) {
 
     // Generate refresh token
     const refreshToken = crypto.randomBytes(64).toString('hex');
-    const refreshExpires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
+    const refreshExpires = rememberMe
+      ? new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) // 30 days
+      : undefined;
 
-    // Store refresh token in DB
+    // Store refresh token in DB (always set expiry in DB, use 30d or 7d default)
     await pool.query(
       `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)
        ON CONFLICT (user_id) DO UPDATE SET token = $2, expires_at = $3`,
-      [user.id, refreshToken, refreshExpires]
+      [user.id, refreshToken, refreshExpires || new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)]
     );
 
     // Set refresh token as HttpOnly cookie
@@ -57,7 +59,7 @@ export async function loginUser(req, res) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      expires: refreshExpires,
+      ...(refreshExpires ? { expires: refreshExpires } : {}),
       path: '/api/auth',
     });
 
