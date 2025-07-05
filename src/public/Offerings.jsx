@@ -7,16 +7,16 @@ export default function Offerings() {
 
   return (
     <div className="container py-5" role="main">
-      {/* Internal Use Only Banner for staff */}
+      {/* Strategic Operations Console Banner for staff */}
       {isAuthenticated && (
         <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
-          INTERNAL USE ONLY
+          STRATEGIC OPERATIONS CONSOLE
         </div>
       )}
       <section className="text-center mb-5">
         <h1 className="display-5 fw-bold mb-3" style={{ color: '#1F2120' }}>Our Offerings</h1>
         <p className="lead text-muted mb-4 mx-auto" style={{ maxWidth: 700 }}>
-          Morres Logistics delivers seamless, transparent, and sustainable logistics solutions—powered by Dar Logistics Technology.
+          Morres Logistics delivers seamless, transparent, and sustainable logistics solutions—empowered by next-generation logistics intelligence.
         </p>
       </section>
       <section>
@@ -56,11 +56,6 @@ export default function Offerings() {
       </div>
       <div className="text-center text-muted small mt-5">
         For support: <a href="mailto:marketing@morreslogistics.com" style={{ color: '#1F2120' }}>marketing@morreslogistics.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
-        <div className="mt-2">
-          <span className="badge bg-success text-white fs-6" style={{ background: '#16a34a', borderRadius: '0.5em', padding: '0.5em 1em' }}>
-            Powered by Dar Logistics Technology
-          </span>
-        </div>
       </div>
     </div>
   );

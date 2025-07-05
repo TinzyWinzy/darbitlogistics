@@ -144,9 +144,9 @@ export default function TrackParentBooking() {
       <div className="d-flex justify-content-center mb-3">
         <StatusLegend />
       </div>
-      {/* Internal Use Only Banner for staff */}
+      {/* Strategic Operations Console Banner for staff */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
-        INTERNAL USE ONLY
+        STRATEGIC OPERATIONS CONSOLE
       </div>
       <div className="row justify-content-center">
         <div className="col-12 col-lg-10">

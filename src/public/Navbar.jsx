@@ -37,16 +37,26 @@ export default function Navbar() {
             <span style={{ fontSize: '1.7em', marginRight: 10 }} role="img" aria-label="logo">🚛</span>
             Morres Logistics
           </span>
-          <span className="small fw-normal mt-1" style={{ color: '#16a34a', letterSpacing: '0.5px', fontSize: '0.95em' }}>
-            Powered by Dar Logistics Technology
-          </span>
         </Link>
         <button
-          className="navbar-toggler"
+          className={`navbar-toggler${!isNavCollapsed ? ' toggler-open' : ''}`}
           type="button"
           onClick={handleNavCollapse}
           aria-expanded={!isNavCollapsed}
           aria-label="Toggle navigation"
+          style={{
+            border: '2px solid #EBD3AD',
+            borderRadius: '0.75rem',
+            boxShadow: '0 2px 8px rgba(235, 211, 173, 0.12)',
+            padding: '0.6em 1em',
+            background: !isNavCollapsed ? 'rgba(235,211,173,0.08)' : 'transparent',
+            transition: 'background 0.2s, box-shadow 0.2s',
+            outline: 'none',
+          }}
+          onMouseOver={e => e.currentTarget.style.background = 'rgba(235,211,173,0.13)'}
+          onMouseOut={e => e.currentTarget.style.background = !isNavCollapsed ? 'rgba(235,211,173,0.08)' : 'transparent'}
+          onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 2px #EBD3AD'}
+          onBlur={e => e.currentTarget.style.boxShadow = '0 2px 8px rgba(235, 211, 173, 0.12)'}
         >
           <span className="navbar-toggler-icon"></span>
         </button>

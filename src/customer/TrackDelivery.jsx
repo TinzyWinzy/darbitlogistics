@@ -113,9 +113,9 @@ export default function TrackDelivery() {
         <h1 className="display-6 fw-bold text-center mb-1" style={{ color: '#1F2120' }}>
           Track Your Consignment
         </h1>
-        {/* Subtle Internal Use Only subtitle */}
+        {/* Strategic Operations Console subtitle */}
         <div className="text-center text-warning small fw-semibold mb-3" style={{ letterSpacing: '0.5px', fontSize: '1em', opacity: 0.7 }}>
-          Internal Use Only
+          Strategic Operations Console
         </div>
         <div className="d-flex justify-content-center mb-3">
           <StatusLegend />

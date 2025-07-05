@@ -7,10 +7,10 @@ export default function Landing() {
 
   return (
     <div className="bg-gradient" style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #EBD3AD 0%, #fffbe6 100%)' }} role="main">
-      {/* Internal Use Only Banner for staff */}
+      {/* Strategic Operations Console Banner for staff */}
       {isAuthenticated && (
         <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
-          INTERNAL USE ONLY
+          STRATEGIC OPERATIONS CONSOLE
         </div>
       )}
       {/* Hero Section */}

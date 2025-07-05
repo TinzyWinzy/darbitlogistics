@@ -21,6 +21,12 @@ router.get('/', async (req, res) => {
     let whereClauses = [];
     let values = [];
     let idx = 1;
+    // Per-user segmentation: only show own bookings for operators
+    if (req.user && req.user.role === 'operator') {
+      whereClauses.push(`created_by_user_id = $${idx}`);
+      values.push(req.user.id);
+      idx++;
+    }
     if (search) {
       whereClauses.push(`(
         LOWER(customer_name) LIKE $${idx} OR

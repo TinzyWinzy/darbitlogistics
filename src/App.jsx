@@ -16,6 +16,7 @@ import BillingDashboard from './public/BillingDashboard';
 import SubscriptionPlans from './public/SubscriptionPlans';
 import HelpCenter from './public/HelpCenter';
 import WelcomeModal from './public/WelcomeModal';
+import PaymentSuccess from './public/PaymentSuccess';
 
 export const AuthContext = createContext(null);
 
@@ -118,6 +119,7 @@ export default function App() {
             <Route path="/billing" element={<BillingDashboard />} />
             <Route path="/plans" element={<SubscriptionPlans />} />
             <Route path="/help" element={<HelpCenter />} />
+            <Route path="/payment-success" element={<PaymentSuccess />} />
           </Routes>
           <Footer />
         </Router>

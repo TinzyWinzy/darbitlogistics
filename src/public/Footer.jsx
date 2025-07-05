@@ -5,7 +5,7 @@ export default function Footer() {
         <div className="row align-items-center gy-3">
           <div className="col-12 col-md-6 text-center text-md-start mb-2 mb-md-0">
             <span className="fw-bold" style={{ color: '#1F2120' }}>Morres Logistics &copy; {new Date().getFullYear()}</span>
-            <span className="ms-3 badge bg-warning text-dark small align-middle">INTERNAL USE ONLY</span>
+            <span className="ms-3 badge bg-warning text-dark small align-middle">STRATEGIC OPERATIONS CONSOLE</span>
           </div>
           <div className="col-12 col-md-6 text-center text-md-end">
             <span className="me-2">Support:</span>

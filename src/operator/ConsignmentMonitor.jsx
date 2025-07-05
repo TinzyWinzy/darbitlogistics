@@ -153,9 +153,9 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSele
 
   return (
     <div className="card shadow-sm border-0 mb-4" role="region" aria-labelledby="consignment-monitor-heading">
-      {/* Internal Use Only Banner */}
+      {/* Strategic Operations Console Banner */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold" style={{ letterSpacing: '1px', borderTopLeftRadius: '0.5rem', borderTopRightRadius: '0.5rem' }}>
-        INTERNAL USE ONLY
+        STRATEGIC OPERATIONS CONSOLE
       </div>
       <div className="card-body">
         <h2 id="consignment-monitor-heading" className="h5 fw-bold mb-3" style={{ color: '#1F2120' }}>

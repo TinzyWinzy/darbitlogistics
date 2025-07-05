@@ -14,6 +14,7 @@ import cookieParser from 'cookie-parser';
 import { authenticateJWT } from './middleware/auth.js';
 import parentBookingsRouter from './routes/parent-bookings.js';
 import adminRouter from './routes/admin.js';
+import { Paynow } from 'paynow';
 
 dotenv.config();
 
@@ -972,6 +973,100 @@ app.get('/deliveries/:trackingId', async (req, res) => {
 
 app.use('/parent-bookings', parentBookingsRouter);
 app.use('/api/admin', adminRouter);
+
+// Get all subscriptions for the current user
+app.get('/api/subscriptions/all', authenticateJWT, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY start_date DESC',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get all subscriptions error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+const paynow = new Paynow(
+  process.env.PAYNOW_INTEGRATION_ID || 'your_id',
+  process.env.PAYNOW_INTEGRATION_KEY || 'your_key'
+);
+paynow.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://your-backend-url.com/api/paynow/callback';
+paynow.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://your-frontend-url.com/payment-success';
+
+// Create a new subscription for the current user (plan selection)
+app.post('/api/subscriptions', authenticateJWT, async (req, res) => {
+  const { tier } = req.body;
+  const { subscriptionTiers } = await import('./config/subscriptions.js');
+  if (!subscriptionTiers[tier]) {
+    return res.status(400).json({ error: 'Invalid subscription tier.' });
+  }
+  try {
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + 1); // 1 month duration
+    const result = await pool.query(
+      `INSERT INTO subscriptions (user_id, tier, status, start_date, end_date, deliveries_used, sms_used)
+       VALUES ($1, $2, 'pending', $3, $4, 0, 0)
+       RETURNING *`,
+      [req.user.id, tier, now, endDate]
+    );
+    const subscription = result.rows[0];
+
+    // Create Paynow payment
+    const paynowPayment = paynow.createPayment(
+      `Subscription for ${req.user.username}`,
+      req.user.email || 'test@example.com'
+    );
+    paynowPayment.add(
+      `${subscriptionTiers[tier].name} Plan`,
+      subscriptionTiers[tier].price
+    );
+    const response = await paynow.send(paynowPayment);
+
+    if (response.success) {
+      // Store Paynow poll URL in subscription for later verification
+      await pool.query(
+        'UPDATE subscriptions SET paynow_poll_url = $1 WHERE id = $2',
+        [response.pollUrl, subscription.id]
+      );
+      res.json({ ...subscription, paynowUrl: response.redirectUrl });
+    } else {
+      res.status(500).json({ error: 'Failed to initiate payment with Paynow.' });
+    }
+  } catch (err) {
+    console.error('Create subscription error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Paynow callback endpoint
+app.post('/api/paynow/callback', async (req, res) => {
+  // Paynow will POST payment status here
+  const { reference, status, pollurl } = req.body;
+  try {
+    // Find the subscription by pollurl or reference
+    const result = await pool.query(
+      'SELECT * FROM subscriptions WHERE paynow_poll_url = $1',
+      [pollurl]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Subscription not found for payment.' });
+    }
+    const subscription = result.rows[0];
+    if (status === 'Paid' || status === 'Paid*') {
+      await pool.query(
+        'UPDATE subscriptions SET status = $1 WHERE id = $2',
+        ['active', subscription.id]
+      );
+    }
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error('Paynow callback error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -183,7 +183,7 @@ const AdminDashboard = () => {
   return (
     <div className="container mt-4" style={{ maxWidth: 1100 }}>
       <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
-        INTERNAL USE ONLY
+        STRATEGIC OPERATIONS CONSOLE
       </div>
       <h2 className="mb-3">Admin Dashboard</h2>
       {/* Tabs */}

@@ -70,9 +70,9 @@ export default function BillingDashboard() {
 
   return (
     <div className="container py-5">
-      {/* Internal Use Only Banner */}
+      {/* Strategic Operations Console Banner */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
-        INTERNAL USE ONLY
+        STRATEGIC OPERATIONS CONSOLE
       </div>
       <h1 className="display-6 fw-bold mb-4" style={{ color: '#1F2120' }}>Billing & Subscription</h1>
 
