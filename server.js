@@ -12,6 +12,8 @@ import axios from 'axios';
 import authRouter from './routes/auth.js';
 import cookieParser from 'cookie-parser';
 import { authenticateJWT } from './middleware/auth.js';
+import parentBookingsRouter from './routes/parent-bookings.js';
+import adminRouter from './routes/admin.js';
 
 dotenv.config();
 
@@ -360,69 +362,6 @@ app.post('/parent-bookings', authenticateJWT, async (req, res) => {
   }
 });
 
-app.get('/parent-bookings', authenticateJWT, async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
-    const offset = parseInt(req.query.offset, 10) || 0;
-    let baseQuery = `
-      SELECT pb.*, bp.completion_percentage, bp.completed_tonnage, bp.total_deliveries
-      FROM parent_bookings pb
-      LEFT JOIN booking_progress bp ON pb.id = bp.parent_booking_id
-    `;
-    let countQuery = `
-      SELECT COUNT(*) AS total
-      FROM parent_bookings pb
-    `;
-    const params = [];
-    const countParams = [];
-
-    if (req.user.username === 'hanzo' || req.user.role === 'admin') {
-      // No additional WHERE clause, return all
-    } else if (req.user.role === 'operator') {
-      baseQuery += ' WHERE pb.created_by_user_id = $1';
-      countQuery += ' WHERE pb.created_by_user_id = $1';
-      params.push(req.user.id);
-      countParams.push(req.user.id);
-    }
-
-    baseQuery += ' ORDER BY pb.deadline ASC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-    params.push(limit, offset);
-
-    const [result, countResult] = await Promise.all([
-      pool.query(baseQuery, params),
-      pool.query(countQuery, countParams)
-    ]);
-    const total = parseInt(countResult.rows[0].total, 10);
-    res.json({ total, parentBookings: result.rows });
-  } catch (err) {
-    console.error('Get parent bookings error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/parent-bookings/:id', authenticateJWT, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM booking_progress WHERE parent_booking_id = $1', [req.params.id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Parent booking not found' });
-    }
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('Get parent booking error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/parent-bookings/:id/deliveries', authenticateJWT, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM deliveries WHERE parent_booking_id = $1', [req.params.id]);
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Get parent booking deliveries error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.patch('/parent-bookings/:id/status', authenticateJWT, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -554,6 +493,16 @@ app.post('/deliveries', authenticateJWT, checkQuota('delivery'), async (req, res
         );
 
         const newDelivery = result.rows[0];
+
+        // Fetch mineral_type and mineral_grade from parent booking
+        const parentBookingMinerals = await pool.query(
+          'SELECT mineral_type, mineral_grade FROM parent_bookings WHERE id = $1',
+          [parent_booking_id]
+        );
+        if (parentBookingMinerals.rows.length > 0) {
+          newDelivery.mineral_type = parentBookingMinerals.rows[0].mineral_type;
+          newDelivery.mineral_grade = parentBookingMinerals.rows[0].mineral_grade;
+        }
 
         // 4. Increment the quota usage in the database
         await pool.query(
@@ -1020,6 +969,9 @@ app.get('/deliveries/:trackingId', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+app.use('/parent-bookings', parentBookingsRouter);
+app.use('/api/admin', adminRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

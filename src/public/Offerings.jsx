@@ -15,19 +15,19 @@ export default function Offerings() {
       )}
       <section className="text-center mb-5">
         <h1 className="display-5 fw-bold mb-3" style={{ color: '#1F2120' }}>Our Offerings</h1>
-        <p className="lead text-muted mb-4 mx-auto" style={{ maxWidth: 600 }}>
-          Morres Logistics delivers a seamless, transparent, and reliable logistics experience for businesses and customers alike.
+        <p className="lead text-muted mb-4 mx-auto" style={{ maxWidth: 700 }}>
+          Morres Logistics delivers seamless, transparent, and sustainable logistics solutions—powered by Dar Logistics Technology.
         </p>
       </section>
       <section>
         <div className="row g-4 g-md-5 justify-content-center">
           {[
             { icon: 'track_changes', title: 'Real-Time Tracking', desc: 'Track your shipments and deliveries in real time, from dispatch to arrival, with instant updates.' },
-            { icon: 'sms', title: 'SMS Notifications', desc: "Automatic SMS updates keep your customers informed at every checkpoint, powered by Africa's Talking." },
-            { icon: 'dashboard_customize', title: 'Operator Dashboard', desc: 'Internal dashboard for operators to manage, update, and monitor all deliveries efficiently.' },
-            { icon: 'api', title: 'API Integration', desc: 'Integrate with your own systems using our secure, documented API for seamless logistics automation.' },
-            { icon: 'security', title: 'Secure Data', desc: 'Your data is protected with industry-standard security and compliance best practices.' },
-            { icon: 'support_agent', title: '24/7 Support', desc: 'Our support team is available around the clock to assist you with any logistics needs.' }
+            { icon: 'sms', title: 'SMS Notifications', desc: 'Automatic SMS updates at every checkpoint, keeping you and your customers informed.' },
+            { icon: 'dashboard_customize', title: 'Operator Dashboard', desc: 'Manage, update, and monitor all deliveries efficiently from a single platform.' },
+            { icon: 'warehouse', title: 'Warehousing', desc: 'Secure, smart storage and inventory control for your goods.' },
+            { icon: 'eco', title: 'Sustainability', desc: 'Eco-conscious operations and community impact at the core of our business.' },
+            { icon: 'api', title: 'API Integration', desc: 'Integrate with your own systems using our secure, documented API.' },
           ].map(({ icon, title, desc }) => (
             <div className="col-12 col-md-4" key={title}>
               <div className="card h-100 shadow-sm border-0 text-center p-4 py-4" style={{ background: 'rgba(255,255,255,0.97)', minHeight: 220 }}>
@@ -55,7 +55,12 @@ export default function Offerings() {
         )}
       </div>
       <div className="text-center text-muted small mt-5">
-        Some features are for internal operations only. For support: <a href="mailto:info@morres.com" style={{ color: '#1F2120' }}>info@morres.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+        For support: <a href="mailto:marketing@morreslogistics.com" style={{ color: '#1F2120' }}>marketing@morreslogistics.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+        <div className="mt-2">
+          <span className="badge bg-success text-white fs-6" style={{ background: '#16a34a', borderRadius: '0.5em', padding: '0.5em 1em' }}>
+            Powered by Dar Logistics Technology
+          </span>
+        </div>
       </div>
     </div>
   );

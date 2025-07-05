@@ -139,7 +139,7 @@ function PaginationBar({ page, setPage, pageSize, setPageSize, total }) {
           }}
           aria-label="Select page size"
         >
-          {[10, 20, 50, 100].map(size => (
+          {[5, 10, 20, 50, 100].map(size => (
             <option key={size} value={size}>{size} / page</option>
           ))}
         </select>
@@ -148,83 +148,8 @@ function PaginationBar({ page, setPage, pageSize, setPageSize, total }) {
   );
 }
 
-const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, selectedId, onSelectDelivery, page = 1, setPage, pageSize = 20, setPageSize, total = 0 }) => {
-  const [search, setSearch] = useState('');
+const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSelectDelivery, page, setPage, pageSize, setPageSize, total, search, setSearch, progressFilter, setProgressFilter, progressSort, setProgressSort, progressSortOrder, setProgressSortOrder }) => {
   const [openBookingId, setOpenBookingId] = useState(null);
-  const [progressFilter, setProgressFilter] = useState('all');
-  const [progressSort, setProgressSort] = useState('deadline');
-  const [progressSortOrder, setProgressSortOrder] = useState('asc');
-
-  const filteredAndSortedParentBookings = useMemo(() => {
-    const q = search.toLowerCase();
-
-    const withDeliveries = parentBookings.map(booking => ({
-      ...booking,
-      deliveries: deliveries.filter(d => d.parentBookingId === booking.id)
-    }));
-
-    const searchFiltered = q ? withDeliveries.filter(booking => {
-      if (
-        (booking.customerName || '').toLowerCase().includes(q) ||
-        (booking.bookingCode || '').toLowerCase().includes(q) ||
-        (booking.destination || '').toLowerCase().includes(q) ||
-        (booking.loadingPoint || '').toLowerCase().includes(q)
-      ) {
-        return true;
-      }
-
-      const hasMatchingDelivery = booking.deliveries.some(d =>
-        (d.trackingId || '').toLowerCase().includes(q) ||
-        (d.currentStatus || '').toLowerCase().includes(q) ||
-        (d.driverDetails?.name || '').toLowerCase().includes(q) ||
-        (d.driverDetails?.vehicleReg || '').toLowerCase().includes(q)
-      );
-
-      return hasMatchingDelivery;
-    }) : withDeliveries;
-
-    const progressFiltered = searchFiltered.filter(booking => {
-      switch (progressFilter) {
-        case 'completed':
-          return booking.completionPercentage === 100;
-        case 'in-progress':
-          return booking.completionPercentage > 0 && booking.completionPercentage < 100;
-        case 'not-started':
-          return booking.completionPercentage === 0;
-        case 'overdue':
-          const isOverdue = new Date(booking.deadline) < new Date();
-          return isOverdue && booking.completionPercentage < 100;
-        default:
-          return true;
-      }
-    });
-
-    const sorted = progressFiltered.sort((a, b) => {
-      let comparison = 0;
-      switch (progressSort) {
-        case 'deadline':
-          comparison = new Date(a.deadline) - new Date(b.deadline);
-          break;
-        case 'progress':
-          comparison = a.completionPercentage - b.completionPercentage;
-          break;
-        case 'tonnage':
-          comparison = a.totalTonnage - b.totalTonnage;
-          break;
-        case 'customer':
-          comparison = a.customerName.localeCompare(b.customerName);
-          break;
-        default:
-          comparison = 0;
-      }
-      return progressSortOrder === 'asc' ? comparison : -comparison;
-    });
-
-    return sorted;
-  }, [search, parentBookings, deliveries, progressFilter, progressSort, progressSortOrder]);
-
-  // Only show the current page of parent bookings
-  const pagedParentBookings = filteredAndSortedParentBookings.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="card shadow-sm border-0 mb-4" role="region" aria-labelledby="consignment-monitor-heading">
@@ -237,7 +162,6 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
           <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>list_alt</span>
           Consignment & Load Monitoring
         </h2>
-        
         {/* Search and Filter Controls */}
         <div
           className="d-flex flex-wrap align-items-center gap-2 mb-2"
@@ -259,7 +183,7 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
             <input
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search consignments or loads..."
               className="form-control"
               disabled={loading}
@@ -273,7 +197,7 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
               className="form-select form-select-sm"
               style={{ flexBasis: '100px', fontSize: '0.95em', padding: '0.2em 0.5em' }}
               value={progressFilter}
-              onChange={(e) => setProgressFilter(e.target.value)}
+              onChange={e => { setProgressFilter(e.target.value); setPage(1); }}
             >
               <option value="all">All</option>
               <option value="completed">Completed</option>
@@ -289,7 +213,7 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
               className="form-select form-select-sm"
               style={{ flexBasis: '100px', fontSize: '0.95em', padding: '0.2em 0.5em' }}
               value={progressSort}
-              onChange={(e) => setProgressSort(e.target.value)}
+              onChange={e => { setProgressSort(e.target.value); setPage(1); }}
             >
               <option value="deadline">Deadline</option>
               <option value="progress">Progress</option>
@@ -298,7 +222,7 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
             </select>
             <button
               className="btn btn-sm btn-outline-secondary"
-              onClick={() => setProgressSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
+              onClick={() => { setProgressSortOrder(order => order === 'asc' ? 'desc' : 'asc'); setPage(1); }}
               aria-label="Toggle sort order"
               style={{ padding: '0.2em 0.5em', fontSize: '1em', marginLeft: 2 }}
             >
@@ -325,12 +249,12 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
           <Spinner />
         ) : error ? (
           <div className="alert alert-danger">Error: {error}</div>
-        ) : filteredAndSortedParentBookings.length === 0 ? (
+        ) : parentBookings.length === 0 ? (
           <div className="alert alert-warning">No consignments found matching your criteria.</div>
         ) : (
           <>
             <div className="accordion" id="bookingAccordion" style={{ background: '#f7f7f5', borderRadius: 8, padding: '0.5rem 0.2rem' }}>
-              {pagedParentBookings.map((booking) => (
+              {parentBookings.map((booking) => (
                 <div
                   className="accordion-item mb-2 p-2"
                   key={booking.id}
@@ -396,17 +320,18 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
                       <div className="row g-2 text-muted small mb-2" style={{ fontSize: '0.92em' }}>
                         <div className="col"><strong>From:</strong> {booking.loadingPoint}</div>
                         <div className="col"><strong>To:</strong> {booking.destination}</div>
+                        <div className="col"><strong>Mineral:</strong> {booking.mineralType || 'N/A'}</div>
                       </div>
                       <div className="row g-2 text-muted small mb-2" style={{ fontSize: '0.92em' }}>
                         <div className="col"><strong>Total:</strong> {booking.totalTonnage}t</div>
                         <div className="col"><strong>Completed:</strong> {booking.completedTonnage}t</div>
-                        <div className="col"><strong>Loads:</strong> {booking.deliveries.length}</div>
+                        <div className="col"><strong>Loads:</strong> {(booking.deliveries || []).length}</div>
                       </div>
 
                       {/* Deliveries List */}
-                      {booking.deliveries.length > 0 ? (
+                      {(booking.deliveries || []).length > 0 ? (
                         <ul className="list-group list-group-flush" style={{ marginTop: 2 }}>
-                          {booking.deliveries.map(delivery => {
+                          {(booking.deliveries || []).map((delivery, index) => {
                             const isSelected = selectedId === delivery.trackingId;
                             const itemStyle = {
                               cursor: 'pointer',
@@ -425,7 +350,7 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
 
                             return (
                               <li
-                                key={delivery.trackingId}
+                                key={delivery.trackingId || delivery.tracking_id || index}
                                 className="list-group-item list-group-item-action p-2"
                                 style={itemStyle}
                                 onClick={() => onSelectDelivery(delivery.trackingId)}
@@ -434,7 +359,7 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
                                   <div>
                                     <strong className="d-block" style={headerStyle}>{delivery.trackingId}</strong>
                                     <small className={isSelected ? 'text-white-50' : 'text-muted'} style={{ fontSize: '0.92em' }}>
-                                      {delivery.driverDetails.name} ({delivery.driverDetails.vehicleReg})
+                                      {(delivery.driverDetails?.name || 'N/A')} ({delivery.driverDetails?.vehicleReg || 'N/A'})
                                     </small>
                                   </div>
                                   <span className={`badge rounded-pill align-self-center fs-6 ${delivery.isCompleted ? 'bg-success' : 'bg-info'}`} style={{ fontSize: '0.93em', padding: '0.3em 0.7em' }}>
@@ -473,10 +398,6 @@ const ConsignmentMonitor = ({ parentBookings, deliveries, loading, error, select
                 </div>
               ))}
             </div>
-            {/* PaginationBar moved below the accordion */}
-            {filteredAndSortedParentBookings.length > 0 && (
-              <PaginationBar page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} total={total} />
-            )}
           </>
         )}
         <div className="mt-4 text-center text-muted small">

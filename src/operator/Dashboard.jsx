@@ -122,7 +122,15 @@ export default function OperatorDashboard() {
     setPage: setParentBookingsPage,
     pageSize: parentBookingsPageSize,
     setPageSize: setParentBookingsPageSize,
-    total: parentBookingsTotal
+    total: parentBookingsTotal,
+    search: parentBookingsSearch,
+    setSearch: setParentBookingsSearch,
+    progressFilter,
+    setProgressFilter,
+    progressSort,
+    setProgressSort,
+    progressSortOrder,
+    setProgressSortOrder
   } = useParentBookings();
 
   const [selectedId, setSelectedId] = useState('');
@@ -447,9 +455,8 @@ export default function OperatorDashboard() {
         <div className="col-12 col-lg-6">
           <ConsignmentMonitor
             parentBookings={parentBookings}
-            deliveries={deliveries}
-            loading={loading}
-            error={error}
+            loading={parentBookingsLoading}
+            error={parentBookingsError}
             selectedId={selectedId}
             onSelectDelivery={(id) => setSelectedId(selectedId === id ? null : id)}
             page={parentBookingsPage}
@@ -457,6 +464,14 @@ export default function OperatorDashboard() {
             pageSize={parentBookingsPageSize}
             setPageSize={setParentBookingsPageSize}
             total={parentBookingsTotal}
+            search={parentBookingsSearch}
+            setSearch={parentBookingsSearch => { setParentBookingsSearch(parentBookingsSearch); setParentBookingsPage(1); }}
+            progressFilter={progressFilter}
+            setProgressFilter={val => { setProgressFilter(val); setParentBookingsPage(1); }}
+            progressSort={progressSort}
+            setProgressSort={val => { setProgressSort(val); setParentBookingsPage(1); }}
+            progressSortOrder={progressSortOrder}
+            setProgressSortOrder={val => { setProgressSortOrder(val); setParentBookingsPage(1); }}
           />
           {/* Pagination Controls for Deliveries */}
           <div className="d-flex justify-content-between align-items-center mt-3">

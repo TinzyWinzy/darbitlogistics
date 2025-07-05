@@ -1,4 +1,4 @@
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useContext, useState } from 'react';
 import { AuthContext } from '../App';
 import { useNavigate } from 'react-router-dom';
@@ -32,9 +32,14 @@ export default function Navbar() {
       }}
     >
       <div className="container-fluid px-4">
-        <Link className="navbar-brand fw-bold d-flex align-items-center" to="/" style={{ color: '#EBD3AD', letterSpacing: '0.5px' }}>
-          <span style={{ fontSize: '1.7em', marginRight: 10 }} role="img" aria-label="logo">🚚</span>
-          Morres Logistics
+        <Link className="navbar-brand fw-bold d-flex flex-column align-items-start" to="/" style={{ color: '#EBD3AD', letterSpacing: '0.5px' }}>
+          <span className="d-flex align-items-center">
+            <span style={{ fontSize: '1.7em', marginRight: 10 }} role="img" aria-label="logo">🚛</span>
+            Morres Logistics
+          </span>
+          <span className="small fw-normal mt-1" style={{ color: '#16a34a', letterSpacing: '0.5px', fontSize: '0.95em' }}>
+            Powered by Dar Logistics Technology
+          </span>
         </Link>
         <button
           className="navbar-toggler"
@@ -96,9 +101,21 @@ export default function Navbar() {
                     Dashboard
                   </Link>
                 </li>
+                {user.role === 'admin' && (
+                  <li className="nav-item">
+                    <Link className="nav-link px-3 py-2 rounded text-light" to="/admin/dashboard" style={{ color: '#EBD3AD' }}>
+                      Admin
+                    </Link>
+                  </li>
+                )}
                 <li className="nav-item">
                   <Link className="nav-link px-3 py-2 rounded text-light" to="/billing" style={{ color: '#EBD3AD' }}>
                     Billing
+                  </Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link px-3 py-2 rounded text-light" to="/help" title="Help / How it works">
+                    <span style={{ fontSize: '1.2em', fontWeight: 600 }}>?</span> Help
                   </Link>
                 </li>
                 <li className="nav-item ms-lg-2 mt-2 mt-lg-0">

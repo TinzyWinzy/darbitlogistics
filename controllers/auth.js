@@ -142,4 +142,38 @@ export async function refreshToken(req, res) {
     console.error('Refresh token error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
+}
+
+export async function createUser(req, res) {
+  const { username, password, role } = req.body;
+  if (!username || !password || !role) {
+    return res.status(400).json({ error: 'Username, password, and role are required' });
+  }
+  try {
+    const hashed = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (username, password, role, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, username, role, created_at',
+      [username, hashed, role]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    console.error('Error creating user:', err);
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+}
+
+export async function deleteUser(req, res) {
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ error: 'User id required' });
+  try {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, username, role', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error deleting user:', err);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
 } 

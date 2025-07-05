@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { normalizeKeys } from './normalizeKeys';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -23,7 +24,13 @@ function onRefreshed(token) {
 
 // Response interceptor for error handling
 api.interceptors.response.use(
-  response => response,
+  response => {
+    // Normalize all response data to camelCase
+    if (response && response.data) {
+      response.data = normalizeKeys(response.data);
+    }
+    return response;
+  },
   async error => {
     const originalRequest = error.config;
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
@@ -60,7 +67,7 @@ export const toCamel = d => ({
   phoneNumber: d.phone_number,
   currentStatus: d.current_status,
   checkpoints: d.checkpoints,
-  driverDetails: d.driver_details,
+  driverDetails: d.driver_details || { name: '', vehicleReg: '' },
   createdAt: d.created_at,
   updatedAt: d.updated_at,
   bookingReference: d.booking_reference,
@@ -101,8 +108,8 @@ export const parentBookingToCamel = d => ({
   customerName: d.customer_name,
   phoneNumber: d.phone_number,
   totalTonnage: d.total_tonnage,
-  mineral_type: d.mineral_type,
-  mineral_grade: d.mineral_grade,
+  mineralType: d.mineral_type,
+  mineralGrade: d.mineral_grade,
   loadingPoint: d.loading_point,
   destination: d.destination,
   deadline: d.deadline,
@@ -114,6 +121,7 @@ export const parentBookingToCamel = d => ({
   totalDeliveries: d.total_deliveries,
   completedDeliveries: d.completed_deliveries,
   notes: d.notes,
+  deliveries: Array.isArray(d.deliveries) ? d.deliveries.map(toCamel) : [],
 });
 
 export const toSnake = d => ({
@@ -154,7 +162,7 @@ export const deliveryApi = {
     try {
       const res = await api.get(`/deliveries?limit=${limit}&offset=${offset}`);
       // Return both deliveries and total count
-      return { deliveries: Array.isArray(res.data.deliveries) ? res.data.deliveries.map(toCamel) : [], total: res.data.total };
+      return { deliveries: res.data.deliveries, total: res.data.total };
     } catch (error) {
       console.error('Failed to fetch deliveries:', error);
       throw error;
@@ -165,7 +173,7 @@ export const deliveryApi = {
   getById: async (trackingId) => {
     try {
       const res = await api.get(`/deliveries/${trackingId}`);
-      return toCamel(res.data);
+      return res.data;
     } catch (error) {
       console.error(`Failed to fetch delivery ${trackingId}:`, error);
       throw error;
@@ -177,7 +185,7 @@ export const deliveryApi = {
     try {
       console.log('Sending delivery data to API:', deliveryData);
       const res = await api.post('/deliveries', deliveryData);
-      return toCamel(res.data);
+      return res.data;
     } catch (error) {
       console.error('Failed to create delivery:', error);
       throw error;
@@ -193,7 +201,7 @@ export const deliveryApi = {
         currentStatus: data.currentStatus,
       };
       const res = await api.post('/updateCheckpoint', payload);
-      return toCamel(res.data);
+      return res.data;
     } catch (error) {
       console.error(`Failed to update checkpoint for ${trackingId}:`, error);
       throw error;
@@ -258,18 +266,29 @@ export const deliveryApi = {
     try {
       console.log('Sending parent booking data to API:', bookingData);
       const res = await api.post('/parent-bookings', bookingData);
-      return parentBookingToCamel(res.data);
+      return res.data;
     } catch (error) {
       console.error('Failed to create parent booking:', error);
       throw error;
     }
   },
 
-  async getAllParentBookings(filters = {}, limit = 20, offset = 0) {
+  async getAllParentBookings({ search = '', progressFilter = 'all', progressSort = 'deadline', progressSortOrder = 'asc' } = {}, pageSize = 20, offset = 0) {
     try {
-      const queryParams = new URLSearchParams({ ...filters, limit, offset }).toString();
+      const page = Math.floor(offset / pageSize) + 1;
+      const queryParams = new URLSearchParams({
+        search,
+        progressFilter,
+        progressSort,
+        progressSortOrder,
+        page,
+        pageSize
+      }).toString();
       const res = await api.get(`/parent-bookings?${queryParams}`);
-      return { parentBookings: Array.isArray(res.data.parentBookings) ? res.data.parentBookings.map(parentBookingToCamel) : [], total: res.data.total };
+      return {
+        parentBookings: res.data.parentBookings,
+        total: res.data.total
+      };
     } catch (error) {
       console.error('Failed to fetch parent bookings:', error);
       throw error;
@@ -309,38 +328,45 @@ export const deliveryApi = {
     return res.data;
   },
 
-  async updateUserSubscription(userId, data) {
-    const res = await api.patch(`/api/admin/subscriptions/${userId}`, data);
+  async updateUserSubscription(subId, data) {
+    const res = await api.patch(`/api/admin/subscriptions/${subId}`, data);
     return res.data;
   },
 
   admin: {
     getAllUsers: async () => {
       try {
-        const res = await api.get('/admin/users');
+        const res = await api.get('/api/admin/users');
         return res.data;
       } catch (error) {
         console.error('Failed to fetch users:', error);
         throw error;
       }
     },
-
     createUser: async (userData) => {
       try {
-        const res = await api.post('/admin/users', userData);
+        const res = await api.post('/api/admin/users', userData);
         return res.data;
       } catch (error) {
         console.error('Failed to create user:', error);
         throw error;
       }
     },
-
     deleteUser: async (userId) => {
       try {
-        const res = await api.delete(`/admin/users/${userId}`);
+        const res = await api.delete(`/api/admin/users/${userId}`);
         return res.data;
       } catch (error) {
         console.error(`Failed to delete user ${userId}:`, error);
+        throw error;
+      }
+    },
+    getLogs: async () => {
+      try {
+        const res = await api.get('/api/admin/logs');
+        return res.data;
+      } catch (error) {
+        console.error('Failed to fetch logs:', error);
         throw error;
       }
     }

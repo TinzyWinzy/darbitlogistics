@@ -14,6 +14,8 @@ import axios from 'axios';
 import ParentBookingDetails from './operator/ParentBookingDetails';
 import BillingDashboard from './public/BillingDashboard';
 import SubscriptionPlans from './public/SubscriptionPlans';
+import HelpCenter from './public/HelpCenter';
+import WelcomeModal from './public/WelcomeModal';
 
 export const AuthContext = createContext(null);
 
@@ -88,34 +90,38 @@ export default function App() {
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, setUser, isAuthenticated, loading }}>
-      <Router>
-        <Navbar />
-        <Routes>
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/dashboard" element={
-            <AdminRoute>
-              <AdminDashboard />
-            </AdminRoute>
-          } />
-          <Route path="/track" element={<TrackDelivery />} />
-          <Route path="/offerings" element={<Offerings />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<Landing />} />
-          <Route path="/track-delivery" element={<TrackDelivery />} />
-          <Route path="/track-booking" element={<TrackParentBooking />} />
-          <Route path="/operator/dashboard" element={<Dashboard />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/parent-booking-details/:id" element={<ParentBookingDetails />} />
-          <Route path="/billing" element={<BillingDashboard />} />
-          <Route path="/plans" element={<SubscriptionPlans />} />
-        </Routes>
-        <Footer />
-      </Router>
-    </AuthContext.Provider>
+    <>
+      <AuthContext.Provider value={{ user, setUser, isAuthenticated, loading }}>
+        <Router>
+          <WelcomeModal />
+          <Navbar />
+          <Routes>
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/dashboard" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
+            <Route path="/track" element={<TrackDelivery />} />
+            <Route path="/offerings" element={<Offerings />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="/track-delivery" element={<TrackDelivery />} />
+            <Route path="/track-booking" element={<TrackParentBooking />} />
+            <Route path="/operator/dashboard" element={<Dashboard />} />
+            <Route path="/parent-booking-details/:id" element={<ParentBookingDetails />} />
+            <Route path="/billing" element={<BillingDashboard />} />
+            <Route path="/plans" element={<SubscriptionPlans />} />
+            <Route path="/help" element={<HelpCenter />} />
+          </Routes>
+          <Footer />
+        </Router>
+      </AuthContext.Provider>
+    </>
   );
 }

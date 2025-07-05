@@ -44,7 +44,7 @@ Implement a **subscription and billing system** with the following requirements:
    - Block delivery updates when quota is exceeded (unless on Enterprise)
 
 3. **Subscription Logic**:
-   - On user sign-up, assign “Starter” trial tier for 7 days
+   - On user sign-up, assign "Starter" trial tier for 7 days
    - After trial, require upgrade to continue
    - Allow admin to manually change tiers (no full payment gateway needed in MVP)
 
@@ -70,7 +70,7 @@ Implement a **subscription and billing system** with the following requirements:
    - Payment system is optional/informational (mock gateway)
 
 8. **Nice to Have**:
-   - Display “Trial X days remaining”
+   - Display "Trial X days remaining"
    - Alert when within 10% of usage limit
 
 ---
@@ -82,4 +82,38 @@ Implement a **subscription and billing system** with the following requirements:
 
 ### 🎁 Bonus:
 Add a feature flag `isTrialUser` to limit or enable premium features during onboarding.
+
+# Feature Proposal: System Garbage Collector (GC)
+
+## Status: To Be Implemented
+
+### Overview
+Morres Logistics requires a system-wide garbage collector to maintain data hygiene, optimize performance, and reduce storage bloat across both backend and frontend systems.
+
+### Purpose
+- Automatically remove expired, obsolete, or orphaned data (e.g., refresh tokens, sessions, logs, temp files)
+- Clean up unused files and outdated caches
+- Improve system reliability and reduce manual maintenance
+
+### Scope
+- **Backend:**
+  - Scheduled cleanup of expired refresh tokens, sessions, logs, and orphaned deliveries
+  - File system hygiene (temp files, unused uploads)
+- **Frontend:**
+  - Service worker cache cleanup
+  - LocalStorage/sessionStorage pruning
+
+### Implementation Ideas
+- Use Node.js cron jobs or PostgreSQL scheduled tasks for backend cleanup
+- Leverage Workbox for service worker cache management
+- Add utilities for frontend storage cleanup on logout/session expiry
+- Log all deletions for auditability
+
+### Next Steps
+- Define which data types and files are considered "garbage"
+- Set retention policies and schedules
+- Implement and test cleanup scripts
+- Monitor and tune for safety and performance
+
+---
 

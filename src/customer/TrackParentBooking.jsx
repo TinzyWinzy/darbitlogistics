@@ -12,6 +12,42 @@ function Spinner() {
   );
 }
 
+function StatusLegend() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-3">
+      <button
+        className="btn btn-link p-0 align-baseline"
+        style={{ color: '#1976d2', fontWeight: 500, textDecoration: 'underline', fontSize: '1em' }}
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        aria-controls="status-legend"
+        type="button"
+      >
+        <span role="img" aria-label="info">ℹ️</span> What do the statuses mean?
+      </button>
+      {open && (
+        <div id="status-legend" className="card card-body mt-2" style={{ background: '#fffbe6', borderLeft: '4px solid #D2691E' }}>
+          <ul className="mb-2" style={{ paddingLeft: 18 }}>
+            <li><b>Pending</b>: Delivery is scheduled but not yet dispatched.</li>
+            <li><b>At Mine</b>: Cargo is at the mine or origin point.</li>
+            <li><b>In Transit</b>: Cargo is on the move to the next checkpoint.</li>
+            <li><b>At Border</b>: Cargo is at a border crossing for customs clearance.</li>
+            <li><b>At Port</b>: Cargo has reached the port for export/import.</li>
+            <li><b>At Port of Destination</b>: Cargo has arrived at the destination port.</li>
+            <li><b>At Warehouse</b>: Cargo is in storage at a warehouse.</li>
+            <li><b>Delivered</b>: Delivery is complete and received by the customer.</li>
+            <li><b>Cancelled</b>: Delivery was cancelled.</li>
+          </ul>
+          <div className="small text-muted">
+            <b>Lost your tracking code?</b> Contact your operator or Morres Logistics support at <a href="mailto:marketing@morreslogistics.com">marketing@morreslogistics.com</a> to retrieve it.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DeliveryCard({ delivery }) {
   return (
     <div className="card mb-3">
@@ -102,6 +138,12 @@ export default function TrackParentBooking() {
 
   return (
     <div className="container py-5">
+      <h1 className="display-6 fw-bold text-center mb-2" style={{ color: '#1F2120' }}>
+        Track Your Parent Booking
+      </h1>
+      <div className="d-flex justify-content-center mb-3">
+        <StatusLegend />
+      </div>
       {/* Internal Use Only Banner for staff */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
         INTERNAL USE ONLY

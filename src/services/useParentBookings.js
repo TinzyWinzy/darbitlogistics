@@ -8,13 +8,22 @@ export function useParentBookings() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState('');
+  const [progressFilter, setProgressFilter] = useState('all');
+  const [progressSort, setProgressSort] = useState('deadline');
+  const [progressSortOrder, setProgressSortOrder] = useState('asc');
 
   const fetchParentBookings = useCallback(async (pageArg = page, pageSizeArg = pageSize) => {
     try {
       setLoading(true);
       setError(null);
       const offset = (pageArg - 1) * pageSizeArg;
-      const { parentBookings: data, total: totalCount } = await deliveryApi.getAllParentBookings({}, pageSizeArg, offset);
+      const { parentBookings: data, total: totalCount } = await deliveryApi.getAllParentBookings({
+        search,
+        progressFilter,
+        progressSort,
+        progressSortOrder
+      }, pageSizeArg, offset);
       setParentBookings(data);
       setTotal(totalCount);
     } catch (err) {
@@ -25,11 +34,11 @@ export function useParentBookings() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize]);
+  }, [page, pageSize, search, progressFilter, progressSort, progressSortOrder]);
 
   useEffect(() => {
     fetchParentBookings(page, pageSize);
-  }, [fetchParentBookings, page, pageSize]);
+  }, [fetchParentBookings, page, pageSize, search, progressFilter, progressSort, progressSortOrder]);
 
   const createParentBooking = useCallback(async (bookingData) => {
     try {
@@ -53,5 +62,13 @@ export function useParentBookings() {
     pageSize,
     setPageSize,
     total,
+    search,
+    setSearch,
+    progressFilter,
+    setProgressFilter,
+    progressSort,
+    setProgressSort,
+    progressSortOrder,
+    setProgressSortOrder,
   };
 } 

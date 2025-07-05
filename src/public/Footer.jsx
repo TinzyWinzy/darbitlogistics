@@ -9,9 +9,11 @@ export default function Footer() {
           </div>
           <div className="col-12 col-md-6 text-center text-md-end">
             <span className="me-2">Support:</span>
-            <a href="mailto:info@morres.com" className="text-decoration-underline" style={{ color: '#1F2120' }}>info@morres.com</a>
+            <a href="mailto:marketing@morreslogistics.com" className="text-decoration-underline" style={{ color: '#1F2120' }}>marketing@morreslogistics.com</a>
             <span className="mx-2">|</span>
             <a href="tel:+263242303123" className="text-decoration-underline" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+            <span className="mx-2">|</span>
+            <a href="http://www.morreslogistics.com" className="text-decoration-underline" style={{ color: '#1F2120' }}>www.morreslogistics.com</a>
           </div>
         </div>
         <div className="row mt-2">
@@ -20,6 +22,13 @@ export default function Footer() {
             <span className="mx-2">|</span>
             <span className="text-secondary" style={{ opacity: 0.5 }}>
               Social links disabled for internal version
+            </span>
+          </div>
+        </div>
+        <div className="row mt-2">
+          <div className="col text-center">
+            <span className="badge bg-success text-white fs-6" style={{ background: '#16a34a', borderRadius: '0.5em', padding: '0.5em 1em' }}>
+              Powered by Dar Logistics Technology
             </span>
           </div>
         </div>

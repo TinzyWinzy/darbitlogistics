@@ -8,14 +8,14 @@ export default function SubscriptionPlans() {
   const handleSelectPlan = (tier) => {
     // In a full implementation, this would lead to a checkout process.
     // For this MVP, it can open a mailto link or show a contact modal.
-    alert(`You selected the ${subscriptionTiers[tier].name} plan. Please contact sales to upgrade.`);
+    window.location.href = `mailto:marketing@morreslogistics.com?subject=Morres Logistics Subscription Inquiry&body=I am interested in the ${subscriptionTiers[tier].name} plan.`;
   };
 
   return (
     <div className="container py-5">
       <div className="text-center mb-5">
         <h1 className="display-6 fw-bold" style={{ color: '#1F2120' }}>Our Subscription Plans</h1>
-        <p className="lead text-muted">Choose the plan that fits your logistics needs.</p>
+        <p className="lead text-muted">Choose the plan that fits your logistics needs. All plans are powered by Dar Logistics Technology for real-time tracking and SMS updates.</p>
       </div>
       <div className="row g-4 justify-content-center">
         {tierOrder.map(tierKey => {
@@ -54,7 +54,7 @@ export default function SubscriptionPlans() {
                       style={{ background: '#D2691E', border: 'none' }}
                       aria-label={`Select ${subscriptionTiers[tierKey].name} plan`}
                     >
-                      Choose Plan
+                      Contact Sales
                     </button>
                   </div>
                 </div>
@@ -62,6 +62,14 @@ export default function SubscriptionPlans() {
             </div>
           );
         })}
+      </div>
+      <div className="text-center text-muted small mt-5">
+        <span className="badge bg-success text-white fs-6" style={{ background: '#16a34a', borderRadius: '0.5em', padding: '0.5em 1em' }}>
+          Powered by Dar Logistics Technology
+        </span>
+        <div className="mt-2">
+          For inquiries: <a href="mailto:marketing@morreslogistics.com" style={{ color: '#1F2120' }}>marketing@morreslogistics.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+        </div>
       </div>
     </div>
   );

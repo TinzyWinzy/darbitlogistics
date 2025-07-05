@@ -1,5 +1,19 @@
 import { useState } from 'react';
 
+// Simple InfoIcon component with tooltip
+function InfoIcon({ text }) {
+  return (
+    <span
+      tabIndex={0}
+      style={{ marginLeft: 6, color: '#1976d2', cursor: 'pointer', fontSize: '1.1em', verticalAlign: 'middle' }}
+      title={text}
+      aria-label={text}
+    >
+      ℹ️
+    </span>
+  );
+}
+
 export default function DeliveryDispatchForm({
   customers,
   parentBookings,
@@ -214,7 +228,10 @@ export default function DeliveryDispatchForm({
   return (
     <form onSubmit={handleSubmit} className="row g-3 align-items-end" autoComplete="off">
       <div className="col-md-4">
-        <label className="form-label">Select Customer *</label>
+        <label className="form-label">
+          Select Customer *
+          <InfoIcon text="Choose the client for this delivery. Customers are registered with their name and phone number." />
+        </label>
         <select 
           className="form-select"
           value={createForm.customerId}
@@ -233,7 +250,10 @@ export default function DeliveryDispatchForm({
         </select>
       </div>
       <div className="col-md-4">
-        <label className="form-label">Select Consignment *</label>
+        <label className="form-label">
+          Select Consignment *
+          <InfoIcon text="A consignment (parent booking) groups multiple deliveries under one contract. Choose the relevant booking for this load." />
+        </label>
         <select 
           className="form-select"
           value={createForm.selectedBookingId}
@@ -261,58 +281,63 @@ export default function DeliveryDispatchForm({
           </div>
         </div>
       )}
-      <div className="col-md-4">
-        <label className="form-label">Container Count *</label>
-        <input 
-          type="number" 
-          className="form-control" 
-          required 
-          min="1"
-          value={createForm.containerCount}
-          onChange={e => setCreateForm(prev => ({ ...prev, containerCount: e.target.value }))}
-          disabled={creating || !createForm.selectedBookingId}
-        />
-      </div>
-      <div className="col-md-4">
-        <label className="form-label">Tonnage *</label>
-        <input 
-          type="number" 
-          className="form-control" 
-          required 
-          min="0.01"
-          step="0.01"
+      <div className="col-md-3">
+        <label className="form-label">
+          Tonnage (tons) *
+          <InfoIcon text="Enter the weight of the cargo in metric tons. Must not exceed the available tonnage for the consignment." />
+        </label>
+        <input
+          type="number"
+          className="form-control"
           value={createForm.tonnage}
           onChange={e => setCreateForm(prev => ({ ...prev, tonnage: e.target.value }))}
-          disabled={creating || !createForm.selectedBookingId}
+          min={0.01}
+          step={0.01}
+          disabled={creating}
+          required
+        />
+      </div>
+      <div className="col-md-3">
+        <label className="form-label">
+          Container Count *
+          <InfoIcon text="Number of containers for this delivery. Must be at least 1." />
+        </label>
+        <input
+          type="number"
+          className="form-control"
+          value={createForm.containerCount}
+          onChange={e => setCreateForm(prev => ({ ...prev, containerCount: e.target.value }))}
+          min={1}
+          step={1}
+          disabled={creating}
+          required
         />
       </div>
       <div className="col-md-4">
-        <label className="form-label">Driver Name *</label>
-        <input 
-          type="text" 
-          className="form-control" 
-          required
-          value={createForm.driverDetails.name}
-          onChange={e => setCreateForm(prev => ({
-            ...prev,
-            driverDetails: { ...prev.driverDetails, name: e.target.value }
-          }))}
-          disabled={creating || !createForm.selectedBookingId}
-        />
-      </div>
-      <div className="col-md-4">
-        <label className="form-label">Vehicle Registration *</label>
-        <input 
-          type="text" 
-          className="form-control" 
-          required
-          value={createForm.driverDetails.vehicleReg}
-          onChange={e => setCreateForm(prev => ({
-            ...prev,
-            driverDetails: { ...prev.driverDetails, vehicleReg: e.target.value }
-          }))}
-          disabled={creating || !createForm.selectedBookingId}
-        />
+        <label className="form-label">
+          Driver Details *
+          <InfoIcon text="Enter the driver's full name and vehicle registration. This ensures accountability and tracking." />
+        </label>
+        <div className="input-group mb-2">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Driver Name"
+            value={createForm.driverDetails.name}
+            onChange={e => setCreateForm(prev => ({ ...prev, driverDetails: { ...prev.driverDetails, name: e.target.value } }))}
+            disabled={creating}
+            required
+          />
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Vehicle Reg."
+            value={createForm.driverDetails.vehicleReg}
+            onChange={e => setCreateForm(prev => ({ ...prev, driverDetails: { ...prev.driverDetails, vehicleReg: e.target.value } }))}
+            disabled={creating}
+            required
+          />
+        </div>
       </div>
       <div className="col-md-4">
         <label className="form-label">Initial Status</label>
