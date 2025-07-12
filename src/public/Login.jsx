@@ -79,34 +79,36 @@ export default function Login() {
               />
               <label htmlFor="username" style={{ fontSize: '0.95em' }}>Username</label>
             </div>
-            <div className="form-floating mb-2 position-relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="form-control"
-                id="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                aria-label="Password"
-                aria-describedby="togglePassword"
-                style={{ fontSize: '0.97em', padding: '0.5em 0.7em' }}
-              />
-              <label htmlFor="password" style={{ fontSize: '0.95em' }}>Password</label>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-secondary position-absolute end-0 top-50 translate-middle-y me-2"
-                id="togglePassword"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                onClick={() => setShowPassword((show) => !show)}
-                tabIndex={0}
-                style={{ zIndex: 2 }}
-              >
-                <span className="material-icons-outlined" aria-hidden="true">
-                  {showPassword ? 'visibility_off' : 'visibility'}
-                </span>
-              </button>
+            {/* Password field using input group for robust alignment */}
+            <div className="mb-2">
+              <label htmlFor="password" style={{ fontSize: '0.95em', marginBottom: 4 }}>Password</label>
+              <div className="input-group">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="form-control"
+                  id="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  aria-label="Password"
+                  aria-describedby="togglePassword"
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  id="togglePassword"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword((show) => !show)}
+                  tabIndex={0}
+                  style={{ minWidth: 40, minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <span className="material-icons-outlined" aria-hidden="true">
+                    {showPassword ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
             </div>
             <div className="form-check mb-2">
               <input
@@ -151,15 +153,21 @@ export default function Login() {
         .form-control, .form-select, .btn {
           border-radius: 5px !important;
           border-color: #D2691E !important;
+          pointer-events: auto !important;
+        }
+        .form-floating, .form-check-input {
+          pointer-events: auto !important;
         }
         .form-control:focus-visible, .form-select:focus-visible, .btn:focus-visible {
           outline: 2px solid #D2691E !important;
           outline-offset: 2px !important;
           box-shadow: 0 0 0 2px #EBD3AD !important;
-          z-index: 2;
         }
         .form-floating > label {
           color: #7c6a4d !important;
+        }
+        #password.form-control {
+          padding-right: 0.7em !important;
         }
         .btn:disabled, .btn[disabled] {
           background: #e5e1db !important;
@@ -167,15 +175,37 @@ export default function Login() {
           border-color: #D2691E !important;
         }
         @media (max-width: 600px) {
+          .card {
+            max-width: 95vw !important;
+            width: 100% !important;
+            margin: 0 1vw !important;
+          }
           .card-body.p-3.p-md-4 {
             padding: 0.7rem 0.3rem !important;
           }
           .form-floating {
-            margin-bottom: 0.7rem !important;
+            margin-bottom: 1.1rem !important;
           }
           .btn.fw-bold {
-            font-size: 1rem !important;
-            padding: 0.5em 0.5em !important;
+            font-size: 1.08rem !important;
+            padding: 0.7em 0.5em !important;
+            min-height: 44px !important;
+          }
+          .form-control {
+            font-size: 1.05em !important;
+            padding: 0.7em 0.9em !important;
+            min-height: 44px !important;
+          }
+          #password.form-control {
+            padding-right: 0.7em !important;
+          }
+          .form-check-label, .form-floating > label {
+            font-size: 1.05em !important;
+          }
+          #togglePassword {
+            min-width: 40px !important;
+            min-height: 40px !important;
+            font-size: 1.15em !important;
           }
         }
         .btn.fw-bold:not(:disabled):hover, .btn.fw-bold:not(:disabled):focus-visible {

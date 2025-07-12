@@ -101,7 +101,9 @@ function AppLayout({ sidebarOpen, setSidebarOpen }) {
                 <Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
                 <Route path="/track" element={<TrackDelivery />} />
                 <Route path="/offerings" element={<Offerings />} />
-                <Route path="/login" element={<Login />} />
+                <Route path="/login" element={
+                  isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
+                } />
                 <Route path="/" element={<Landing />} />
                 <Route path="/track-delivery" element={<TrackDelivery />} />
                 <Route path="/track-booking" element={<TrackParentBooking />} />
