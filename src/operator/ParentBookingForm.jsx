@@ -160,13 +160,6 @@ export default function ParentBookingForm({
 
   return (
     <form onSubmit={handleSubmit} className="row g-3" autoComplete="off">
-      <div className="col-12 d-flex justify-content-between align-items-center mb-2">
-        <h2 className="h5 fw-bold mb-0" style={{ color: '#1F2120' }}>
-          <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>add_box</span>
-          Log New Consignment
-        </h2>
-        <button type="button" className="btn-close" onClick={onClose} aria-label="Close modal"></button>
-      </div>
       <div className="col-md-6">
         <label className="form-label">Customer Name <span className="required-asterisk">*</span></label>
         <input
