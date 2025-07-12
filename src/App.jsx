@@ -125,6 +125,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false); // for mobile
 
+  // Add these states to hold user-specific data at the top level
+  const [deliveries, setDeliveries] = useState([]);
+  const [parentBookings, setParentBookings] = useState([]);
+
   useEffect(() => {
     const checkAuth = async () => {
       let token = localStorage.getItem('jwt_token');
@@ -158,6 +162,15 @@ export default function App() {
     };
     checkAuth();
   }, []);
+
+  // Clear all user-specific state on logout or user change
+  useEffect(() => {
+    if (!user) {
+      setDeliveries([]);
+      setParentBookings([]);
+      // Add any other user-specific state resets here
+    }
+  }, [user]);
 
   const isAuthenticated = !!user;
 

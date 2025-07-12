@@ -30,6 +30,14 @@ if [ -f "$ADDON_SCHEMA_FILE" ]; then
   echo "Add-on subscription migration complete."
 fi
 
+# Apply add_notifications_table.sql if present
+NOTIFICATIONS_SCHEMA_FILE="$SCRIPT_DIR/add_notifications_table.sql"
+if [ -f "$NOTIFICATIONS_SCHEMA_FILE" ]; then
+  echo "Applying notifications table migration from $NOTIFICATIONS_SCHEMA_FILE..."
+  psql "$DATABASE_URL" -f "$NOTIFICATIONS_SCHEMA_FILE"
+  echo "Notifications table migration complete."
+fi
+
 # Ensure ENUM patch for 'pending' status is applied (in both SQL files)
 # Run data-fix.sql if present
 DATA_FIX_FILE="$SCRIPT_DIR/data-fix.sql"

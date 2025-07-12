@@ -762,7 +762,7 @@ app.get('/deliveries/analytics', authenticateJWT, async (req, res) => {
       where = 'WHERE pb.created_by_user_id = $1';
       params.push(req.user.id);
     }
-    // Example: total deliveries, pending, completed, total tonnage
+    // Main analytics query
     const query = `
       SELECT 
         COUNT(*) AS total_deliveries,
@@ -779,7 +779,22 @@ app.get('/deliveries/analytics', authenticateJWT, async (req, res) => {
       ${where}
     `;
     const result = await pool.query(query, params);
-    res.json({ analytics: result.rows[0] });
+    // Monthly breakdown for the last 12 months
+    const monthlyQuery = `
+      SELECT
+        TO_CHAR(date_trunc('month', d.created_at), 'Mon YYYY') AS month,
+        COUNT(*) AS deliveries
+      FROM deliveries d
+      LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id
+      ${where}
+      GROUP BY month
+      ORDER BY MIN(d.created_at)
+      LIMIT 12
+    `;
+    const monthlyResult = await pool.query(monthlyQuery, params);
+    const monthlyLabels = monthlyResult.rows.map(r => r.month);
+    const monthlyData = monthlyResult.rows.map(r => parseInt(r.deliveries, 10));
+    res.json({ analytics: { ...result.rows[0], monthlyLabels, monthlyData } });
   } catch (err) {
     console.error('Analytics error:', err);
     res.status(500).json({ error: err.message });

@@ -714,3 +714,12 @@ BEGIN
         ALTER TABLE deliveries ADD COLUMN custom_status TEXT;
     END IF;
 END $$; 
+
+-- Ensure invoices table has user_id column (idempotent)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'invoices') AND
+       NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'user_id') THEN
+        ALTER TABLE invoices ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
+END $$; 

@@ -240,6 +240,30 @@ export default function OperatorDashboard() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!user) {
+      setLocalDeliveries([]);
+      setCustomers([]);
+      setSelectedCustomerBookings([]);
+      setNotifications([]);
+      setAnalytics(null);
+      setInvoices([]);
+      setSelectedId('');
+      setSelectedParentId(null);
+      setSelectedParentBooking(null);
+      setShowParentDetails(false);
+      setShowCreateParentBookingModal(false);
+      setFeedback('');
+      setSubmitting(false);
+      setShowToast(false);
+      setToastMsg('');
+      setShowSmsPreview(false);
+      setSmsPreview('');
+      setActiveChartTab('bar');
+      // ...add any other user-specific state resets here
+    }
+  }, [user]);
+
   const error = deliveriesError || parentBookingsError;
 
   function generateTrackingId() {
