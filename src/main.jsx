@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import 'bootstrap/dist/css/bootstrap.min.css'
-import '../../morres_frontend/assets/bootstrap/js/bootstrap.min.js';
+// Bootstrap JS is now loaded via CDN in public/index.html for portability.
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
