@@ -607,53 +607,6 @@ export default function OperatorDashboard() {
           </div>
         </div>
       </div>
-      {/* Invoice History */}
-      <div className="mb-4">
-        <div className="card shadow-sm border-0">
-          <div className="card-header bg-light fw-bold">Invoice History</div>
-          <div className="card-body">
-            {loadingInvoices ? <Spinner /> : invoices.length > 0 ? (
-              <table className="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Invoice #</th>
-                    <th>Amount</th>
-                    <th>Currency</th>
-                    <th>Paid</th>
-                    <th>Date</th>
-                    <th>Download</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map(inv => (
-                    <tr key={inv.invoiceId || inv.invoice_id}>
-                      <td>{inv.invoiceId || inv.invoice_id}</td>
-                      <td>{inv.amount}</td>
-                      <td>{inv.currency}</td>
-                      <td>
-                        <span className={`badge bg-${inv.paid ? 'success' : 'danger'}`}>{inv.paid ? 'Yes' : 'No'}</span>
-                      </td>
-                      <td>{inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : ''}</td>
-                      <td>
-                        <a
-                          href={`$${process.env.VITE_API_URL || ''}/api/invoices/${inv.invoiceId || inv.invoice_id}/download`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-sm btn-outline-primary"
-                          title="Download invoice"
-                          aria-label="Download invoice"
-                        >
-                          <FaFileDownload className="me-1" />Download
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : <div className="text-muted">No invoices found.</div>}
-          </div>
-        </div>
-      </div>
       {/* Strategic Operations Console Banner */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
         STRATEGIC OPERATIONS CONSOLE

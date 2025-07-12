@@ -24,6 +24,7 @@ import CustomerList from './operator/CustomerList';
 import { useDeliveries } from './services/useDeliveries';
 import { useParentBookings } from './services/useParentBookings';
 import Reports from './operator/Reports';
+import InvoiceHistory from './components/InvoiceHistory';
 
 export const AuthContext = createContext(null);
 
@@ -113,6 +114,11 @@ function AppLayout({ sidebarOpen, setSidebarOpen }) {
                 <Route path="/plans" element={<SubscriptionPlans />} />
                 <Route path="/help" element={<HelpCenter />} />
                 <Route path="/payment-success" element={<PaymentSuccess />} />
+                <Route path="/invoices" element={
+                  <ProtectedRoute>
+                    <InvoiceHistory />
+                  </ProtectedRoute>
+                } />
         </Routes>
         <Footer />
       </main>

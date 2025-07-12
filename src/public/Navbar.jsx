@@ -45,27 +45,24 @@ export default function Navbar({ onHamburgerClick }) {
           <span style={{ fontSize: '1.7em', marginRight: 10 }} role="img" aria-label="logo">🚛</span>
           Morres Logistics
         </Link>
-        {/* Hamburger for dashboard/internal routes only */}
-        {!isPublic && (
-          <button
-            className="navbar-toggler ms-3 d-lg-none"
-            type="button"
-            onClick={onHamburgerClick}
-            aria-expanded={!isNavCollapsed}
-            aria-label="Toggle navigation"
-            style={{
-              border: '2px solid #EBD3AD',
-              borderRadius: '0.75rem',
-              boxShadow: '0 2px 8px rgba(235, 211, 173, 0.12)',
-              padding: '0.6em 1em',
-              background: 'transparent',
-              transition: 'background 0.2s, box-shadow 0.2s',
-              outline: 'none',
-            }}
-          >
-            <span className="navbar-toggler-icon"></span>
-          </button>
-        )}
+        {/* Hamburger always visible on mobile */}
+        <button
+          className="navbar-toggler ms-3 d-lg-none"
+          type="button"
+          onClick={onHamburgerClick}
+          aria-label="Toggle navigation"
+          style={{
+            border: '2px solid #EBD3AD',
+            borderRadius: '0.75rem',
+            boxShadow: '0 2px 8px rgba(235, 211, 173, 0.12)',
+            padding: '0.6em 1em',
+            background: 'transparent',
+            transition: 'background 0.2s, box-shadow 0.2s',
+            outline: 'none',
+          }}
+        >
+          <span className="navbar-toggler-icon"></span>
+        </button>
       </div>
       <div className="d-flex align-items-center">
         {isPublic ? (
