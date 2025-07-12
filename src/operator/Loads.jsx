@@ -105,9 +105,17 @@ export default function Loads() {
 
   return (
     <div className="container py-4">
+      <style>{`
+        @media (max-width: 600px) {
+          .loads-table th, .loads-table td { font-size: 0.93em; padding: 0.4em 0.3em; }
+          .loads-table th { position: sticky; top: 0; background: #f8f9fa; z-index: 2; }
+          .loads-table { min-width: 700px; }
+          .loads-card { display: block; margin-bottom: 1rem; border-radius: 0.5rem; box-shadow: 0 1px 4px rgba(31,33,32,0.07); border: 1px solid #eee; background: #fff; }
+        }
+      `}</style>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2 className="fw-bold mb-0" style={{ color: '#1F2120' }}>Loads</h2>
-        <button className="btn btn-primary fw-bold" style={{ background: '#1F2120', border: 'none', color: '#EBD3AD' }} onClick={() => setShowCreateModal(true)}>
+        <button className="btn btn-primary fw-bold" style={{ background: '#1F2120', border: 'none', color: '#EBD3AD', fontSize: '1.1em', padding: '0.5em 1.2em' }} onClick={() => setShowCreateModal(true)}>
           Dispatch New Load
         </button>
       </div>
@@ -120,12 +128,13 @@ export default function Loads() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             aria-label="Search loads"
+            style={{ fontSize: '1em' }}
           />
-          <button className="btn btn-outline-secondary" type="submit">Search</button>
+          <button className="btn btn-outline-secondary" type="submit" style={{ fontSize: '1em' }}>Search</button>
         </div>
-        <div className="mt-2 d-flex align-items-center gap-2">
+        <div className="mt-2 d-flex align-items-center gap-2 flex-wrap">
           <label htmlFor="statusFilter" className="form-label mb-0 me-2 small">Status:</label>
-          <select id="statusFilter" className="form-select form-select-sm" style={{width:'auto'}} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
+          <select id="statusFilter" className="form-select form-select-sm" style={{width:'auto', fontSize:'1em'}} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
             <option value="">All</option>
             <option value="Pending">Pending</option>
             <option value="Active">Active</option>
@@ -141,7 +150,7 @@ export default function Loads() {
         <>
           <div className="modal-backdrop fade show" onClick={() => setShowCreateModal(false)}></div>
           <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" role="dialog" aria-modal="true">
-            <div className="modal-dialog modal-lg modal-dialog-centered" role="document">
+            <div className="modal-dialog modal-lg modal-dialog-centered" role="document" style={{ maxWidth: '98vw' }}>
               <div className="modal-content">
                 <div className="modal-header">
                   <h5 className="modal-title">Dispatch New Load</h5>
@@ -166,7 +175,8 @@ export default function Loads() {
           </div>
         </>
       )}
-      <div className="card shadow-sm border-0">
+      {/* Responsive Table/Card Switch */}
+      <div className="card shadow-sm border-0 d-none d-sm-block">
         <div className="card-body p-0">
           {loading ? (
             <div className="p-4 text-center">Loading...</div>
@@ -174,7 +184,7 @@ export default function Loads() {
             <div className="alert alert-danger m-3">{error}</div>
           ) : (
             <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
+              <table className="table table-hover align-middle mb-0 loads-table">
                 <thead className="table-light">
                   <tr>
                     <th>Tracking ID</th>
@@ -218,8 +228,8 @@ export default function Loads() {
                             ) : ''}
                           </td>
                           <td>
-                            <button className="btn btn-sm btn-outline-primary me-2" onClick={() => navigate(`/track-delivery?id=${delivery.trackingId}`)} aria-label="Track delivery">Track</button>
-                            <button className="btn btn-sm btn-outline-secondary" onClick={() => navigate(`/dashboard?delivery=${delivery.trackingId}`)} aria-label="View delivery">View</button>
+                            <button className="btn btn-sm btn-outline-primary me-2" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/track-delivery?id=${delivery.trackingId}`)} aria-label="Track delivery">Track</button>
+                            <button className="btn btn-sm btn-outline-secondary" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/dashboard?delivery=${delivery.trackingId}`)} aria-label="View delivery">View</button>
                           </td>
                         </tr>
                       ))
@@ -230,14 +240,50 @@ export default function Loads() {
           )}
         </div>
       </div>
+      {/* Mobile Card View */}
+      <div className="d-block d-sm-none">
+        {loading ? (
+          <div className="p-4 text-center">Loading...</div>
+        ) : error ? (
+          <div className="alert alert-danger m-3">{error}</div>
+        ) : deliveries.length === 0 ? (
+          <div className="text-center text-muted py-5">
+            <div className="mb-2" style={{fontSize:'2rem'}}>&#128230;</div>
+            <div>No loads found. Try adjusting your search or filters.</div>
+          </div>
+        ) : (
+          deliveries
+            .filter(delivery => !statusFilter || delivery.currentStatus === statusFilter)
+            .map(delivery => (
+              <div key={delivery.trackingId} className="loads-card p-3 mb-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <div>
+                    <span className="fw-bold" style={{color:'#1F2120',fontSize:'1.1em'}}>{delivery.trackingId}</span>
+                    <span className="ms-2">{statusBadge(delivery.currentStatus)}</span>
+                  </div>
+                  <button className="btn btn-sm btn-outline-primary" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/track-delivery?id=${delivery.trackingId}`)} aria-label="Track delivery">Track</button>
+                </div>
+                <div className="mb-1"><strong>Customer:</strong> <span style={{color:'#1e40af'}}>{delivery.customerName}</span></div>
+                <div className="mb-1"><strong>Consignment:</strong> {delivery.parentBookingId}</div>
+                <div className="mb-1"><strong>Tonnage:</strong> {delivery.tonnage} | <strong>Containers:</strong> {delivery.containerCount}</div>
+                <div className="mb-1"><strong>Driver:</strong> {delivery.driverDetails?.name}</div>
+                <div className="mb-1"><strong>Created:</strong> {delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : ''}</div>
+                <div className="d-flex gap-2 mt-2">
+                  <button className="btn btn-outline-secondary w-50" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/dashboard?delivery=${delivery.trackingId}`)} aria-label="View delivery">View</button>
+                  <button className="btn btn-outline-primary w-50" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/track-delivery?id=${delivery.trackingId}`)} aria-label="Track delivery">Track</button>
+                </div>
+              </div>
+            ))
+        )}
+      </div>
       <div className="d-flex justify-content-between align-items-center mt-3">
         <div>
           Showing {Math.min((page - 1) * pageSize + 1, total)}-
           {Math.min(page * pageSize, total)} of {total}
         </div>
         <div>
-          <button className="btn btn-sm btn-outline-secondary me-2" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Prev</button>
-          <button className="btn btn-sm btn-outline-secondary" disabled={page * pageSize >= total} onClick={() => setPage(p => p + 1)}>Next</button>
+          <button className="btn btn-sm btn-outline-secondary me-2" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{fontSize:'1em',padding:'0.4em 0.8em'}}>Prev</button>
+          <button className="btn btn-sm btn-outline-secondary" disabled={page * pageSize >= total} onClick={() => setPage(p => p + 1)} style={{fontSize:'1em',padding:'0.4em 0.8em'}}>Next</button>
         </div>
       </div>
     </div>

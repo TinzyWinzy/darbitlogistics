@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import React from 'react'; // Added for useEffect
 
 function formatDate(date) {
   if (!date) return '-';
@@ -24,6 +25,18 @@ function exportToCSV(customers, columns) {
   a.download = 'customers.csv';
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// Responsive helper
+function useIsMobile() {
+  if (typeof window === 'undefined') return false;
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 600);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
 }
 
 /**
@@ -122,78 +135,108 @@ export default function CustomerList({ parentBookings = [], deliveries = [] }) {
   // Columns for export
   const exportColumns = ['name', 'phone', 'email', 'bookings', 'loads', 'totalTonnage', 'lastBooking', 'lastLoad', 'status'];
 
+  const isMobile = useIsMobile();
+
   return (
     <div className="container py-4">
       <h2 className="fw-bold mb-4" style={{ color: '#1F2120' }}>Customers</h2>
-      <div className="mb-3 d-flex flex-wrap gap-2 align-items-end">
+      {/* Controls: stack on mobile */}
+      <div className={`mb-3 d-flex ${isMobile ? 'flex-column gap-2 align-items-stretch' : 'flex-wrap gap-2 align-items-end'}`}>        
         <input
           type="text"
           className="form-control"
-          style={{ maxWidth: 240 }}
+          style={isMobile ? { width: '100%' } : { maxWidth: 240 }}
           placeholder="Search by name, phone, or email..."
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1); }}
         />
-        <button className="btn btn-outline-primary" onClick={() => exportToCSV(filtered, exportColumns)}>Export CSV</button>
+        <button className="btn btn-outline-primary" style={isMobile ? { width: '100%', fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => exportToCSV(filtered, exportColumns)}>Export CSV</button>
       </div>
+      {/* Table for desktop, cards for mobile */}
       <div className="card shadow-sm border-0">
         <div className="card-body p-0">
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('name'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Name</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('phone'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Phone</th>
-                  <th>Email</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('bookings'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Bookings</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('loads'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Loads</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('totalTonnage'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Total Tonnage</th>
-                  <th>Last Booking</th>
-                  <th>Last Load</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paged.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center text-muted">No customers found.</td></tr>
-                ) : (
-                  paged.map(c => (
-                    <tr key={c.id}>
-                      <td>{highlight(c.name, search)}</td>
-                      <td>{highlight(c.phone, search)}</td>
-                      <td>{highlight(c.email || '-', search)}</td>
-                      <td>{c.bookings.length}</td>
-                      <td>{c.loads.length}</td>
-                      <td>{c.totalTonnage.toFixed(2)}</td>
-                      <td>{formatDate(c.lastBooking)}</td>
-                      <td>{formatDate(c.lastLoad)}</td>
-                      <td><span className={`badge bg-${c.status === 'active' ? 'success' : 'secondary'}`}>{c.status}</span></td>
-                      <td><button className="btn btn-sm btn-outline-info" onClick={() => setModal(c)}>View Details</button></td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          {/* Pagination */}
+          {isMobile ? (
+            <div>
+              {paged.length === 0 ? (
+                <div className="text-center text-muted py-4">No customers found.</div>
+              ) : (
+                paged.map(c => (
+                  <div key={c.id} className="mb-3 p-3 rounded shadow-sm bg-white" style={{ border: '1px solid #eee' }}>
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <div>
+                        <div className="fw-bold" style={{ fontSize: '1.1em' }}>{highlight(c.name, search)}</div>
+                        <div className="text-muted small">{highlight(c.phone, search)}</div>
+                      </div>
+                      <span className={`badge bg-${c.status === 'active' ? 'success' : 'secondary'}`}>{c.status}</span>
+                    </div>
+                    <div className="d-flex flex-wrap gap-2 mb-2">
+                      <span className="badge bg-light text-dark border">Bookings: {c.bookings.length}</span>
+                      <span className="badge bg-light text-dark border">Loads: {c.loads.length}</span>
+                      <span className="badge bg-light text-dark border">Tonnage: {c.totalTonnage.toFixed(2)}</span>
+                    </div>
+                    <button className="btn btn-outline-info w-100" style={{ fontSize: '1em', padding: '0.6em' }} onClick={() => setModal(c)}>View Details</button>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('name'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Name</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('phone'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Phone</th>
+                    <th>Email</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('bookings'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Bookings</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('loads'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Loads</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('totalTonnage'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Total Tonnage</th>
+                    <th>Last Booking</th>
+                    <th>Last Load</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.length === 0 ? (
+                    <tr><td colSpan={10} className="text-center text-muted">No customers found.</td></tr>
+                  ) : (
+                    paged.map(c => (
+                      <tr key={c.id}>
+                        <td>{highlight(c.name, search)}</td>
+                        <td>{highlight(c.phone, search)}</td>
+                        <td>{highlight(c.email || '-', search)}</td>
+                        <td>{c.bookings.length}</td>
+                        <td>{c.loads.length}</td>
+                        <td>{c.totalTonnage.toFixed(2)}</td>
+                        <td>{formatDate(c.lastBooking)}</td>
+                        <td>{formatDate(c.lastLoad)}</td>
+                        <td><span className={`badge bg-${c.status === 'active' ? 'success' : 'secondary'}`}>{c.status}</span></td>
+                        <td><button className="btn btn-sm btn-outline-info" onClick={() => setModal(c)}>View Details</button></td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {/* Pagination: sticky and touch-friendly on mobile */}
           {totalPages > 1 && (
-            <nav className="mt-3">
-              <ul className="pagination justify-content-center">
-                <li className={`page-item${page === 1 ? ' disabled' : ''}`}><button className="page-link" onClick={() => setPage(page - 1)}>&laquo;</button></li>
+            <nav className={isMobile ? 'mt-2 position-sticky bottom-0 bg-white py-2' : 'mt-3'} style={isMobile ? { zIndex: 10 } : {}}>
+              <ul className={`pagination justify-content-center ${isMobile ? 'mb-0' : ''}`} style={isMobile ? { fontSize: '1.2em' } : {}}>
+                <li className={`page-item${page === 1 ? ' disabled' : ''}`}><button className="page-link" style={isMobile ? { minWidth: 44, minHeight: 44 } : {}} onClick={() => setPage(page - 1)}>&laquo;</button></li>
                 {Array.from({ length: totalPages }, (_, i) => (
-                  <li key={i + 1} className={`page-item${page === i + 1 ? ' active' : ''}`}><button className="page-link" onClick={() => setPage(i + 1)}>{i + 1}</button></li>
+                  <li key={i + 1} className={`page-item${page === i + 1 ? ' active' : ''}`}><button className="page-link" style={isMobile ? { minWidth: 44, minHeight: 44 } : {}} onClick={() => setPage(i + 1)}>{i + 1}</button></li>
                 ))}
-                <li className={`page-item${page === totalPages ? ' disabled' : ''}`}><button className="page-link" onClick={() => setPage(page + 1)}>&raquo;</button></li>
+                <li className={`page-item${page === totalPages ? ' disabled' : ''}`}><button className="page-link" style={isMobile ? { minWidth: 44, minHeight: 44 } : {}} onClick={() => setPage(page + 1)}>&raquo;</button></li>
               </ul>
             </nav>
           )}
         </div>
       </div>
-      {/* Details Modal */}
+      {/* Details Modal: full-screen on mobile */}
       {modal && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
-          <div className="modal-dialog modal-lg">
+          <div className={isMobile ? 'modal-dialog modal-fullscreen' : 'modal-dialog modal-lg'}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Customer Details: {modal.name}</h5>
@@ -244,12 +287,18 @@ export default function CustomerList({ parentBookings = [], deliveries = [] }) {
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setModal(null)}>Close</button>
+                <button className="btn btn-secondary w-100" style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setModal(null)}>Close</button>
               </div>
             </div>
           </div>
         </div>
       )}
+      {/* Mobile-specific styles */}
+      <style>{`
+        @media (max-width: 600px) {
+          .modal-fullscreen { max-width: 100vw !important; margin: 0; }
+        }
+      `}</style>
     </div>
   );
 } 

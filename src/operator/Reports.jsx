@@ -37,6 +37,18 @@ function sumBy(array, key) {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28CFF', '#FF6F91', '#6FCF97', '#F2994A'];
 
+// Responsive helper
+function useIsMobile() {
+  if (typeof window === 'undefined') return false;
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 600);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
 export default function Reports() {
   const { deliveries, loading } = useDeliveries();
   const [search, setSearch] = useState('');
@@ -92,6 +104,14 @@ export default function Reports() {
   const [loadingScheduled, setLoadingScheduled] = useState(false);
   const [editReport, setEditReport] = useState(null);
   const [deleteReport, setDeleteReport] = useState(null);
+  const [notification, setNotification] = useState({ show: false, type: '', message: '' });
+  const notificationTimeout = useRef();
+
+  function showNotification(type, message) {
+    setNotification({ show: true, type, message });
+    clearTimeout(notificationTimeout.current);
+    notificationTimeout.current = setTimeout(() => setNotification({ show: false, type: '', message: '' }), 3500);
+  }
 
   // Fetch scheduled reports
   useEffect(() => {
@@ -110,7 +130,6 @@ export default function Reports() {
 
   async function handleScheduleSubmit() {
     setShowScheduleModal(false);
-    // Mock API call
     const payload = {
       recipients: scheduleRecipients.split(',').map(e => e.trim()).filter(Boolean),
       schedule: scheduleType,
@@ -120,24 +139,33 @@ export default function Reports() {
       columns: scheduleColumns,
       filters: scheduleReportType === 'filtered' ? {/* TODO: add current filters */} : undefined,
     };
-    // Replace with real API call
-    await fetch('/api/reports/schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    alert('Scheduled report created!');
+    try {
+      await scheduledReportApi.create(payload);
+      showNotification('success', 'Scheduled report created!');
+    } catch (err) {
+      showNotification('danger', 'Failed to create scheduled report.');
+    }
   }
 
   async function handleDeleteReport(id) {
-    await scheduledReportApi.delete(id);
-    setScheduledReports(scheduledReports.filter(r => r.id !== id));
-    setDeleteReport(null);
+    try {
+      await scheduledReportApi.delete(id);
+      setScheduledReports(scheduledReports.filter(r => r.id !== id));
+      setDeleteReport(null);
+      showNotification('success', 'Scheduled report deleted.');
+    } catch (err) {
+      showNotification('danger', 'Failed to delete scheduled report.');
+    }
   }
 
   async function handlePauseResume(report) {
-    await scheduledReportApi.update(report.id, { ...report, status: report.status === 'active' ? 'paused' : 'active' });
-    setScheduledReports(scheduledReports.map(r => r.id === report.id ? { ...r, status: r.status === 'active' ? 'paused' : 'active' } : r));
+    try {
+      await scheduledReportApi.update(report.id, { ...report, status: report.status === 'active' ? 'paused' : 'active' });
+      setScheduledReports(scheduledReports.map(r => r.id === report.id ? { ...r, status: r.status === 'active' ? 'paused' : 'active' } : r));
+      showNotification('info', `Report ${report.status === 'active' ? 'paused' : 'resumed'}.`);
+    } catch (err) {
+      showNotification('danger', 'Failed to update report status.');
+    }
   }
 
   // Unique options
@@ -230,43 +258,69 @@ export default function Reports() {
     pdf.save('morres_report.pdf');
   };
 
+  const isMobile = useIsMobile();
+  // Pagination for mobile card view
+  const [mobilePage, setMobilePage] = useState(1);
+  const mobilePageSize = 10;
+  const mobileTotalPages = Math.ceil(filtered.length / mobilePageSize);
+  const mobilePaged = isMobile ? filtered.slice((mobilePage - 1) * mobilePageSize, mobilePage * mobilePageSize) : filtered;
+
+  // Pagination for mobile scheduled reports
+  const [schedPage, setSchedPage] = useState(1);
+  const schedPageSize = 10;
+  const schedTotalPages = Math.ceil(scheduledReports.length / schedPageSize);
+  const schedPaged = isMobile ? scheduledReports.slice((schedPage - 1) * schedPageSize, schedPage * schedPageSize) : scheduledReports;
+
   return (
     <div className="container py-5">
+      {/* Notification Toast */}
+      {notification.show && (
+        <div className={`toast show position-fixed top-0 end-0 m-4`} style={{ zIndex: 9999, minWidth: 220 }} role="alert" aria-live="assertive" aria-atomic="true">
+          <div className={`toast-header bg-${notification.type} text-white`}>
+            <strong className="me-auto">{notification.type === 'success' ? 'Success' : notification.type === 'danger' ? 'Error' : 'Info'}</strong>
+            <button type="button" className="btn-close btn-close-white" onClick={() => setNotification({ show: false, type: '', message: '' })} aria-label="Close"></button>
+          </div>
+          <div className="toast-body">{notification.message}</div>
+        </div>
+      )}
       <h2 className="fw-bold mb-4">Reports</h2>
-      <div className="mb-3 d-flex flex-wrap gap-2 align-items-end">
-        <input type="text" className="form-control" style={{ maxWidth: 200 }} placeholder="Search by tracking ID or customer" value={search} onChange={e => setSearch(e.target.value)} />
-        <select className="form-select" style={{ maxWidth: 160 }} value={status} onChange={e => setStatus(e.target.value)}>
+      {/* Filters: stack vertically on mobile */}
+      <div className={`mb-3 d-flex ${isMobile ? 'flex-column gap-2 align-items-stretch' : 'flex-wrap gap-2 align-items-end'}`}>        
+        <input type="text" className="form-control" style={isMobile ? { width: '100%' } : { maxWidth: 200 }} placeholder="Search by tracking ID or customer" value={search} onChange={e => setSearch(e.target.value)} />
+        <select className="form-select" style={isMobile ? { width: '100%' } : { maxWidth: 160 }} value={status} onChange={e => setStatus(e.target.value)}>
           <option value="">All Statuses</option>
           {uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <div style={{ minWidth: 200 }}>
+        <div style={isMobile ? { width: '100%' } : { minWidth: 200 }}>
           <Select
             isMulti
             options={uniqueCustomers.map(c => ({ value: c, label: c }))}
             value={customer.map(c => ({ value: c, label: c }))}
             onChange={opts => setCustomer(opts.map(o => o.value))}
             placeholder="Select customers"
+            styles={isMobile ? { container: base => ({ ...base, width: '100%' }) } : {}}
           />
         </div>
-        <div style={{ minWidth: 200 }}>
+        <div style={isMobile ? { width: '100%' } : { minWidth: 200 }}>
           <Select
             isMulti
             options={uniqueMinerals.map(m => ({ value: m, label: m }))}
             value={mineral.map(m => ({ value: m, label: m }))}
             onChange={opts => setMineral(opts.map(o => o.value))}
             placeholder="Select minerals"
+            styles={isMobile ? { container: base => ({ ...base, width: '100%' }) } : {}}
           />
         </div>
-        <input type="date" className="form-control" style={{ maxWidth: 160 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-        <input type="date" className="form-control" style={{ maxWidth: 160 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-        <button className="btn btn-primary ms-auto" onClick={() => setShowCsvModal(true)}>Export CSV</button>
-        <button className="btn btn-outline-secondary" onClick={() => setShowPdfModal(true)}>Export PDF</button>
-        <button className="btn btn-outline-success" onClick={() => setShowScheduleModal(true)}>Schedule Email Report</button>
+        <input type="date" className="form-control" style={isMobile ? { width: '100%' } : { maxWidth: 160 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        <input type="date" className="form-control" style={isMobile ? { width: '100%' } : { maxWidth: 160 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        <button className="btn btn-primary" style={isMobile ? { width: '100%', fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setShowCsvModal(true)}>Export CSV</button>
+        <button className="btn btn-outline-secondary" style={isMobile ? { width: '100%', fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setShowPdfModal(true)}>Export PDF</button>
+        <button className="btn btn-outline-success" style={isMobile ? { width: '100%', fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setShowScheduleModal(true)}>Schedule Email Report</button>
       </div>
-      {/* CSV Export Modal */}
+      {/* CSV Export Modal: full-screen on mobile */}
       {showCsvModal && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
-          <div className="modal-dialog">
+          <div className={isMobile ? 'modal-dialog modal-fullscreen' : 'modal-dialog'}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Export CSV</h5>
@@ -296,9 +350,10 @@ export default function Reports() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowCsvModal(false)}>Cancel</button>
+                <button className="btn btn-secondary w-100" style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setShowCsvModal(false)}>Cancel</button>
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-primary w-100"
+                  style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}}
                   onClick={() => {
                     setShowCsvModal(false);
                     exportToCSV(filtered, csvColumns);
@@ -312,10 +367,10 @@ export default function Reports() {
           </div>
         </div>
       )}
-      {/* PDF Export Modal */}
+      {/* PDF Export Modal: full-screen on mobile */}
       {showPdfModal && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
-          <div className="modal-dialog">
+          <div className={isMobile ? 'modal-dialog modal-fullscreen' : 'modal-dialog'}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Export PDF</h5>
@@ -325,17 +380,17 @@ export default function Reports() {
                 <p>This will export the current charts and table as a branded PDF report.</p>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowPdfModal(false)}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleExportPDF}>Export PDF</button>
+                <button className="btn btn-secondary w-100" style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setShowPdfModal(false)}>Cancel</button>
+                <button className="btn btn-primary w-100" style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}} onClick={handleExportPDF}>Export PDF</button>
               </div>
             </div>
           </div>
         </div>
       )}
-      {/* Schedule Email Report Modal */}
+      {/* Schedule Email Report Modal: full-screen on mobile */}
       {showScheduleModal && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
-          <div className="modal-dialog">
+          <div className={isMobile ? 'modal-dialog modal-fullscreen' : 'modal-dialog'}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Schedule Email Report</h5>
@@ -394,9 +449,10 @@ export default function Reports() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowScheduleModal(false)}>Cancel</button>
+                <button className="btn btn-secondary w-100" style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setShowScheduleModal(false)}>Cancel</button>
                 <button
-                  className="btn btn-success"
+                  className="btn btn-success w-100"
+                  style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}}
                   onClick={handleScheduleSubmit}
                   disabled={!scheduleRecipients || scheduleColumns.length === 0}
                 >
@@ -409,8 +465,71 @@ export default function Reports() {
       )}
       {/* Report Content for PDF Export */}
       <div ref={reportRef}>
-        {/* Charts Section */}
-        <div className="row mb-4 g-3">
+        {/* Charts Section: single column on mobile */}
+        <div className={isMobile ? 'mb-4' : 'row mb-4 g-3'}>
+          {isMobile ? (
+            <>
+              <div className="mb-3">
+                <div className="card h-100 shadow-sm">
+                  <div className="card-body">
+                    <h6 className="fw-bold mb-3">Deliveries Over Time</h6>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={deliveriesOverTime} onClick={e => e && e.activeLabel && handleDrilldown('month', e.activeLabel)}>
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="count" fill="#0088FE" name="Deliveries" />
+                        <Bar dataKey="tonnage" fill="#00C49F" name="Tonnage" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+              <div className="mb-3">
+                <div className="card h-100 shadow-sm">
+                  <div className="card-body">
+                    <h6 className="fw-bold mb-3">Tonnage by Mineral</h6>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={tonnageByMineral}
+                          dataKey="tonnage"
+                          nameKey="mineral"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={70}
+                          label
+                          onClick={(_, i) => handleDrilldown('mineral', tonnageByMineral[i]?.mineral)}
+                        >
+                          {tonnageByMineral.map((entry, i) => <Cell key={entry.mineral} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+              <div className="mb-3">
+                <div className="card h-100 shadow-sm">
+                  <div className="card-body">
+                    <h6 className="fw-bold mb-3">Top Customers (Tonnage)</h6>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={topCustomers} layout="vertical" onClick={e => e && e.activeLabel && handleDrilldown('customer', e.activeLabel)}>
+                        <XAxis type="number" dataKey="tonnage" />
+                        <YAxis type="category" dataKey="customer" width={90} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="tonnage" fill="#FF8042" name="Tonnage" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
           <div className="col-md-6">
             <div className="card h-100 shadow-sm">
               <div className="card-body">
@@ -469,14 +588,41 @@ export default function Reports() {
               </div>
             </div>
           </div>
+            </>
+          )}
         </div>
-        {/* Table Section */}
+        {/* Data Section: Card/List on mobile, table on desktop */}
         <div className="card shadow-sm border-0">
           <div className="card-body p-0">
             {loading ? <div className="p-4 text-center">Loading...</div> : (
-              <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0">
-                  <thead className="table-light">
+              isMobile ? (
+                filtered.length === 0 ? (
+                  <div className="text-center text-muted py-4">No deliveries found.</div>
+                ) : (
+                  <>
+                    <div>
+                      {mobilePaged.map(d => (
+                        <DeliveryCard key={d.trackingId} delivery={d} onShowDetails={() => setDrilldown({ type: 'row', value: d.trackingId, details: [d] })} />
+                      ))}
+                    </div>
+                    {/* Mobile Pagination */}
+                    {mobileTotalPages > 1 && (
+                      <nav className="mt-2 position-sticky bottom-0 bg-white py-2" style={{ zIndex: 10 }}>
+                        <ul className="pagination justify-content-center mb-0" style={{ fontSize: '1.2em' }}>
+                          <li className={`page-item${mobilePage === 1 ? ' disabled' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setMobilePage(mobilePage - 1)}>&laquo;</button></li>
+                          {Array.from({ length: mobileTotalPages }, (_, i) => (
+                            <li key={i + 1} className={`page-item${mobilePage === i + 1 ? ' active' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setMobilePage(i + 1)}>{i + 1}</button></li>
+                          ))}
+                          <li className={`page-item${mobilePage === mobileTotalPages ? ' disabled' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setMobilePage(mobilePage + 1)}>&raquo;</button></li>
+                        </ul>
+                      </nav>
+                    )}
+                  </>
+                )
+              ) : (
+                <div className="table-responsive" style={isMobile ? { overflowX: 'auto' } : {}}>
+                  <table className="table table-hover align-middle mb-0" style={isMobile ? { minWidth: 600, fontSize: '1em' } : {}}>
+                    <thead className="table-light" style={isMobile ? { position: 'sticky', top: 0, zIndex: 2 } : {}}>
                     <tr>
                       <th>Tracking ID</th>
                       <th>Customer</th>
@@ -492,7 +638,7 @@ export default function Reports() {
                       <tr><td colSpan={7} className="text-center text-muted">No deliveries found.</td></tr>
                     ) : (
                       filtered.map(d => (
-                        <tr key={d.trackingId} style={{ cursor: 'pointer' }} onClick={() => setDrilldown({ type: 'row', value: d.trackingId, details: [d] })}>
+                          <tr key={d.trackingId} style={{ cursor: 'pointer', height: isMobile ? 56 : undefined }} onClick={() => setDrilldown({ type: 'row', value: d.trackingId, details: [d] })}>
                           <td>{d.trackingId}</td>
                           <td>{d.customerName}</td>
                           <td>{d.currentStatus}</td>
@@ -506,14 +652,15 @@ export default function Reports() {
                   </tbody>
                 </table>
               </div>
+              )
             )}
           </div>
         </div>
       </div>
-      {/* Drilldown Modal */}
+      {/* Drilldown Modal: full-screen on mobile */}
       {drilldown && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
-          <div className="modal-dialog modal-lg">
+          <div className={isMobile ? 'modal-dialog modal-fullscreen' : 'modal-dialog modal-lg'}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">{drilldown.type === 'row' ? 'Delivery Details' : `Details for ${drilldown.type}: ${drilldown.value}`}</h5>
@@ -552,7 +699,7 @@ export default function Reports() {
                 )}
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setDrilldown(null)}>Close</button>
+                <button className="btn btn-secondary w-100" style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setDrilldown(null)}>Close</button>
               </div>
             </div>
           </div>
@@ -561,49 +708,89 @@ export default function Reports() {
       <hr className="my-5" />
       <h4 className="fw-bold mb-3">Scheduled Reports</h4>
       {loadingScheduled ? <div>Loading scheduled reports...</div> : (
-        <div className="table-responsive">
-          <table className="table table-bordered">
-            <thead>
-              <tr>
-                <th>Recipients</th>
-                <th>Schedule</th>
-                <th>Day</th>
-                <th>Time</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Last Run</th>
-                <th>Next Run</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scheduledReports.length === 0 ? (
-                <tr><td colSpan={9} className="text-center text-muted">No scheduled reports.</td></tr>
-              ) : scheduledReports.map(r => (
-                <tr key={r.id}>
-                  <td>{r.recipients}</td>
-                  <td>{r.schedule_type}</td>
-                  <td>{r.day_of_week}</td>
-                  <td>{r.time}</td>
-                  <td>{r.report_type}</td>
-                  <td>{r.status}</td>
-                  <td>{r.last_run ? new Date(r.last_run).toLocaleString() : '-'}</td>
-                  <td>{r.next_run ? new Date(r.next_run).toLocaleString() : '-'}</td>
-                  <td>
-                    <button className="btn btn-sm btn-outline-primary me-1" onClick={() => setEditReport(r)}>Edit</button>
-                    <button className="btn btn-sm btn-outline-danger me-1" onClick={() => setDeleteReport(r)}>Delete</button>
-                    <button className="btn btn-sm btn-outline-secondary" onClick={() => handlePauseResume(r)}>{r.status === 'active' ? 'Pause' : 'Resume'}</button>
-                  </td>
+        isMobile ? (
+          schedPaged.length === 0 ? (
+            <div className="text-center text-muted py-4">No scheduled reports.</div>
+          ) : (
+            <>
+              <div>
+                {schedPaged.map(r => (
+                  <div key={r.id} className="delivery-card mb-3">
+                    <div className="delivery-card-header">
+                      <span className="delivery-card-key">{Array.isArray(r.recipients) ? r.recipients.join(', ') : r.recipients}</span>
+                      <span className="delivery-card-status">{r.status}</span>
+                    </div>
+                    <div className="mb-1 text-muted small">{r.schedule_type} &bull; {r.day_of_week} &bull; {r.time}</div>
+                    <div className="mb-1"><strong>Type:</strong> {r.report_type}</div>
+                    <div className="mb-1"><strong>Last Run:</strong> {r.last_run ? new Date(r.last_run).toLocaleString() : '-'}</div>
+                    <div className="mb-1"><strong>Next Run:</strong> {r.next_run ? new Date(r.next_run).toLocaleString() : '-'}</div>
+                    <div className="d-flex gap-2 mt-2">
+                      <button className="btn btn-sm btn-outline-primary flex-fill" onClick={() => setEditReport(r)}>Edit</button>
+                      <button className="btn btn-sm btn-outline-danger flex-fill" onClick={() => setDeleteReport(r)}>Delete</button>
+                      <button className="btn btn-sm btn-outline-secondary flex-fill" onClick={() => handlePauseResume(r)}>{r.status === 'active' ? 'Pause' : 'Resume'}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Mobile Pagination for scheduled reports */}
+              {schedTotalPages > 1 && (
+                <nav className="mt-2 position-sticky bottom-0 bg-white py-2" style={{ zIndex: 10 }}>
+                  <ul className="pagination justify-content-center mb-0" style={{ fontSize: '1.2em' }}>
+                    <li className={`page-item${schedPage === 1 ? ' disabled' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setSchedPage(schedPage - 1)}>&laquo;</button></li>
+                    {Array.from({ length: schedTotalPages }, (_, i) => (
+                      <li key={i + 1} className={`page-item${schedPage === i + 1 ? ' active' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setSchedPage(i + 1)}>{i + 1}</button></li>
+                    ))}
+                    <li className={`page-item${schedPage === schedTotalPages ? ' disabled' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setSchedPage(schedPage + 1)}>&raquo;</button></li>
+                  </ul>
+                </nav>
+              )}
+            </>
+          )
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-bordered">
+              <thead>
+                <tr>
+                  <th>Recipients</th>
+                  <th>Schedule</th>
+                  <th>Day</th>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Last Run</th>
+                  <th>Next Run</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {scheduledReports.length === 0 ? (
+                  <tr><td colSpan={9} className="text-center text-muted">No scheduled reports.</td></tr>
+                ) : scheduledReports.map(r => (
+                  <tr key={r.id}>
+                    <td>{Array.isArray(r.recipients) ? r.recipients.join(', ') : r.recipients}</td>
+                    <td>{r.schedule_type}</td>
+                    <td>{r.day_of_week}</td>
+                    <td>{r.time}</td>
+                    <td>{r.report_type}</td>
+                    <td>{r.status}</td>
+                    <td>{r.last_run ? new Date(r.last_run).toLocaleString() : '-'}</td>
+                    <td>{r.next_run ? new Date(r.next_run).toLocaleString() : '-'}</td>
+                    <td>
+                      <button className="btn btn-sm btn-outline-primary me-1" onClick={() => setEditReport(r)}>Edit</button>
+                      <button className="btn btn-sm btn-outline-danger me-1" onClick={() => setDeleteReport(r)}>Delete</button>
+                      <button className="btn btn-sm btn-outline-secondary" onClick={() => handlePauseResume(r)}>{r.status === 'active' ? 'Pause' : 'Resume'}</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
-      {/* Delete confirmation modal */}
+      {/* Delete confirmation modal: full-screen on mobile */}
       {deleteReport && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
-          <div className="modal-dialog">
+          <div className={isMobile ? 'modal-dialog modal-fullscreen' : 'modal-dialog'}>
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Delete Scheduled Report</h5>
@@ -613,14 +800,62 @@ export default function Reports() {
                 <p>Are you sure you want to delete this scheduled report?</p>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setDeleteReport(null)}>Cancel</button>
-                <button className="btn btn-danger" onClick={() => handleDeleteReport(deleteReport.id)}>Delete</button>
+                <button className="btn btn-secondary w-100" style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setDeleteReport(null)}>Cancel</button>
+                <button className="btn btn-danger w-100" style={isMobile ? { fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => handleDeleteReport(deleteReport.id)}>Delete</button>
               </div>
             </div>
           </div>
         </div>
       )}
       {/* Edit modal (reuse schedule modal, pre-fill with editReport) - implementation can be added as needed */}
+      {/* Mobile-specific styles */}
+      <style>{`
+        @media (max-width: 600px) {
+          .modal-fullscreen { max-width: 100vw !important; margin: 0; }
+        }
+      `}</style>
+      {/* DeliveryCard component for mobile list view */}
+      {isMobile && (
+        <style>{`
+          .delivery-card { border: 1px solid #eee; border-radius: 8px; margin-bottom: 1rem; background: #fff; box-shadow: 0 1px 2px rgba(31,33,32,0.03); padding: 1rem; }
+          .delivery-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+          .delivery-card-key { font-weight: bold; color: #1F2120; }
+          .delivery-card-status { font-size: 0.97em; padding: 0.3em 0.7em; border-radius: 1em; background: #f3ede7; color: #333; }
+          .delivery-card-details { font-size: 0.97em; margin-top: 0.7em; border-top: 1px solid #f3ede7; padding-top: 0.7em; }
+        `}</style>
+      )}
+    </div>
+  );
+}
+
+// DeliveryCard: minimal, inline, no bloat
+function DeliveryCard({ delivery, onShowDetails }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="delivery-card">
+      <div className="delivery-card-header">
+        <span className="delivery-card-key">{delivery.trackingId}</span>
+        <span className="delivery-card-status">{delivery.currentStatus}</span>
+      </div>
+      <div className="mb-1 text-muted small">{delivery.customerName}</div>
+      <div className="d-flex flex-wrap gap-2 mb-2">
+        <span className="badge bg-light text-dark border">Tonnage: {delivery.tonnage}</span>
+        <span className="badge bg-light text-dark border">Containers: {delivery.containerCount}</span>
+        <span className="badge bg-light text-dark border">{delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : ''}</span>
+      </div>
+      <button className="btn btn-outline-info w-100" style={{ fontSize: '1em', padding: '0.6em' }} onClick={() => setShow(s => !s)}>{show ? 'Hide Details' : 'Details'}</button>
+      {show && (
+        <div className="delivery-card-details">
+          <div><strong>Mineral:</strong> {delivery.mineralType}</div>
+          <div><strong>Status:</strong> {delivery.currentStatus}</div>
+          <div><strong>Tracking ID:</strong> {delivery.trackingId}</div>
+          <div><strong>Customer:</strong> {delivery.customerName}</div>
+          <div><strong>Tonnage:</strong> {delivery.tonnage}</div>
+          <div><strong>Containers:</strong> {delivery.containerCount}</div>
+          <div><strong>Created At:</strong> {delivery.createdAt ? new Date(delivery.createdAt).toLocaleString() : ''}</div>
+          <button className="btn btn-sm btn-outline-secondary mt-2 w-100" onClick={onShowDetails}>Full Delivery Info</button>
+        </div>
+      )}
     </div>
   );
 } 
