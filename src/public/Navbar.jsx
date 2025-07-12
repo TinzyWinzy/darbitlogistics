@@ -3,6 +3,7 @@ import { useContext, useState } from 'react';
 import { AuthContext } from '../App';
 import { useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaCog, FaUserShield, FaSignOutAlt } from 'react-icons/fa';
+import Dropdown from 'react-bootstrap/Dropdown';
 
 export default function Navbar({ onHamburgerClick }) {
   const { user, setUser } = useContext(AuthContext);
@@ -89,60 +90,42 @@ export default function Navbar({ onHamburgerClick }) {
               )}
             </ul>
             {user && (
-              <div className="dropdown ms-3">
-                <button
-                  className="btn btn-link dropdown-toggle text-light d-flex align-items-center"
-                  type="button"
-                  id="userMenuButton"
-                  data-bs-toggle="dropdown"
-                  aria-expanded="false"
-                  style={{ color: '#EBD3AD', textDecoration: 'none' }}
-                >
+              <Dropdown align="end" className="ms-3">
+                <Dropdown.Toggle variant="link" className="text-light d-flex align-items-center" style={{ color: '#EBD3AD', textDecoration: 'none' }} id="userMenuButton">
                   <FaUserCircle className="me-2" size={24} />
                   <span className="fw-semibold">{user.name || user.email || 'User'}</span>
-                </button>
-                <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuButton">
-                  <li><Link className="dropdown-item d-flex align-items-center" to="#"><FaUserCircle className="me-2" /> Profile</Link></li>
-                  <li><Link className="dropdown-item d-flex align-items-center" to="#"><FaCog className="me-2" /> Settings</Link></li>
-                  {user.role === 'admin' && (
-                    <>
-                      <li><hr className="dropdown-divider" /></li>
-                      <li><Link className="dropdown-item d-flex align-items-center text-danger fw-bold" to="/admin/dashboard"><FaUserShield className="me-2" /> Admin</Link></li>
-                    </>
-                  )}
-                  <li><hr className="dropdown-divider" /></li>
-                  <li><button className="dropdown-item d-flex align-items-center" onClick={handleLogout}><FaSignOutAlt className="me-2" /> Logout</button></li>
-                </ul>
-              </div>
+                </Dropdown.Toggle>
+                <Dropdown.Menu>
+                  <Dropdown.Item as={Link} to="#" className="d-flex align-items-center"><FaUserCircle className="me-2" /> Profile</Dropdown.Item>
+                  <Dropdown.Item as={Link} to="#" className="d-flex align-items-center"><FaCog className="me-2" /> Settings</Dropdown.Item>
+                  {user.role === 'admin' && <>
+                    <Dropdown.Divider />
+                    <Dropdown.Item as={Link} to="/admin/dashboard" className="d-flex align-items-center text-danger fw-bold"><FaUserShield className="me-2" /> Admin</Dropdown.Item>
+                  </>}
+                  <Dropdown.Divider />
+                  <Dropdown.Item as="button" className="d-flex align-items-center" onClick={handleLogout}><FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
             )}
           </>
         ) : (
           user && (
-            <div className="dropdown">
-              <button
-                className="btn btn-link dropdown-toggle text-light d-flex align-items-center"
-                type="button"
-                id="userMenuButton"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-                style={{ color: '#EBD3AD', textDecoration: 'none' }}
-              >
+            <Dropdown align="end">
+              <Dropdown.Toggle variant="link" className="text-light d-flex align-items-center" style={{ color: '#EBD3AD', textDecoration: 'none' }} id="userMenuButton">
                 <FaUserCircle className="me-2" size={24} />
                 <span className="fw-semibold">{user.name || user.email || 'User'}</span>
-              </button>
-              <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuButton">
-                <li><Link className="dropdown-item d-flex align-items-center" to="#"><FaUserCircle className="me-2" /> Profile</Link></li>
-                <li><Link className="dropdown-item d-flex align-items-center" to="#"><FaCog className="me-2" /> Settings</Link></li>
-                {user.role === 'admin' && (
-                  <>
-                    <li><hr className="dropdown-divider" /></li>
-                    <li><Link className="dropdown-item d-flex align-items-center text-danger fw-bold" to="/admin/dashboard"><FaUserShield className="me-2" /> Admin</Link></li>
-                  </>
-                )}
-                <li><hr className="dropdown-divider" /></li>
-                <li><button className="dropdown-item d-flex align-items-center" onClick={handleLogout}><FaSignOutAlt className="me-2" /> Logout</button></li>
-              </ul>
-            </div>
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item as={Link} to="#" className="d-flex align-items-center"><FaUserCircle className="me-2" /> Profile</Dropdown.Item>
+                <Dropdown.Item as={Link} to="#" className="d-flex align-items-center"><FaCog className="me-2" /> Settings</Dropdown.Item>
+                {user.role === 'admin' && <>
+                  <Dropdown.Divider />
+                  <Dropdown.Item as={Link} to="/admin/dashboard" className="d-flex align-items-center text-danger fw-bold"><FaUserShield className="me-2" /> Admin</Dropdown.Item>
+                </>}
+                <Dropdown.Divider />
+                <Dropdown.Item as="button" className="d-flex align-items-center" onClick={handleLogout}><FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           )
         )}
         {/* Add the Plans link for logged-in users only */}
