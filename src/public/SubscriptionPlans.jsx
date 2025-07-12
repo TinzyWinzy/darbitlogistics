@@ -30,6 +30,7 @@ export default function SubscriptionPlans() {
   const [selectedTier, setSelectedTier] = useState(null);
   const [createMsg, setCreateMsg] = useState('');
   const [activeTab, setActiveTab] = useState('current');
+  const [loadingPlanId, setLoadingPlanId] = useState(null);
 
   useEffect(() => {
     if (!user) {
@@ -96,6 +97,28 @@ export default function SubscriptionPlans() {
 
   const handleRequestUpgrade = () => {
     window.location.href = 'mailto:sales@morreslogistics.com?subject=Subscription Upgrade Request';
+  };
+
+  const handleUpgrade = async (planId) => {
+    setLoadingPlanId(planId);
+    setError(null);
+    try {
+      const res = await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId }),
+      });
+      const data = await res.json();
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        setError('Payment initiation failed.');
+      }
+    } catch (e) {
+      setError('Payment initiation failed.');
+    } finally {
+      setLoadingPlanId(null);
+    }
   };
 
   // Tab content renderers

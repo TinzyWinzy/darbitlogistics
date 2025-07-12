@@ -1,8 +1,18 @@
 // This file is clean: no unused imports, no dead code, follows best practices.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { deliveryApi } from '../services/api';
 import DeliveryDispatchForm from './DeliveryDispatchForm';
 import { useNavigate } from 'react-router-dom';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+} from 'recharts';
 
 export default function Loads() {
   const [deliveries, setDeliveries] = useState([]);
@@ -103,6 +113,25 @@ export default function Loads() {
     return <span className={`badge bg-${map[status] || 'secondary'}`}>{status}</span>;
   };
 
+  // Compute summary data for Recharts: [{ date, [customer1]: count, [customer2]: count, ... }]
+  const chartData = useMemo(() => {
+    // Get all unique customers
+    const customers = Array.from(new Set(deliveries.map(d => d.customerName || 'Unknown')));
+    // Group by date
+    const grouped = {};
+    deliveries.forEach(delivery => {
+      const date = delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : 'Unknown';
+      const customer = delivery.customerName || 'Unknown';
+      if (!grouped[date]) grouped[date] = { date };
+      grouped[date][customer] = (grouped[date][customer] || 0) + 1;
+    });
+    // Return as array, sorted by date
+    return Object.values(grouped).sort((a, b) => new Date(a.date) - new Date(b.date));
+  }, [deliveries]);
+
+  const customerKeys = useMemo(() => Array.from(new Set(deliveries.map(d => d.customerName || 'Unknown'))), [deliveries]);
+  const colors = ['#1976d2', '#D2691E', '#16a34a', '#dc2626', '#6b7280', '#f59e42', '#8e24aa', '#0097a7', '#c62828', '#388e3c'];
+
   return (
     <div className="container py-4">
       <style>{`
@@ -175,6 +204,33 @@ export default function Loads() {
           </div>
         </>
       )}
+      {/* Loads summary graph with Recharts */}
+      <div className="mb-4">
+        <h5 className="fw-bold mb-2" style={{ color: '#1F2120' }}>Loads per Day by Customer</h5>
+        {chartData.length > 0 && customerKeys.length > 0 ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 30 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" fontSize={13} angle={-15} textAnchor="end" height={50} />
+              <YAxis allowDecimals={false} fontSize={13} />
+              <Tooltip cursor={{ fill: '#f3f3f3' }} />
+              <Legend verticalAlign="top" height={36} />
+              {customerKeys.map((customer, idx) => (
+                <Bar
+                  key={customer}
+                  dataKey={customer}
+                  stackId="a"
+                  fill={colors[idx % colors.length]}
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={true}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="text-muted small">No data to display.</div>
+        )}
+      </div>
       {/* Responsive Table/Card Switch */}
       <div className="card shadow-sm border-0 d-none d-sm-block">
         <div className="card-body p-0">

@@ -123,20 +123,7 @@ export default function OperatorDashboard() {
     loading: parentBookingsLoading, 
     error: parentBookingsError, 
     createParentBooking,
-    fetchParentBookings,
-    page: parentBookingsPage,
-    setPage: setParentBookingsPage,
-    pageSize: parentBookingsPageSize,
-    setPageSize: setParentBookingsPageSize,
-    total: parentBookingsTotal,
-    search: parentBookingsSearch,
-    setSearch: setParentBookingsSearch,
-    progressFilter,
-    setProgressFilter,
-    progressSort,
-    setProgressSort,
-    progressSortOrder,
-    setProgressSortOrder
+    fetchParentBookings
   } = useParentBookings();
 
   const [selectedId, setSelectedId] = useState('');
@@ -689,30 +676,16 @@ export default function OperatorDashboard() {
             parentBookings={parentBookings}
             loading={parentBookingsLoading}
             error={parentBookingsError}
-            selectedId={selectedId}
-            onSelectDelivery={(id) => setSelectedId(selectedId === id ? null : id)}
-            page={parentBookingsPage}
-            setPage={setParentBookingsPage}
-            pageSize={parentBookingsPageSize}
-            setPageSize={setParentBookingsPageSize}
-            total={parentBookingsTotal}
-            search={parentBookingsSearch}
-            setSearch={parentBookingsSearch => { setParentBookingsSearch(parentBookingsSearch); setParentBookingsPage(1); }}
-            progressFilter={progressFilter}
-            setProgressFilter={val => { setProgressFilter(val); setParentBookingsPage(1); }}
-            progressSort={progressSort}
-            setProgressSort={val => { setProgressSort(val); setParentBookingsPage(1); }}
-            progressSortOrder={progressSortOrder}
-            setProgressSortOrder={val => { setProgressSortOrder(val); setParentBookingsPage(1); }}
+            onSelectDelivery={setSelectedId}
           />
           {/* Highlight selected consignment visually (handled in ConsignmentMonitor if possible) */}
           {/* Pagination Controls for Deliveries */}
           <div className="d-flex justify-content-between align-items-center mt-3">
             <div className="small text-muted">
-              {parentBookingsTotal > 0 && (
+              {parentBookings.length > 0 && (
                 <span>
-                  Showing {Math.min((parentBookingsPage - 1) * parentBookingsPageSize + 1, parentBookingsTotal)}-
-                  {Math.min(parentBookingsPage * parentBookingsPageSize, parentBookingsTotal)} of {parentBookingsTotal} deliveries
+                  Showing {Math.min((page - 1) * pageSize + 1, total)}-
+                  {Math.min(page * pageSize, total)} of {total} deliveries
                 </span>
               )}
             </div>
@@ -720,20 +693,20 @@ export default function OperatorDashboard() {
               <button
                 className="btn fw-bold"
                 style={{ background: '#fff', border: '1px solid #1F2120', color: '#1F2120', borderRadius: '0.5rem', padding: '0.5rem 1.25rem' }}
-                onClick={() => setParentBookingsPage(parentBookingsPage - 1)}
-                disabled={parentBookingsPage === 1}
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
                 aria-label="Previous page"
               >
                 &laquo; Prev
               </button>
               <span className="mx-2 align-self-center small">
-                Page {parentBookingsPage} of {Math.max(1, Math.ceil(parentBookingsTotal / parentBookingsPageSize))}
+                Page {page} of {Math.max(1, Math.ceil(total / pageSize))}
               </span>
               <button
                 className="btn fw-bold"
                 style={{ background: '#fff', border: '1px solid #1F2120', color: '#1F2120', borderRadius: '0.5rem', padding: '0.5rem 1.25rem' }}
-                onClick={() => setParentBookingsPage(parentBookingsPage + 1)}
-                disabled={parentBookingsPage * parentBookingsPageSize >= parentBookingsTotal}
+                onClick={() => setPage(page + 1)}
+                disabled={page * pageSize >= total}
                 aria-label="Next page"
               >
                 Next &raquo;
@@ -743,10 +716,10 @@ export default function OperatorDashboard() {
               <select
                 className="form-select form-select-sm"
                 style={{ width: 'auto', display: 'inline-block' }}
-                value={parentBookingsPageSize}
+                value={pageSize}
                 onChange={e => {
-                  setParentBookingsPageSize(Number(e.target.value));
-                  setParentBookingsPage(1);
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
                 }}
                 aria-label="Select page size"
               >

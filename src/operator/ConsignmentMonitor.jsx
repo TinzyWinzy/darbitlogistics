@@ -50,16 +50,93 @@ const DELIVERY_STATUS_STEPS = [
   'Cancelled'
 ];
 
-const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSelectDelivery, page, setPage, pageSize, setPageSize, total, search, setSearch, progressFilter, setProgressFilter, progressSort, setProgressSort, progressSortOrder, setProgressSortOrder, customStatusFilter, setCustomStatusFilter, user }) => {
+const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery }) => {
+  // Internalize all control state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useState('');
+  const [progressFilter, setProgressFilter] = useState('all');
+  const [progressSort, setProgressSort] = useState('deadline');
+  const [progressSortOrder, setProgressSortOrder] = useState('asc');
+  const [customStatusFilter, setCustomStatusFilter] = useState('all');
+  const [selectedId, setSelectedId] = useState(null);
   const [openBookingId, setOpenBookingId] = useState(null);
 
-  // Clear all user-specific state on user change/logout
-  useEffect(() => {
-    if (!user) {
-      setOpenBookingId(null);
-      // Add any other user-specific state resets here if needed
+  // Filtering, sorting, and pagination logic
+  const filteredBookings = useMemo(() => {
+    let filtered = parentBookings;
+    if (search) {
+      filtered = filtered.filter(b =>
+        (b.customerName && b.customerName.toLowerCase().includes(search.toLowerCase())) ||
+        (b.trackingId && b.trackingId.toLowerCase().includes(search.toLowerCase()))
+      );
     }
-  }, [user]);
+    if (progressFilter !== 'all') {
+      filtered = filtered.filter(b => {
+        if (progressFilter === 'completed') return b.status === 'Completed';
+        if (progressFilter === 'in-progress') return b.status === 'Active' || b.status === 'In Transit';
+        if (progressFilter === 'not-started') return b.status === 'Pending';
+        if (progressFilter === 'overdue') return b.deadline && new Date(b.deadline) < new Date();
+        return true;
+      });
+    }
+    if (customStatusFilter !== 'all') {
+      filtered = filtered.filter(b => b.customStatus === customStatusFilter);
+    }
+    // Sorting
+    filtered = [...filtered].sort((a, b) => {
+      let valA, valB;
+      switch (progressSort) {
+        case 'deadline':
+          valA = a.deadline ? new Date(a.deadline) : new Date(0);
+          valB = b.deadline ? new Date(b.deadline) : new Date(0);
+          break;
+        case 'progress':
+          valA = a.progress || 0;
+          valB = b.progress || 0;
+          break;
+        case 'tonnage':
+          valA = a.tonnage || 0;
+          valB = b.tonnage || 0;
+          break;
+        case 'customer':
+          valA = a.customerName || '';
+          valB = b.customerName || '';
+          break;
+        default:
+          valA = 0; valB = 0;
+      }
+      if (valA < valB) return progressSortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return progressSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return filtered;
+  }, [parentBookings, search, progressFilter, customStatusFilter, progressSort, progressSortOrder]);
+
+  // Pagination
+  const total = filteredBookings.length;
+  const paginatedBookings = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredBookings.slice(start, start + pageSize);
+  }, [filteredBookings, page, pageSize]);
+
+  // Selection handler
+  const handleSelect = (id) => {
+    setSelectedId(id === selectedId ? null : id);
+    if (onSelectDelivery) onSelectDelivery(id === selectedId ? null : id);
+  };
+
+  // Clear all user-specific state on user change/logout
+  // Remove this effect:
+  // useEffect(() => {
+  //   if (!user) {
+  //     setOpenBookingId(null);
+  //     // Add any other user-specific state resets here if needed
+  //   }
+  // }, [user]);
+
+  // Reset page if filters/search change
+  useEffect(() => { setPage(1); }, [search, progressFilter, customStatusFilter, progressSort, progressSortOrder]);
 
   return (
     <div className="card shadow-sm border-0 mb-4" role="region" aria-labelledby="consignment-monitor-heading">
@@ -157,6 +234,13 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSele
             </button>
           </div>
         </div>
+        {/* Summary UI for pagination */}
+        {total > 0 && (
+          <div className="small text-muted mb-2" style={{marginLeft: 2}}>
+            Showing {Math.min((page - 1) * pageSize + 1, total)}-
+            {Math.min(page * pageSize, total)} of {total} consignments
+          </div>
+        )}
         {/* Responsive stacking for small screens */}
         <style>{`
           @media (max-width: 600px) {
@@ -176,12 +260,12 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSele
           <Spinner />
         ) : error ? (
           <div className="alert alert-danger">Error: {error}</div>
-        ) : parentBookings.length === 0 ? (
+        ) : paginatedBookings.length === 0 ? (
           <div className="alert alert-warning">No consignments found matching your criteria.</div>
         ) : (
           <>
             <div className="accordion" id="bookingAccordion" style={{ background: '#f7f7f5', borderRadius: 8, padding: '0.5rem 0.2rem' }}>
-              {parentBookings.map((booking) => (
+              {paginatedBookings.map((booking) => (
                 <div
                   className="accordion-item mb-2 p-2"
                   key={booking.id}
@@ -293,7 +377,7 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSele
                                 key={trackingId}
                                 className="list-group-item list-group-item-action p-2"
                                 style={itemStyle}
-                                onClick={() => onSelectDelivery(trackingId)}
+                                onClick={() => handleSelect(trackingId)}
                               >
                                 {/* Modern Card Layout */}
                                 <div className="row align-items-center g-2">
