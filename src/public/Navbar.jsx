@@ -2,11 +2,19 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useContext, useState } from 'react';
 import { AuthContext } from '../App';
 import { useNavigate } from 'react-router-dom';
+import { FaUserCircle, FaCog, FaUserShield, FaSignOutAlt } from 'react-icons/fa';
 
-export default function Navbar() {
+export default function Navbar({ onHamburgerClick }) {
   const { user, setUser } = useContext(AuthContext);
   const navigate = useNavigate();
   const [isNavCollapsed, setIsNavCollapsed] = useState(true);
+  const location = useLocation();
+
+  // Define public routes
+  const publicRoutes = [
+    '/', '/track', '/track-delivery', '/login', '/register', '/offerings', '/help', '/plans', '/payment-success'
+  ];
+  const isPublic = publicRoutes.some(route => location.pathname === route || location.pathname.startsWith(route));
 
   const handleNavCollapse = () => setIsNavCollapsed(!isNavCollapsed);
 
@@ -22,7 +30,7 @@ export default function Navbar() {
 
   return (
     <nav
-      className="navbar navbar-expand-lg shadow-sm"
+      className="navbar navbar-expand-lg shadow-sm d-flex justify-content-between align-items-center"
       style={{
         background: '#1F2120',
         borderRadius: '0.75rem',
@@ -31,123 +39,118 @@ export default function Navbar() {
         padding: '0.75rem 0',
       }}
     >
-      <div className="container-fluid px-4">
-        <Link className="navbar-brand fw-bold d-flex flex-column align-items-start" to="/" style={{ color: '#EBD3AD', letterSpacing: '0.5px' }}>
-          <span className="d-flex align-items-center">
-            <span style={{ fontSize: '1.7em', marginRight: 10 }} role="img" aria-label="logo">🚛</span>
-            Morres Logistics
-          </span>
+      <div className="d-flex align-items-center">
+        <Link className="navbar-brand fw-bold d-flex align-items-center" to="/" style={{ color: '#EBD3AD', letterSpacing: '0.5px' }}>
+          <span style={{ fontSize: '1.7em', marginRight: 10 }} role="img" aria-label="logo">🚛</span>
+          Morres Logistics
         </Link>
-        <button
-          className={`navbar-toggler${!isNavCollapsed ? ' toggler-open' : ''}`}
-          type="button"
-          onClick={handleNavCollapse}
-          aria-expanded={!isNavCollapsed}
-          aria-label="Toggle navigation"
-          style={{
-            border: '2px solid #EBD3AD',
-            borderRadius: '0.75rem',
-            boxShadow: '0 2px 8px rgba(235, 211, 173, 0.12)',
-            padding: '0.6em 1em',
-            background: !isNavCollapsed ? 'rgba(235,211,173,0.08)' : 'transparent',
-            transition: 'background 0.2s, box-shadow 0.2s',
-            outline: 'none',
-          }}
-          onMouseOver={e => e.currentTarget.style.background = 'rgba(235,211,173,0.13)'}
-          onMouseOut={e => e.currentTarget.style.background = !isNavCollapsed ? 'rgba(235,211,173,0.08)' : 'transparent'}
-          onFocus={e => e.currentTarget.style.boxShadow = '0 0 0 2px #EBD3AD'}
-          onBlur={e => e.currentTarget.style.boxShadow = '0 2px 8px rgba(235, 211, 173, 0.12)'}
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
-        <div className={`${isNavCollapsed ? 'collapse' : ''} navbar-collapse`} id="mainNavbar">
-          <ul className="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center gap-lg-3 gap-2">
-            <li className="nav-item">
-              <NavLink
-                to="/"
-                className={({ isActive }) =>
-                  'nav-link px-3 py-2 rounded' +
-                  (isActive
-                    ? ' fw-bold text-light'
-                    : ' text-light opacity-85')
-                }
-                style={{ color: '#EBD3AD' }}
-              >
-                Home
-              </NavLink>
-            </li>
-            <li className="nav-item">
-              <NavLink
-                to="/offerings"
-                className={({ isActive }) =>
-                  'nav-link px-3 py-2 rounded' +
-                  (isActive
-                    ? ' fw-bold text-light'
-                    : ' text-light opacity-85')
-                }
-                style={{ color: '#EBD3AD' }}
-              >
-                Offerings
-              </NavLink>
-            </li>
-            <li className="nav-item">
-              <NavLink
-                to="/track"
-                className={({ isActive }) =>
-                  'nav-link px-3 py-2 rounded' +
-                  (isActive
-                    ? ' fw-bold text-light'
-                    : ' text-light opacity-85')
-                }
-                style={{ color: '#EBD3AD' }}
-              >
-                Track Delivery
-              </NavLink>
-            </li>
+        {/* Hamburger for dashboard/internal routes only */}
+        {!isPublic && (
+          <button
+            className="navbar-toggler ms-3 d-lg-none"
+            type="button"
+            onClick={onHamburgerClick}
+            aria-expanded={!isNavCollapsed}
+            aria-label="Toggle navigation"
+            style={{
+              border: '2px solid #EBD3AD',
+              borderRadius: '0.75rem',
+              boxShadow: '0 2px 8px rgba(235, 211, 173, 0.12)',
+              padding: '0.6em 1em',
+              background: 'transparent',
+              transition: 'background 0.2s, box-shadow 0.2s',
+              outline: 'none',
+            }}
+          >
+            <span className="navbar-toggler-icon"></span>
+          </button>
+        )}
+      </div>
+      <div className="d-flex align-items-center">
+        {isPublic ? (
+          <>
+            <ul className="navbar-nav flex-row gap-2 align-items-center mb-0">
+              <li className="nav-item">
+                <NavLink to="/" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Home</NavLink>
+              </li>
+              <li className="nav-item">
+                <NavLink to="/track" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Track</NavLink>
+              </li>
+              <li className="nav-item">
+                <NavLink to="/offerings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Offerings</NavLink>
+              </li>
+              <li className="nav-item">
+                <NavLink to="/help" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Help</NavLink>
+              </li>
+              {!user && (
+                <li className="nav-item">
+                  <NavLink to="/login" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Login</NavLink>
+                </li>
+              )}
+            </ul>
             {user && (
-              <>
-                <li className="nav-item">
-                  <Link className="nav-link px-3 py-2 rounded text-light" to="/operator/dashboard" style={{ color: '#EBD3AD' }}>
-                    Dashboard
-                  </Link>
-                </li>
-                {user.role === 'admin' && (
-                  <li className="nav-item">
-                    <Link className="nav-link px-3 py-2 rounded text-light" to="/admin/dashboard" style={{ color: '#EBD3AD' }}>
-                      Admin
-                    </Link>
-                  </li>
-                )}
-                <li className="nav-item">
-                  <Link className="nav-link px-3 py-2 rounded text-light" to="/billing" style={{ color: '#EBD3AD' }}>
-                    Billing
-                  </Link>
-                </li>
-                <li className="nav-item">
-                  <Link className="nav-link px-3 py-2 rounded text-light" to="/help" title="Help / How it works">
-                    <span style={{ fontSize: '1.2em', fontWeight: 600 }}>?</span> Help
-                  </Link>
-                </li>
-                <li className="nav-item ms-lg-2 mt-2 mt-lg-0">
-                  <button
-                    className="btn fw-bold px-4 py-2"
-                    style={{
-                      background: '#EBD3AD',
-                      color: '#1F2120',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 1px 4px rgba(31,33,32,0.06)',
-                      letterSpacing: '0.5px',
-                    }}
-                    onClick={handleLogout}
-                  >
-                    Logout
-                  </button>
-                </li>
-              </>
+              <div className="dropdown ms-3">
+                <button
+                  className="btn btn-link dropdown-toggle text-light d-flex align-items-center"
+                  type="button"
+                  id="userMenuButton"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  style={{ color: '#EBD3AD', textDecoration: 'none' }}
+                >
+                  <FaUserCircle className="me-2" size={24} />
+                  <span className="fw-semibold">{user.name || user.email || 'User'}</span>
+                </button>
+                <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuButton">
+                  <li><Link className="dropdown-item d-flex align-items-center" to="#"><FaUserCircle className="me-2" /> Profile</Link></li>
+                  <li><Link className="dropdown-item d-flex align-items-center" to="#"><FaCog className="me-2" /> Settings</Link></li>
+                  {user.role === 'admin' && (
+                    <>
+                      <li><hr className="dropdown-divider" /></li>
+                      <li><Link className="dropdown-item d-flex align-items-center text-danger fw-bold" to="/admin/dashboard"><FaUserShield className="me-2" /> Admin</Link></li>
+                    </>
+                  )}
+                  <li><hr className="dropdown-divider" /></li>
+                  <li><button className="dropdown-item d-flex align-items-center" onClick={handleLogout}><FaSignOutAlt className="me-2" /> Logout</button></li>
+                </ul>
+              </div>
             )}
-          </ul>
-        </div>
+          </>
+        ) : (
+          user && (
+            <div className="dropdown">
+              <button
+                className="btn btn-link dropdown-toggle text-light d-flex align-items-center"
+                type="button"
+                id="userMenuButton"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                style={{ color: '#EBD3AD', textDecoration: 'none' }}
+              >
+                <FaUserCircle className="me-2" size={24} />
+                <span className="fw-semibold">{user.name || user.email || 'User'}</span>
+              </button>
+              <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuButton">
+                <li><Link className="dropdown-item d-flex align-items-center" to="#"><FaUserCircle className="me-2" /> Profile</Link></li>
+                <li><Link className="dropdown-item d-flex align-items-center" to="#"><FaCog className="me-2" /> Settings</Link></li>
+                {user.role === 'admin' && (
+                  <>
+                    <li><hr className="dropdown-divider" /></li>
+                    <li><Link className="dropdown-item d-flex align-items-center text-danger fw-bold" to="/admin/dashboard"><FaUserShield className="me-2" /> Admin</Link></li>
+                  </>
+                )}
+                <li><hr className="dropdown-divider" /></li>
+                <li><button className="dropdown-item d-flex align-items-center" onClick={handleLogout}><FaSignOutAlt className="me-2" /> Logout</button></li>
+              </ul>
+            </div>
+          )
+        )}
+        {/* Add the Plans link for logged-in users only */}
+        {!isPublic && user && (
+          <li className="nav-item">
+            <NavLink to="/plans" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Plans</NavLink>
+          </li>
+        )}
       </div>
     </nav>
   );

@@ -100,7 +100,10 @@ export const toCamel = d => ({
   status: d.status,
   remainingTonnage: d.remaining_tonnage,
   completedTonnage: d.completed_tonnage,
-  createdByUserId: d.created_by_user_id
+  createdByUserId: d.created_by_user_id,
+  value: d.value,
+  cost: d.cost,
+  customStatus: d.custom_status,
 });
 
 export const parentBookingToCamel = d => ({
@@ -152,17 +155,32 @@ export const toSnake = d => ({
   environmental_incident: d.environmentalIncident || false,
   incident_details: d.incidentDetails || {},
   sampling_required: d.samplingRequired || false,
-  sampling_status: d.samplingStatus
+  sampling_status: d.samplingStatus,
+  value: d.value,
+  cost: d.cost,
+  custom_status: d.customStatus,
 });
 
 // API endpoints
 export const deliveryApi = {
   // Get all deliveries
-  getAll: async (limit = 20, offset = 0) => {
+  /**
+   * Fetch deliveries with optional search, pagination
+   * @param {number} limit
+   * @param {number} offset
+   * @param {string} search - optional search string
+   */
+  getAll: async (limit = 20, offset = 0, search = '') => {
     try {
-      const res = await api.get(`/deliveries?limit=${limit}&offset=${offset}`);
-      // Return both deliveries and total count
-      return { deliveries: res.data.deliveries, total: res.data.total };
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString(),
+        ...(search ? { search } : {})
+      });
+      const res = await api.get(`/deliveries?${params.toString()}`);
+      // Defensive normalization
+      const data = normalizeKeys(res.data);
+      return { deliveries: data.deliveries, total: data.total };
     } catch (error) {
       console.error('Failed to fetch deliveries:', error);
       throw error;
@@ -173,7 +191,7 @@ export const deliveryApi = {
   getById: async (trackingId) => {
     try {
       const res = await api.get(`/deliveries/${trackingId}`);
-      return res.data;
+      return normalizeKeys(res.data);
     } catch (error) {
       console.error(`Failed to fetch delivery ${trackingId}:`, error);
       throw error;
@@ -185,7 +203,7 @@ export const deliveryApi = {
     try {
       console.log('Sending delivery data to API:', deliveryData);
       const res = await api.post('/deliveries', deliveryData);
-      return res.data;
+      return normalizeKeys(res.data);
     } catch (error) {
       console.error('Failed to create delivery:', error);
       throw error;
@@ -201,7 +219,7 @@ export const deliveryApi = {
         currentStatus: data.currentStatus,
       };
       const res = await api.post('/updateCheckpoint', payload);
-      return res.data;
+      return normalizeKeys(res.data);
     } catch (error) {
       console.error(`Failed to update checkpoint for ${trackingId}:`, error);
       throw error;
@@ -245,7 +263,7 @@ export const deliveryApi = {
   async getParentBooking(id) {
     try {
       const res = await api.get(`/parent-bookings/${id}`);
-      return res.data;
+      return normalizeKeys(res.data);
     } catch (error) {
       console.error(`Failed to fetch parent booking ${id}:`, error);
       throw error;
@@ -255,7 +273,7 @@ export const deliveryApi = {
   async getDeliveriesByParentId(parentId) {
     try {
       const res = await api.get(`/parent-bookings/${parentId}/deliveries`);
-      return res.data;
+      return normalizeKeys(res.data);
     } catch (error) {
       console.error(`Failed to fetch deliveries for parent booking ${parentId}:`, error);
       throw error;
@@ -266,7 +284,7 @@ export const deliveryApi = {
     try {
       console.log('Sending parent booking data to API:', bookingData);
       const res = await api.post('/parent-bookings', bookingData);
-      return res.data;
+      return normalizeKeys(res.data);
     } catch (error) {
       console.error('Failed to create parent booking:', error);
       throw error;
@@ -285,9 +303,10 @@ export const deliveryApi = {
         pageSize
       }).toString();
       const res = await api.get(`/parent-bookings?${queryParams}`);
+      const data = normalizeKeys(res.data);
       return {
-        parentBookings: res.data.parentBookings,
-        total: res.data.total
+        parentBookings: data.parentBookings,
+        total: data.total
       };
     } catch (error) {
       console.error('Failed to fetch parent bookings:', error);
@@ -333,6 +352,11 @@ export const deliveryApi = {
     return res.data;
   },
 
+  async createSubscription({ tier }) {
+    const res = await api.post('/api/subscriptions', { tier });
+    return res.data;
+  },
+
   admin: {
     getAllUsers: async () => {
       try {
@@ -370,6 +394,74 @@ export const deliveryApi = {
         throw error;
       }
     }
+  },
+  // Get analytics for dashboard
+  getAnalytics: async () => {
+    try {
+      const res = await api.get('/deliveries/analytics');
+      // Defensive normalization
+      const data = normalizeKeys(res.data);
+      return data.analytics;
+    } catch (error) {
+      console.error('Failed to fetch analytics:', error);
+      throw error;
+    }
+  }
+};
+
+export const notificationApi = {
+  // Fetch notifications for current user
+  async getNotifications() {
+    const res = await api.get('/api/notifications');
+    return res.data.notifications;
+  },
+  // Mark notification as read
+  async markNotificationRead(id) {
+    const res = await api.patch(`/api/notifications/${id}/read`);
+    return res.data.notification;
+  },
+  // Create a notification (admin only)
+  async createNotification({ userId, type = 'info', message, entityType, entityId }) {
+    const res = await api.post('/api/notifications', {
+      user_id: userId,
+      type,
+      message,
+      entity_type: entityType,
+      entity_id: entityId
+    });
+    return res.data.notification;
+  }
+};
+
+export const invoiceApi = {
+  // Fetch invoice history for current user
+  async getInvoices() {
+    const res = await api.get('/api/invoices');
+    return res.data.invoices;
+  },
+  // Download invoice (returns JSON for now)
+  async downloadInvoice(invoiceId) {
+    const res = await api.get(`/api/invoices/${invoiceId}/download`, { responseType: 'blob' });
+    return res.data;
+  }
+};
+
+export const scheduledReportApi = {
+  create: async (config) => {
+    const res = await api.post('/api/reports/schedule', config);
+    return res.data;
+  },
+  getAll: async () => {
+    const res = await api.get('/api/reports/schedule');
+    return res.data;
+  },
+  update: async (id, config) => {
+    const res = await api.put(`/api/reports/schedule/${id}`, config);
+    return res.data;
+  },
+  delete: async (id) => {
+    const res = await api.delete(`/api/reports/schedule/${id}`);
+    return res.data;
   }
 };
 

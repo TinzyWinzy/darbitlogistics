@@ -88,7 +88,11 @@ export async function logoutUser(req, res) {
 
 export function getMe(req, res) {
   if (req.user) {
-    res.json(req.user);
+    // Always return a name field for frontend display
+    res.json({
+      ...req.user,
+      name: req.user.name || req.user.username || ''
+    });
   } else {
     res.status(401).json({ error: 'Not authenticated' });
   }
@@ -155,6 +159,13 @@ export async function createUser(req, res) {
       'INSERT INTO users (username, password, role, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, username, role, created_at',
       [username, hashed, role]
     );
+    // Log admin action
+    if (req.user && req.user.username) {
+      await pool.query(
+        'INSERT INTO admin_logs (action, actor, target, details) VALUES ($1, $2, $3, $4)',
+        ['create_user', req.user.username, username, JSON.stringify({ role })]
+      );
+    }
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
@@ -171,6 +182,13 @@ export async function deleteUser(req, res) {
   try {
     const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, username, role', [id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    // Log admin action
+    if (req.user && req.user.username) {
+      await pool.query(
+        'INSERT INTO admin_logs (action, actor, target, details) VALUES ($1, $2, $3, $4)',
+        ['delete_user', req.user.username, id, JSON.stringify({})]
+      );
+    }
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error deleting user:', err);

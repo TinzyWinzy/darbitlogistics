@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Dashboard from './operator/Dashboard';
 import AdminDashboard from './operator/AdminDashboard';
 import TrackDelivery from './customer/TrackDelivery';
@@ -17,6 +17,13 @@ import SubscriptionPlans from './public/SubscriptionPlans';
 import HelpCenter from './public/HelpCenter';
 import WelcomeModal from './public/WelcomeModal';
 import PaymentSuccess from './public/PaymentSuccess';
+import { Suspense } from 'react';
+import Sidebar from './public/Sidebar';
+import Loads from './operator/Loads';
+import CustomerList from './operator/CustomerList';
+import { useDeliveries } from './services/useDeliveries';
+import { useParentBookings } from './services/useParentBookings';
+import Reports from './operator/Reports';
 
 export const AuthContext = createContext(null);
 
@@ -50,9 +57,71 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+function AppLayout({ sidebarOpen, setSidebarOpen }) {
+  const { user } = useContext(AuthContext);
+  const isAuthenticated = !!user;
+  const location = useLocation();
+  const sidebarRoutes = [
+    '/dashboard', '/loads', '/customers', '/reports', '/billing', '/admin/dashboard'
+  ];
+  const showSidebar = isAuthenticated && sidebarRoutes.some(route => location.pathname.startsWith(route));
+
+  // Use the same hooks as Dashboard to get parentBookings and deliveries
+  const deliveriesData = useDeliveries();
+  const parentBookingsData = useParentBookings();
+
+  return (
+    <div className="app-flex-layout d-flex">
+      {showSidebar && (
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      )}
+      <main className="flex-grow-1">
+        <Routes>
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/loads" element={
+                  <ProtectedRoute>
+                    <Loads />
+                  </ProtectedRoute>
+                } />
+                <Route path="/customers" element={
+                  <ProtectedRoute>
+                    <CustomerList parentBookings={parentBookingsData.parentBookings} deliveries={deliveriesData.deliveries} />
+                  </ProtectedRoute>
+                } />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/admin/dashboard" element={
+                  <AdminRoute>
+                    <AdminDashboard />
+                  </AdminRoute>
+                } />
+                <Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
+                <Route path="/track" element={<TrackDelivery />} />
+                <Route path="/offerings" element={<Offerings />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={<Landing />} />
+                <Route path="/track-delivery" element={<TrackDelivery />} />
+                <Route path="/track-booking" element={<TrackParentBooking />} />
+                <Route path="/operator/dashboard" element={<Dashboard />} />
+                <Route path="/parent-booking-details/:id" element={<ParentBookingDetails />} />
+                <Route path="/billing" element={<BillingDashboard />} />
+                <Route path="/plans" element={<SubscriptionPlans />} />
+                <Route path="/help" element={<HelpCenter />} />
+                <Route path="/payment-success" element={<PaymentSuccess />} />
+        </Routes>
+        <Footer />
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // for mobile
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -95,33 +164,8 @@ export default function App() {
       <AuthContext.Provider value={{ user, setUser, isAuthenticated, loading }}>
         <Router>
           <WelcomeModal />
-          <Navbar />
-          <Routes>
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/dashboard" element={
-              <AdminRoute>
-                <AdminDashboard />
-              </AdminRoute>
-            } />
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
-            <Route path="/track" element={<TrackDelivery />} />
-            <Route path="/offerings" element={<Offerings />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Landing />} />
-            <Route path="/track-delivery" element={<TrackDelivery />} />
-            <Route path="/track-booking" element={<TrackParentBooking />} />
-            <Route path="/operator/dashboard" element={<Dashboard />} />
-            <Route path="/parent-booking-details/:id" element={<ParentBookingDetails />} />
-            <Route path="/billing" element={<BillingDashboard />} />
-            <Route path="/plans" element={<SubscriptionPlans />} />
-            <Route path="/help" element={<HelpCenter />} />
-            <Route path="/payment-success" element={<PaymentSuccess />} />
-          </Routes>
-          <Footer />
+          <Navbar onHamburgerClick={() => setSidebarOpen(o => !o)} />
+          <AppLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         </Router>
       </AuthContext.Provider>
     </>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../services/AuthContext';
+import { AuthContext } from '../App';
 import { deliveryApi } from '../services/api';
 
 export default function PaymentSuccess() {

@@ -4,10 +4,18 @@ import UnoCSS from 'unocss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
+// --- Capacitor Integration: Ensure correct base path and output for native builds ---
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
+    base: './', // Required for Capacitor: relative asset paths
+    build: {
+      outDir: 'dist', // Capacitor expects web assets in 'dist'
+    },
+    server: {
+      host: true, // Allow LAN/devices to access dev server
+    },
     plugins: [
       react(), 
       UnoCSS(),
@@ -18,6 +26,8 @@ export default defineConfig(({ mode }) => {
         },
         // Service Worker configuration
         workbox: {
+          // Allow larger files to be precached (for big JS bundles)
+          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB
           // Handle SPA navigation (serves index.html for all routes)
           navigateFallback: '/index.html',
           
@@ -80,9 +90,9 @@ export default defineConfig(({ mode }) => {
           theme_color: '#ffffff',
           icons: [
             {
-              src: 'pwa-192x192.png',
+              src: 'logo.jpg',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/jpeg'
             },
             {
               src: 'pwa-512x512.png',

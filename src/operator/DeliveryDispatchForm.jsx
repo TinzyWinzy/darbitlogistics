@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FaSpinner } from 'react-icons/fa';
 
 // Simple InfoIcon component with tooltip
 function InfoIcon({ text }) {
@@ -25,7 +26,7 @@ export default function DeliveryDispatchForm({
   const [createForm, setCreateForm] = useState({
     customerId: '',
     selectedBookingId: '',
-    currentStatus: '',
+    currentStatus: 'Pending', // <-- set default to 'Pending'
     driverDetails: {
       name: '',
       vehicleReg: ''
@@ -37,11 +38,16 @@ export default function DeliveryDispatchForm({
     loadingPoint: '',
     destination: '',
     environmentalIncidents: '',
-    samplingStatus: ''
+    samplingStatus: '',
+    value: '', // <-- add value field
+    cost: ''   // <-- add cost field
   });
   const [creating, setCreating] = useState(false);
   const [createFeedback, setCreateFeedback] = useState('');
   const [selectedCustomerBookings, setSelectedCustomerBookings] = useState([]);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+  const [toastType, setToastType] = useState('success');
 
   const handleCustomerSelect = (customerId) => {
     setCreateForm(prev => ({
@@ -56,7 +62,9 @@ export default function DeliveryDispatchForm({
       loadingPoint: '',
       destination: '',
       environmentalIncidents: '',
-      samplingStatus: ''
+      samplingStatus: '',
+      value: '', // <-- add value field
+      cost: ''   // <-- add cost field
     }));
     // Filter bookings for this customer
     const [customerName, phoneNumber] = customerId.split('|');
@@ -111,8 +119,9 @@ export default function DeliveryDispatchForm({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setCreating(true);
     setCreateFeedback('');
+    setShowToast(false);
+    setCreating(true);
     if (!createForm.customerId) {
       setCreateFeedback('Please select a customer.');
       setCreating(false);
@@ -178,16 +187,21 @@ export default function DeliveryDispatchForm({
         vehicleReg: createForm.driverDetails.vehicleReg.trim()
       },
       environmentalIncidents: createForm.environmentalIncidents || null,
-      samplingStatus: createForm.samplingStatus || 'Not Sampled'
+      samplingStatus: createForm.samplingStatus || 'Not Sampled',
+      value: createForm.value !== '' ? parseFloat(createForm.value) : 0, // <-- add value
+      cost: createForm.cost !== '' ? parseFloat(createForm.cost) : 0     // <-- add cost
     };
     try {
       const res = await createDelivery(camelToSnake(deliveryData));
       if (res.success) {
-        setCreateFeedback('Delivery created successfully!');
+        setCreateFeedback('Delivery dispatched successfully!');
+        setToastMsg('Delivery dispatched successfully!');
+        setToastType('success');
+        setShowToast(true);
         setCreateForm({
           customerId: '',
           selectedBookingId: '',
-          currentStatus: '',
+          currentStatus: 'Pending', // <-- reset to 'Pending' after submit
           containerCount: '',
           tonnage: '',
           vehicleType: 'Standard Truck',
@@ -199,198 +213,283 @@ export default function DeliveryDispatchForm({
           loadingPoint: '',
           destination: '',
           environmentalIncidents: '',
-          samplingStatus: ''
+          samplingStatus: '',
+          value: '', // <-- add value field
+          cost: ''   // <-- add cost field
         });
+        setSelectedCustomerBookings([]);
         if (fetchParentBookings) await fetchParentBookings();
         if (onSuccess) onSuccess(res);
       }
-    } catch (error) {
-      // Sentinel Zero: Handle quota/subscription errors gracefully
-      if (error.response) {
-        if (error.response.status === 403 && (error.response.data?.quotaExceeded || error.response.data?.error?.toLowerCase().includes('subscription'))) {
-          setCreateFeedback(
-            error.response.data.error ||
-            'You have no active subscription or have exceeded your delivery quota. Please contact support or upgrade your plan.'
-          );
-        } else if (error.response.status === 401) {
-          setCreateFeedback('Your session has expired. Please log in again.');
-        } else {
-          setCreateFeedback(error.response.data?.error || 'Failed to create delivery');
-        }
-      } else {
-        setCreateFeedback('Failed to create delivery. Network or server error.');
-      }
-      if (onFeedback) onFeedback(error);
+    } catch (err) {
+      setCreateFeedback(err.response?.data?.error || 'Failed to dispatch delivery.');
+      setToastMsg(err.response?.data?.error || 'Failed to dispatch delivery.');
+      setToastType('danger');
+      setShowToast(true);
+      if (onFeedback) onFeedback(err.response?.data?.error || 'Failed to dispatch delivery.');
+    } finally {
+      setCreating(false);
+      setTimeout(() => setShowToast(false), 2500);
     }
-    setCreating(false);
   };
 
+  // Sort consignments by remaining tonnage (descending)
+  const sortedCustomerBookings = (selectedCustomerBookings || []).slice().sort((a, b) => {
+    const tA = Number(a.remainingTonnage || a.remaining_tonnage || 0);
+    const tB = Number(b.remainingTonnage || b.remaining_tonnage || 0);
+    return tB - tA;
+  });
+
   return (
-    <form onSubmit={handleSubmit} className="row g-3 align-items-end" autoComplete="off">
-      <div className="col-md-4">
-        <label className="form-label">
-          Select Customer *
-          <InfoIcon text="Choose the client for this delivery. Customers are registered with their name and phone number." />
-        </label>
-        <select 
-          className="form-select"
-          value={createForm.customerId}
-          onChange={(e) => {
-            handleCustomerSelect(e.target.value);
-          }}
-          disabled={creating}
-          required
-        >
-          <option value="">Choose customer...</option>
-          {customers.map(customer => (
-            <option key={customer.id} value={customer.id}>
-              {customer.name} ({customer.phone})
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="col-md-4">
-        <label className="form-label">
-          Select Consignment *
-          <InfoIcon text="A consignment (parent booking) groups multiple deliveries under one contract. Choose the relevant booking for this load." />
-        </label>
-        <select 
-          className="form-select"
-          value={createForm.selectedBookingId}
-          onChange={(e) => {
-            setCreateForm(prev => ({ ...prev, selectedBookingId: e.target.value }));
-            handleBookingSelect(e.target.value);
-          }}
-          disabled={creating || !createForm.customerId}
-          required
-        >
-          <option value="">Choose consignment...</option>
-          {selectedCustomerBookings.map((booking, idx) => (
-            <option key={booking.id || idx} value={booking.id}>
-              {booking.bookingCode} - {booking.mineral_type} ({booking.mineral_grade}) - {booking.remainingTonnage} tons available
-            </option>
-          ))}
-        </select>
-      </div>
-      {createForm.selectedBookingId && (
-        <div className="col-12 mt-2 mb-2">
-          <div className="alert alert-light p-2" style={{ borderLeft: '3px solid #1F2120' }}>
-            <small className="text-muted d-block">
-              <strong>Route:</strong> {createForm.loadingPoint} &rarr; {createForm.destination}
-            </small>
+    <>
+      {/* Toast/Snackbar Feedback */}
+      {showToast && (
+        <div className={`toast show position-fixed bottom-0 end-0 m-4 bg-${toastType}`} style={{zIndex:9999, minWidth: '220px'}} role="alert" aria-live="assertive" aria-atomic="true">
+          <div className={`toast-header text-white bg-${toastType}`}> 
+            <strong className="me-auto">{toastType === 'success' ? 'Success' : 'Error'}</strong>
+            <button type="button" className="btn-close btn-close-white" onClick={() => setShowToast(false)} aria-label="Close"></button>
           </div>
+          <div className="toast-body">{toastMsg}</div>
         </div>
       )}
-      <div className="col-md-3">
-        <label className="form-label">
-          Tonnage (tons) *
-          <InfoIcon text="Enter the weight of the cargo in metric tons. Must not exceed the available tonnage for the consignment." />
-        </label>
-        <input
-          type="number"
-          className="form-control"
-          value={createForm.tonnage}
-          onChange={e => setCreateForm(prev => ({ ...prev, tonnage: e.target.value }))}
-          min={0.01}
-          step={0.01}
-          disabled={creating}
-          required
-        />
-      </div>
-      <div className="col-md-3">
-        <label className="form-label">
-          Container Count *
-          <InfoIcon text="Number of containers for this delivery. Must be at least 1." />
-        </label>
-        <input
-          type="number"
-          className="form-control"
-          value={createForm.containerCount}
-          onChange={e => setCreateForm(prev => ({ ...prev, containerCount: e.target.value }))}
-          min={1}
-          step={1}
-          disabled={creating}
-          required
-        />
-      </div>
-      <div className="col-md-4">
-        <label className="form-label">
-          Driver Details *
-          <InfoIcon text="Enter the driver's full name and vehicle registration. This ensures accountability and tracking." />
-        </label>
-        <div className="input-group mb-2">
+      <form onSubmit={handleSubmit} className="row g-3 align-items-end" autoComplete="off">
+        <div className="col-md-4">
+          <label className="form-label">
+            <span className="fw-bold text-danger">*</span> Select Customer
+            <InfoIcon text="Choose the client for this delivery. Customers are registered with their name and phone number." />
+          </label>
+          <select 
+            className="form-select"
+            value={createForm.customerId}
+            onChange={(e) => {
+              handleCustomerSelect(e.target.value);
+            }}
+            disabled={creating}
+            required
+            aria-label="Select customer"
+          >
+            <option value="">Choose customer...</option>
+            {customers.map(customer => (
+              <option key={customer.id} value={customer.id}>
+                {customer.name} ({customer.phone})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="col-md-4">
+          <label className="form-label">
+            <span className="fw-bold text-danger">*</span> Select Consignment
+            <InfoIcon text="A consignment (parent booking) groups multiple deliveries under one contract. Choose the relevant booking for this load." />
+          </label>
+          {/* In the dropdown, show only concise info */}
+          <select 
+            className="form-select"
+            value={createForm.selectedBookingId}
+            onChange={(e) => {
+              setCreateForm(prev => ({ ...prev, selectedBookingId: e.target.value }));
+              handleBookingSelect(e.target.value);
+            }}
+            disabled={creating || !createForm.customerId}
+            required
+            aria-label="Select consignment"
+          >
+            <option value="" disabled>
+              {sortedCustomerBookings.length === 0 ? 'No consignments available for this customer' : 'Select a consignment...'}
+            </option>
+            {sortedCustomerBookings.map(booking => {
+              const code = booking.bookingCode || booking.booking_code || 'N/A';
+              const mineral = booking.mineralType || booking.mineral_type || '';
+              const tons = booking.remainingTonnage || booking.remaining_tonnage || 0;
+              return (
+                <option key={booking.id || code} value={booking.id || code}>
+                  {`${code} – ${tons} tons${mineral ? ' – ' + mineral : ''}`}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+        {/* Show more meta for selected consignment below, similar to route */}
+        {createForm.selectedBookingId && (() => {
+          const selected = sortedCustomerBookings.find(b => (b.id || b.bookingCode || b.booking_code) === createForm.selectedBookingId);
+          if (!selected) return null;
+          const grade = selected.mineralGrade || selected.mineral_grade || '';
+          const date = selected.bookingDate || selected.booking_date || '';
+          const value = selected.value ? `₦${Number(selected.value).toLocaleString()}` : null;
+          const cost = selected.cost ? `$${Number(selected.cost).toLocaleString()}` : null;
+          return (
+            <div className="col-12 mt-2 mb-2">
+              <div className="alert alert-light p-2" style={{ borderLeft: '3px solid #1F2120' }}>
+                <small className="text-muted d-block">
+                  <strong>Route:</strong> {createForm.loadingPoint} &rarr; {createForm.destination}
+                </small>
+                <div className="mt-2" style={{ fontSize: '0.97em', color: '#444' }}>
+                  <div><strong>Grade:</strong> {grade || <span className="text-muted">Not specified</span>}</div>
+                  {date && <div><strong>Booked:</strong> {new Date(date).toLocaleDateString()}</div>}
+                  {value && <div><strong>Value:</strong> {value}</div>}
+                  {cost && <div><strong>Cost:</strong> {cost}</div>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+        <div className="col-md-3">
+          <label className="form-label">
+            <span className="fw-bold text-danger">*</span> Tonnage
+            <InfoIcon text="Weight of the load in metric tons." />
+          </label>
+          <input
+            type="number"
+            className="form-control"
+            value={createForm.tonnage}
+            onChange={e => setCreateForm(prev => ({ ...prev, tonnage: e.target.value }))}
+            required
+            aria-label="Tonnage"
+            min={0.1}
+            step={0.01}
+            disabled={creating}
+          />
+        </div>
+        <div className="col-md-3">
+          <label className="form-label">
+            <span className="fw-bold text-danger">*</span> Container Count
+            <InfoIcon text="Number of containers for this load." />
+          </label>
+          <input
+            type="number"
+            className="form-control"
+            value={createForm.containerCount}
+            onChange={e => setCreateForm(prev => ({ ...prev, containerCount: e.target.value }))}
+            required
+            aria-label="Container count"
+            min={1}
+            step={1}
+            disabled={creating}
+          />
+        </div>
+        <div className="col-md-4">
+          <label className="form-label">
+            <span className="fw-bold text-danger">*</span> Driver Name
+            <InfoIcon text="Name of the driver assigned to this load." />
+          </label>
           <input
             type="text"
             className="form-control"
-            placeholder="Driver Name"
             value={createForm.driverDetails.name}
             onChange={e => setCreateForm(prev => ({ ...prev, driverDetails: { ...prev.driverDetails, name: e.target.value } }))}
-            disabled={creating}
             required
+            aria-label="Driver name"
+            disabled={creating}
           />
+        </div>
+        <div className="col-md-4">
+          <label className="form-label">
+            <span className="fw-bold text-danger">*</span> Vehicle Reg
+            <InfoIcon text="Vehicle registration number." />
+          </label>
           <input
             type="text"
             className="form-control"
-            placeholder="Vehicle Reg."
             value={createForm.driverDetails.vehicleReg}
             onChange={e => setCreateForm(prev => ({ ...prev, driverDetails: { ...prev.driverDetails, vehicleReg: e.target.value } }))}
-            disabled={creating}
             required
+            aria-label="Vehicle registration"
+            disabled={creating}
           />
         </div>
-      </div>
-      <div className="col-md-4">
-        <label className="form-label">Initial Status</label>
-        <input 
-          type="text" 
-          className="form-control" 
-          placeholder="e.g., Pending"
-          value={createForm.currentStatus}
-          onChange={e => setCreateForm(prev => ({ ...prev, currentStatus: e.target.value }))}
-          disabled={creating || !createForm.selectedBookingId}
-        />
-      </div>
-      <div className="col-md-4">
-        <label className="form-label">Environmental Incidents</label>
-        <textarea
-          className="form-control"
-          rows="2"
-          placeholder="Enter any environmental incidents"
-          value={createForm.environmentalIncidents}
-          onChange={e => setCreateForm(prev => ({ ...prev, environmentalIncidents: e.target.value }))}
-          disabled={creating || !createForm.selectedBookingId}
-        />
-      </div>
-      <div className="col-md-4">
-        <label className="form-label">Sampling Status</label>
-        <select
-          className="form-select"
-          value={createForm.samplingStatus}
-          onChange={e => setCreateForm(prev => ({ ...prev, samplingStatus: e.target.value }))}
-          disabled={creating || !createForm.selectedBookingId}
-        >
-          <option value="">Select status...</option>
-          <option value="Not Sampled">Not Sampled</option>
-          <option value="Sampled">Sampled</option>
-          <option value="Pending">Pending</option>
-        </select>
-      </div>
-      <div className="col-12">
-        <button 
-          type="submit" 
-          className="btn btn-primary fw-bold" 
-          style={{ background: '#1F2120', border: 'none', color: '#EBD3AD' }} 
-          disabled={creating || !createForm.selectedBookingId}
-          aria-label="Dispatch load"
-        >
-          {creating ? 'Creating...' : 'Dispatch Load'}
-        </button>
-      </div>
-      {createFeedback && (
-        <div className={`mt-3 alert ${createFeedback.includes('success') ? 'alert-success' : 'alert-danger'}`}>
-          {createFeedback}
+        <div className="col-md-4">
+          <label className="form-label">Initial Status</label>
+          <select
+            className="form-select"
+            value={createForm.currentStatus}
+            onChange={e => setCreateForm(prev => ({ ...prev, currentStatus: e.target.value }))}
+            disabled={creating || !createForm.selectedBookingId}
+            aria-label="Initial Status"
+          >
+            <option value="Pending">Pending</option>
+            <option value="At Mine">At Mine</option>
+            <option value="In Transit">In Transit</option>
+            <option value="At Border">At Border</option>
+            <option value="At Port">At Port</option>
+            <option value="At Port of Destination">At Port of Destination</option>
+            <option value="At Warehouse">At Warehouse</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
         </div>
-      )}
-    </form>
+        <div className="col-md-4">
+          <label className="form-label">Environmental Incidents</label>
+          <textarea
+            className="form-control"
+            rows="2"
+            placeholder="Enter any environmental incidents"
+            value={createForm.environmentalIncidents}
+            onChange={e => setCreateForm(prev => ({ ...prev, environmentalIncidents: e.target.value }))}
+            disabled={creating || !createForm.selectedBookingId}
+          />
+        </div>
+        <div className="col-md-4">
+          <label className="form-label">Sampling Status</label>
+          <select
+            className="form-select"
+            value={createForm.samplingStatus}
+            onChange={e => setCreateForm(prev => ({ ...prev, samplingStatus: e.target.value }))}
+            disabled={creating || !createForm.selectedBookingId}
+          >
+            <option value="">Select status...</option>
+            <option value="Not Sampled">Not Sampled</option>
+            <option value="Sampled">Sampled</option>
+            <option value="Pending">Pending</option>
+          </select>
+        </div>
+        <div className="col-md-4">
+          <label className="form-label">Value (USD)</label>
+          <input
+            type="number"
+            className="form-control"
+            value={createForm.value}
+            onChange={e => setCreateForm(prev => ({ ...prev, value: e.target.value }))}
+            min="0"
+            step="0.01"
+            placeholder="Enter value (optional)"
+            disabled={creating || !createForm.selectedBookingId}
+          />
+        </div>
+        <div className="col-md-4">
+          <label className="form-label">Cost (USD)</label>
+          <input
+            type="number"
+            className="form-control"
+            value={createForm.cost}
+            onChange={e => setCreateForm(prev => ({ ...prev, cost: e.target.value }))}
+            min="0"
+            step="0.01"
+            placeholder="Enter cost (required)"
+            required
+            disabled={creating || !createForm.selectedBookingId}
+          />
+        </div>
+        <div className="col-12 d-flex align-items-center gap-3">
+          <button
+            type="submit"
+            className="btn fw-bold"
+            style={{
+              background: '#1F2120',
+              color: '#EBD3AD',
+              border: 'none',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 1.25rem',
+              opacity: creating ? 0.7 : 1,
+              cursor: creating ? 'not-allowed' : 'pointer',
+              minWidth: '160px'
+            }}
+            disabled={creating}
+            aria-label="Dispatch load"
+          >
+            {creating ? <><FaSpinner className="me-2 fa-spin" /> Dispatching...</> : 'Dispatch Load'}
+          </button>
+          {createFeedback && <span className={`text-${createFeedback.includes('success') ? 'success' : 'danger'}`}>{createFeedback}</span>}
+        </div>
+      </form>
+    </>
   );
 } 

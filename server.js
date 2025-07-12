@@ -15,6 +15,12 @@ import { authenticateJWT } from './middleware/auth.js';
 import parentBookingsRouter from './routes/parent-bookings.js';
 import adminRouter from './routes/admin.js';
 import { Paynow } from 'paynow';
+import { v4 as uuidv4 } from 'uuid';
+import cron from 'node-cron';
+import nodemailer from 'nodemailer';
+import { Parser as CsvParser } from 'json2csv';
+import rateLimit from 'express-rate-limit';
+import { subscriptionTiers } from './config/subscriptions.js';
 
 dotenv.config();
 
@@ -270,7 +276,8 @@ app.post('/parent-bookings', authenticateJWT, async (req, res) => {
     particle_size,
     requires_analysis,
     special_handling_notes,
-    environmental_concerns
+    environmental_concerns,
+    cost = 0 // Consignment cost
   } = req.body;
 
   try {
@@ -303,14 +310,18 @@ app.post('/parent-bookings', authenticateJWT, async (req, res) => {
       return res.status(400).json({ error: 'Moisture content must be between 0 and 100%.' });
     }
     
+    if (cost < 0) {
+      return res.status(400).json({ error: 'Cost must be non-negative.' });
+    }
+
     const result = await pool.query(
       `INSERT INTO parent_bookings (
         customer_name, phone_number, total_tonnage, mineral_type, mineral_grade, 
         loading_point, destination, deadline, booking_code, notes,
         moisture_content, particle_size, requires_analysis,
         special_handling_notes, environmental_concerns,
-        remaining_tonnage, status, created_by_user_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
+        remaining_tonnage, status, created_by_user_id, cost
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
       RETURNING *`,
       [
         customer_name,
@@ -330,7 +341,8 @@ app.post('/parent-bookings', authenticateJWT, async (req, res) => {
         environmental_concerns,
         total_tonnage, // Initially, remaining_tonnage equals total_tonnage
         'Active',  // Default status
-        req.user.id
+        req.user.id,
+        cost
       ]
     );
 
@@ -389,6 +401,28 @@ app.patch('/parent-bookings/:id/status', authenticateJWT, async (req, res) => {
   }
 });
 
+// Add PATCH endpoint to update cost
+app.patch('/parent-bookings/:id/cost', authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  const { cost } = req.body;
+  if (cost === undefined || cost < 0) {
+    return res.status(400).json({ error: 'Cost must be provided and non-negative.' });
+  }
+  try {
+    const result = await pool.query(
+      'UPDATE parent_bookings SET cost = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [cost, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Parent booking not found.' });
+    }
+    res.json({ success: true, booking: result.rows[0] });
+  } catch (err) {
+    console.error(`Update parent booking cost error for id ${id}:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delivery Routes
 app.post('/deliveries', authenticateJWT, checkQuota('delivery'), async (req, res) => {
   let { 
@@ -403,7 +437,10 @@ app.post('/deliveries', authenticateJWT, checkQuota('delivery'), async (req, res
     loading_point,
     destination,
     checkpoints = [], 
-    driver_details = {} 
+    driver_details = {},
+    value = 0,
+    cost = 0,
+    custom_status = null
   } = req.body;
 
   // 1. Validate input
@@ -471,8 +508,11 @@ app.post('/deliveries', authenticateJWT, checkQuota('delivery'), async (req, res
             booking_reference,
             checkpoints, 
             driver_details,
-            created_by_user_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            created_by_user_id,
+            value,
+            cost,
+            custom_status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
           RETURNING *`,
           [
             tracking_id, 
@@ -489,7 +529,10 @@ app.post('/deliveries', authenticateJWT, checkQuota('delivery'), async (req, res
             booking_reference,
             JSON.stringify(checkpoints), 
             JSON.stringify(driver_details),
-            req.user.id
+            req.user.id,
+            value,
+            cost,
+            custom_status
           ]
         );
 
@@ -552,10 +595,13 @@ app.post('/deliveries', authenticateJWT, checkQuota('delivery'), async (req, res
   }
 });
 
+// GET /deliveries?limit=20&offset=0&search=foo
+// Optional 'search' param filters by customer_name, tracking_id, or current_status (case-insensitive, partial match)
 app.get('/deliveries', authenticateJWT, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
     const offset = parseInt(req.query.offset, 10) || 0;
+    const search = req.query.search ? req.query.search.trim().toLowerCase() : '';
     let baseQuery = `
       SELECT 
         d.*,
@@ -574,12 +620,30 @@ app.get('/deliveries', authenticateJWT, async (req, res) => {
     `;
     const params = [];
     const countParams = [];
+    let whereClauses = [];
 
+    // Role-based filtering
     if (req.user.role === 'operator') {
-      baseQuery += ' WHERE pb.created_by_user_id = $1';
-      countQuery += ' WHERE pb.created_by_user_id = $1';
+      whereClauses.push('pb.created_by_user_id = $' + (params.length + 1));
       params.push(req.user.id);
       countParams.push(req.user.id);
+    }
+
+    // Search filtering
+    if (search) {
+      const searchParam = `%${search}%`;
+      whereClauses.push(`(
+        LOWER(d.customer_name) LIKE $${params.length + 1}
+        OR LOWER(d.tracking_id) LIKE $${params.length + 1}
+        OR LOWER(d.current_status) LIKE $${params.length + 1}
+      )`);
+      params.push(searchParam);
+      countParams.push(searchParam);
+    }
+
+    if (whereClauses.length > 0) {
+      baseQuery += ' WHERE ' + whereClauses.join(' AND ');
+      countQuery += ' WHERE ' + whereClauses.join(' AND ');
     }
 
     baseQuery += ' ORDER BY d.created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
@@ -593,6 +657,131 @@ app.get('/deliveries', authenticateJWT, async (req, res) => {
     res.json({ total, deliveries: result.rows });
   } catch (err) {
     console.error('Get deliveries error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- NEW DASHBOARD/ANALYTICS ENDPOINTS ---
+
+// 1. Loads summary by day and customer
+app.get('/deliveries/summary-by-day-customer', authenticateJWT, async (req, res) => {
+  try {
+    let where = '';
+    let params = [];
+    if (req.user.role === 'operator') {
+      where = 'WHERE pb.created_by_user_id = $1';
+      params.push(req.user.id);
+    }
+    const query = `
+      SELECT 
+        pb.customer_name, 
+        DATE(d.created_at) AS day, 
+        COUNT(*) AS deliveries_count, 
+        SUM(d.tonnage) AS total_tonnage
+      FROM deliveries d
+      LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id
+      ${where}
+      GROUP BY pb.customer_name, day
+      ORDER BY day DESC, pb.customer_name
+    `;
+    const result = await pool.query(query, params);
+    res.json({ summary: result.rows });
+  } catch (err) {
+    console.error('Summary by day/customer error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Pending loads summary
+app.get('/deliveries/pending-summary', authenticateJWT, async (req, res) => {
+  try {
+    let where = 'WHERE d.current_status != $1';
+    let params = ['Delivered'];
+    if (req.user.role === 'operator') {
+      where += ' AND pb.created_by_user_id = $2';
+      params.push(req.user.id);
+    }
+    const query = `
+      SELECT 
+        pb.customer_name, 
+        COUNT(*) AS pending_count, 
+        SUM(d.tonnage) AS pending_tonnage
+      FROM deliveries d
+      LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id
+      ${where}
+      GROUP BY pb.customer_name
+      ORDER BY pb.customer_name
+    `;
+    const result = await pool.query(query, params);
+    res.json({ pending: result.rows });
+  } catch (err) {
+    console.error('Pending summary error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Loads value/cost summary
+app.get('/deliveries/value-summary', authenticateJWT, async (req, res) => {
+  try {
+    // Assume value/cost is stored in d.value or d.cost; if not, return tonnage as proxy
+    let where = '';
+    let params = [];
+    if (req.user.role === 'operator') {
+      where = 'WHERE pb.created_by_user_id = $1';
+      params.push(req.user.id);
+    }
+    const query = `
+      SELECT 
+        pb.customer_name, 
+        SUM(d.tonnage) AS total_tonnage,
+        SUM(d.value) AS total_value,
+        SUM(d.cost) AS total_cost,
+        COUNT(DISTINCT CASE WHEN d.custom_status = 'On Time' THEN d.tracking_id END) AS on_time_count,
+        COUNT(DISTINCT CASE WHEN d.custom_status = 'Delayed' THEN d.tracking_id END) AS delayed_count,
+        COUNT(DISTINCT CASE WHEN d.custom_status = 'Cancelled' THEN d.tracking_id END) AS cancelled_count
+      FROM deliveries d
+      LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id
+      ${where}
+      GROUP BY pb.customer_name
+      ORDER BY pb.customer_name
+    `;
+    const result = await pool.query(query, params);
+    res.json({ valueSummary: result.rows });
+  } catch (err) {
+    console.error('Value summary error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. General analytics for dashboard graphs
+app.get('/deliveries/analytics', authenticateJWT, async (req, res) => {
+  try {
+    let where = '';
+    let params = [];
+    if (req.user.role === 'operator') {
+      where = 'WHERE pb.created_by_user_id = $1';
+      params.push(req.user.id);
+    }
+    // Example: total deliveries, pending, completed, total tonnage
+    const query = `
+      SELECT 
+        COUNT(*) AS total_deliveries,
+        SUM(CASE WHEN d.current_status = 'Delivered' THEN 1 ELSE 0 END) AS completed_deliveries,
+        SUM(CASE WHEN d.current_status != 'Delivered' THEN 1 ELSE 0 END) AS pending_deliveries,
+        SUM(d.tonnage) AS total_tonnage,
+        SUM(d.value) AS total_value,
+        SUM(d.cost) AS total_cost,
+        COUNT(DISTINCT CASE WHEN d.custom_status = 'On Time' THEN d.tracking_id END) AS on_time_count,
+        COUNT(DISTINCT CASE WHEN d.custom_status = 'Delayed' THEN d.tracking_id END) AS delayed_count,
+        COUNT(DISTINCT CASE WHEN d.custom_status = 'Cancelled' THEN d.tracking_id END) AS cancelled_count
+      FROM deliveries d
+      LEFT JOIN parent_bookings pb ON d.parent_booking_id = pb.id
+      ${where}
+    `;
+    const result = await pool.query(query, params);
+    res.json({ analytics: result.rows[0] });
+  } catch (err) {
+    console.error('Analytics error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -784,7 +973,7 @@ app.post('/send-notification', authenticateJWT, async (req, res) => {
     const notificationPayload = JSON.stringify({
       title: 'Morres Logistics',
       body: message,
-      icon: '/pwa-192x192.png',
+      icon: '/logo.jpg',
     });
 
     const promises = result.rows.map(row =>
@@ -945,6 +1134,14 @@ app.patch('/api/admin/subscriptions/:userId', authenticateJWT, adminOnly, async 
 
     const result = await pool.query(updateQuery, values);
     
+    // Log admin action
+    if (req.user && req.user.username) {
+      await pool.query(
+        'INSERT INTO admin_logs (action, actor, target, details) VALUES ($1, $2, $3, $4)',
+        ['update_subscription', req.user.username, userId, JSON.stringify({ newTier, newStatus, newEndDate })]
+      );
+    }
+    
     console.log(`[AUDIT] Subscription for user ${userId} updated by admin ${req.user.username}. New tier: ${newTier}`);
     res.json({ success: true, subscription: result.rows[0] });
 
@@ -995,49 +1192,56 @@ const paynow = new Paynow(
 paynow.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://your-backend-url.com/api/paynow/callback';
 paynow.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://your-frontend-url.com/payment-success';
 
-// Create a new subscription for the current user (plan selection)
+// POST /api/subscriptions - create a new subscription and initiate payment
 app.post('/api/subscriptions', authenticateJWT, async (req, res) => {
-  const { tier } = req.body;
-  const { subscriptionTiers } = await import('./config/subscriptions.js');
-  if (!subscriptionTiers[tier]) {
-    return res.status(400).json({ error: 'Invalid subscription tier.' });
-  }
   try {
+    const { tier } = req.body;
+    const userId = req.user.id;
+    if (!tier || !subscriptionTiers[tier]) {
+      return res.status(400).json({ error: 'Invalid or missing subscription tier.' });
+    }
+    // Check for existing active/trial subscription
+    const existing = await pool.query(
+      `SELECT * FROM subscriptions WHERE user_id = $1 AND status IN ('active', 'trial', 'pending') ORDER BY start_date DESC LIMIT 1`,
+      [userId]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'You already have an active or pending subscription.' });
+    }
+    // Create pending subscription (start_date = now, end_date = null until payment)
     const now = new Date();
-    const endDate = new Date(now);
-    endDate.setMonth(endDate.getMonth() + 1); // 1 month duration
     const result = await pool.query(
-      `INSERT INTO subscriptions (user_id, tier, status, start_date, end_date, deliveries_used, sms_used)
-       VALUES ($1, $2, 'pending', $3, $4, 0, 0)
-       RETURNING *`,
-      [req.user.id, tier, now, endDate]
+      `INSERT INTO subscriptions (user_id, tier, status, start_date) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [userId, tier, 'pending', now]
     );
     const subscription = result.rows[0];
-
-    // Create Paynow payment
-    const paynowPayment = paynow.createPayment(
-      `Subscription for ${req.user.username}`,
-      req.user.email || 'test@example.com'
+    // Initiate Paynow payment
+    const paynowClient = new paynow(
+      process.env.PAYNOW_INTEGRATION_ID,
+      process.env.PAYNOW_INTEGRATION_KEY
     );
-    paynowPayment.add(
-      `${subscriptionTiers[tier].name} Plan`,
-      subscriptionTiers[tier].price
+    const userEmail = req.user.email || 'info@morres.com';
+    const payment = paynowClient.createPayment(
+      `Subscription ${tier} for user ${userId}`,
+      userEmail
     );
-    const response = await paynow.send(paynowPayment);
-
+    payment.add(`Morres Logistics Subscription (${tier})`, subscriptionTiers[tier].price);
+    const response = await paynowClient.send(payment);
     if (response.success) {
-      // Store Paynow poll URL in subscription for later verification
+      // Optionally, store poll URL in DB for later verification
       await pool.query(
         'UPDATE subscriptions SET paynow_poll_url = $1 WHERE id = $2',
         [response.pollUrl, subscription.id]
       );
-      res.json({ ...subscription, paynowUrl: response.redirectUrl });
+      return res.json({ paynowUrl: response.redirectUrl });
     } else {
-      res.status(500).json({ error: 'Failed to initiate payment with Paynow.' });
+      // Clean up failed subscription
+      await pool.query('DELETE FROM subscriptions WHERE id = $1', [subscription.id]);
+      return res.status(500).json({ error: 'Failed to initiate payment. Please try again.' });
     }
   } catch (err) {
     console.error('Create subscription error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Failed to create subscription.' });
   }
 });
 
@@ -1065,6 +1269,445 @@ app.post('/api/paynow/callback', async (req, res) => {
   } catch (err) {
     console.error('Paynow callback error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Notification API Endpoints ---
+
+// 1. Get notifications for current user (or global/system notifications)
+app.get('/api/notifications', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    // Fetch user-specific and global notifications (user_id IS NULL)
+    const result = await pool.query(
+      `SELECT * FROM notifications
+       WHERE (user_id = $1 OR user_id IS NULL)
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [userId]
+    );
+    res.json({ notifications: result.rows });
+  } catch (err) {
+    console.error('Get notifications error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 2. Mark notification as read
+app.patch('/api/notifications/:id/read', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    // Only allow marking notifications that belong to user or are global
+    const result = await pool.query(
+      `UPDATE notifications
+       SET read = true
+       WHERE id = $1 AND (user_id = $2 OR user_id IS NULL)
+       RETURNING *`,
+      [id, userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Notification not found or not permitted.' });
+    }
+    res.json({ success: true, notification: result.rows[0] });
+  } catch (err) {
+    console.error('Mark notification read error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 3. Create a notification (admin/system only)
+app.post('/api/notifications', authenticateJWT, adminOnly, async (req, res) => {
+  try {
+    const { user_id, type = 'info', message, entity_type, entity_id } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required.' });
+    }
+    const result = await pool.query(
+      `INSERT INTO notifications (user_id, type, message, entity_type, entity_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [user_id || null, type, message, entity_type || null, entity_id || null]
+    );
+    res.status(201).json({ success: true, notification: result.rows[0] });
+  } catch (err) {
+    console.error('Create notification error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Invoice API Endpoints ---
+
+// 1. Get invoice history for current user
+app.get('/api/invoices', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await pool.query(
+      `SELECT * FROM invoices WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+      [userId]
+    );
+    res.json({ invoices: result.rows });
+  } catch (err) {
+    console.error('Get invoices error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 2. Download invoice (JSON placeholder)
+app.get('/api/invoices/:invoiceId/download', authenticateJWT, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { invoiceId } = req.params;
+    const result = await pool.query(
+      `SELECT * FROM invoices WHERE invoice_id = $1 AND user_id = $2`,
+      [invoiceId, userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found.' });
+    }
+    // For now, return JSON; in future, generate PDF/CSV
+    res.setHeader('Content-Disposition', `attachment; filename=invoice-${invoiceId}.json`);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Download invoice error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- SCHEDULED REPORTS ENDPOINTS ---
+
+// Helper: Ensure scheduled_reports table exists (migration placeholder)
+async function ensureScheduledReportsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS scheduled_reports (
+      id UUID PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      recipients TEXT NOT NULL,
+      schedule_type VARCHAR(20) NOT NULL,
+      day_of_week VARCHAR(10),
+      time VARCHAR(10),
+      report_type VARCHAR(20) NOT NULL,
+      columns TEXT NOT NULL,
+      filters JSONB,
+      status VARCHAR(20) DEFAULT 'active',
+      last_run TIMESTAMP,
+      next_run TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
+ensureScheduledReportsTable();
+
+// POST /api/reports/schedule
+app.post('/api/reports/schedule', authenticateJWT, async (req, res) => {
+  const { recipients, schedule, dayOfWeek, time, reportType, columns, filters } = req.body;
+  if (!recipients || !schedule || !dayOfWeek || !time || !reportType || !columns) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
+  try {
+    const id = uuidv4();
+    await pool.query(
+      `INSERT INTO scheduled_reports (id, user_id, recipients, schedule_type, day_of_week, time, report_type, columns, filters)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [id, req.user.id, recipients.join(','), schedule, dayOfWeek, time, reportType, columns.join(','), filters ? JSON.stringify(filters) : null]
+    );
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error('Create scheduled report error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/reports/schedule
+app.get('/api/reports/schedule', authenticateJWT, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM scheduled_reports WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get scheduled reports error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/reports/schedule/:id
+app.put('/api/reports/schedule/:id', authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  const { recipients, schedule, dayOfWeek, time, reportType, columns, filters, status } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE scheduled_reports SET
+        recipients = $1,
+        schedule_type = $2,
+        day_of_week = $3,
+        time = $4,
+        report_type = $5,
+        columns = $6,
+        filters = $7,
+        status = COALESCE($8, status),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $9 AND user_id = $10
+      RETURNING *`,
+      [recipients.join(','), schedule, dayOfWeek, time, reportType, columns.join(','), filters ? JSON.stringify(filters) : null, status, id, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Scheduled report not found.' });
+    }
+    res.json({ success: true, report: result.rows[0] });
+  } catch (err) {
+    console.error('Update scheduled report error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/reports/schedule/:id
+app.delete('/api/reports/schedule/:id', authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'DELETE FROM scheduled_reports WHERE id = $1 AND user_id = $2 RETURNING *',
+      [id, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Scheduled report not found.' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete scheduled report error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Placeholder: Background job to process and send scheduled reports
+// (To be implemented: cron/worker that queries scheduled_reports, generates PDF/CSV, and emails to recipients)
+
+// Email transporter (configure via .env)
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+});
+
+// Helper: Calculate next run time
+function getNextRun(scheduleType, dayOfWeek, time) {
+  const now = new Date();
+  let next = new Date(now);
+  const [hour, minute] = time.split(':').map(Number);
+  next.setHours(hour, minute, 0, 0);
+  if (scheduleType === 'weekly') {
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const targetDay = days.indexOf(dayOfWeek);
+    let diff = (targetDay - now.getDay() + 7) % 7;
+    if (diff === 0 && now > next) diff = 7;
+    next.setDate(now.getDate() + diff);
+  } else if (scheduleType === 'monthly') {
+    // Next occurrence of this day in the next month
+    next.setMonth(now.getMonth() + (now > next ? 1 : 0));
+  }
+  if (next < now) next.setDate(next.getDate() + 1);
+  return next;
+}
+
+// Cron job: runs every 5 minutes
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    const now = new Date();
+    const result = await pool.query(
+      `SELECT * FROM scheduled_reports WHERE status = 'active' AND (next_run IS NULL OR next_run <= $1)`,
+      [now]
+    );
+    for (const report of result.rows) {
+      // Fetch deliveries based on report config (MVP: all deliveries for user)
+      const deliveriesRes = await pool.query(
+        'SELECT * FROM deliveries WHERE created_by_user_id = $1',
+        [report.user_id]
+      );
+      let deliveries = deliveriesRes.rows;
+      // Apply filters if present (MVP: skip for now)
+      // Select columns
+      const columns = report.columns.split(',');
+      const data = deliveries.map(d => {
+        const row = {};
+        columns.forEach(col => { row[col] = d[col]; });
+        return row;
+      });
+      // Generate CSV
+      const csv = new CsvParser({ fields: columns }).parse(data);
+      // Email
+      const mailOptions = {
+        from: process.env.SMTP_FROM || 'noreply@morreslogistics.com',
+        to: report.recipients,
+        subject: 'Scheduled Morres Logistics Report',
+        text: 'See attached CSV report.',
+        attachments: [
+          { filename: 'report.csv', content: csv }
+        ]
+      };
+      try {
+        await transporter.sendMail(mailOptions);
+        // Update last_run and next_run
+        const nextRun = getNextRun(report.schedule_type, report.day_of_week, report.time);
+        await pool.query(
+          'UPDATE scheduled_reports SET last_run = $1, next_run = $2 WHERE id = $3',
+          [now, nextRun, report.id]
+        );
+        console.log(`[SCHEDULED REPORT] Sent to ${report.recipients} at ${now}`);
+      } catch (err) {
+        console.error(`[SCHEDULED REPORT ERROR] Email failed for report ${report.id}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error('[SCHEDULED REPORT CRON ERROR]', err);
+  }
+});
+
+// --- PUBLIC ONE-TIME DELIVERY ENDPOINT ---
+
+const publicDeliveryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+app.post('/api/public/send-delivery', publicDeliveryLimiter, async (req, res) => {
+  const { customer_name, phone_number, loading_point, destination, tonnage, container_count } = req.body;
+  // Basic validation
+  if (!customer_name || !phone_number || !loading_point || !destination || !tonnage || !container_count) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
+  if (!validateZimPhone(phone_number)) {
+    return res.status(400).json({ error: 'Invalid Zimbabwean phone number.' });
+  }
+  // Create Paynow payment for $1.00
+  const paynowPayment = paynow.createPayment(
+    `One-Time Delivery for ${customer_name}`,
+    phone_number + '@public.morres.com'
+  );
+  paynowPayment.add('One-Time Delivery', 1.00);
+  try {
+    const response = await paynow.send(paynowPayment);
+    if (response.success) {
+      // Store pollUrl and delivery details in a temp table for callback
+      await pool.query(
+        'INSERT INTO one_time_deliveries (paynow_poll_url, customer_name, phone_number, loading_point, destination, tonnage, container_count, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [response.pollUrl, customer_name, phone_number, loading_point, destination, tonnage, container_count, 'pending']
+      );
+      return res.json({ paynowUrl: response.redirectUrl });
+    } else {
+      return res.status(500).json({ error: 'Failed to initiate payment with Paynow.' });
+    }
+  } catch (err) {
+    console.error('One-Time Delivery Paynow error:', err);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+// --- PAYNOW CALLBACK LOGIC ---
+app.post('/api/paynow/one-time-callback', async (req, res) => {
+  const { pollUrl, paymentStatus } = req.body;
+  if (!pollUrl || paymentStatus !== 'Paid') return res.status(400).json({ error: 'Invalid callback.' });
+  try {
+    // Find the pending one-time delivery
+    const result = await pool.query('SELECT * FROM one_time_deliveries WHERE paynow_poll_url = $1 AND status = $2', [pollUrl, 'pending']);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'No pending delivery found.' });
+    const delivery = result.rows[0];
+    // Mark as paid
+    await pool.query('UPDATE one_time_deliveries SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', ['paid', delivery.id]);
+    // Create a delivery record (minimal fields)
+    await pool.query(
+      `INSERT INTO deliveries (customer_name, phone_number, loading_point, destination, tonnage, container_count, current_status, created_by_user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,'Pending',NULL)`,
+      [delivery.customer_name, delivery.phone_number, delivery.loading_point, delivery.destination, delivery.tonnage, delivery.container_count]
+    );
+    // Send SMS (pseudo, replace with actual SMS logic)
+    // await sendSMS(delivery.phone_number, 'Your one-time delivery has been created!');
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('One-time Paynow callback error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+app.post('/api/paynow/addon-callback', async (req, res) => {
+  const { pollUrl, paymentStatus } = req.body;
+  if (!pollUrl || paymentStatus !== 'Paid') return res.status(400).json({ error: 'Invalid callback.' });
+  try {
+    // Find the pending add-on purchase
+    const result = await pool.query('SELECT * FROM addon_purchases WHERE paynow_poll_url = $1 AND status = $2', [pollUrl, 'pending']);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'No pending add-on found.' });
+    const addon = result.rows[0];
+    // Mark as paid
+    await pool.query('UPDATE addon_purchases SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', ['paid', addon.id]);
+    // Credit the user's subscription
+    if (addon.type === 'deliveries') {
+      await pool.query('UPDATE subscriptions SET deliveries_used = deliveries_used - $1 WHERE user_id = $2 AND status = $3', [addon.quantity, addon.user_id, 'active']);
+    } else if (addon.type === 'sms') {
+      await pool.query('UPDATE subscriptions SET sms_used = sms_used - $1 WHERE user_id = $2 AND status = $3', [addon.quantity, addon.user_id, 'active']);
+    }
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Add-on Paynow callback error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+// --- ADD-ON PURCHASE ENDPOINTS ---
+app.post('/api/addons/purchase-deliveries', authenticateJWT, async (req, res) => {
+  const { quantity } = req.body;
+  if (!quantity || quantity < 1) return res.status(400).json({ error: 'Quantity required.' });
+  const price = 0.25 * quantity;
+  const paynowPayment = paynow.createPayment(
+    `Extra Deliveries for ${req.user.username}`,
+    req.user.email || 'test@example.com'
+  );
+  paynowPayment.add('Extra Deliveries', price);
+  try {
+    const response = await paynow.send(paynowPayment);
+    if (response.success) {
+      await pool.query(
+        'INSERT INTO addon_purchases (user_id, type, quantity, paynow_poll_url, status) VALUES ($1,$2,$3,$4,$5)',
+        [req.user.id, 'deliveries', quantity, response.pollUrl, 'pending']
+      );
+      return res.json({ paynowUrl: response.redirectUrl });
+    } else {
+      return res.status(500).json({ error: 'Failed to initiate payment with Paynow.' });
+    }
+  } catch (err) {
+    console.error('Addon purchase error:', err);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+app.post('/api/addons/purchase-sms', authenticateJWT, async (req, res) => {
+  const { quantity } = req.body;
+  if (!quantity || quantity < 1) return res.status(400).json({ error: 'Quantity required.' });
+  const price = 2.00 * (quantity / 100);
+  const paynowPayment = paynow.createPayment(
+    `SMS Top-up for ${req.user.username}`,
+    req.user.email || 'test@example.com'
+  );
+  paynowPayment.add('SMS Top-up', price);
+  try {
+    const response = await paynow.send(paynowPayment);
+    if (response.success) {
+      await pool.query(
+        'INSERT INTO addon_purchases (user_id, type, quantity, paynow_poll_url, status) VALUES ($1,$2,$3,$4,$5)',
+        [req.user.id, 'sms', quantity, response.pollUrl, 'pending']
+      );
+      return res.json({ paynowUrl: response.redirectUrl });
+    } else {
+      return res.status(500).json({ error: 'Failed to initiate payment with Paynow.' });
+    }
+  } catch (err) {
+    console.error('Addon purchase error:', err);
+    return res.status(500).json({ error: 'Internal server error.' });
   }
 });
 

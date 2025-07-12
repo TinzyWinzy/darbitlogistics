@@ -148,7 +148,51 @@ function PaginationBar({ page, setPage, pageSize, setPageSize, total }) {
   );
 }
 
-const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSelectDelivery, page, setPage, pageSize, setPageSize, total, search, setSearch, progressFilter, setProgressFilter, progressSort, setProgressSort, progressSortOrder, setProgressSortOrder }) => {
+// Add color map for custom statuses
+const statusBadgeColors = {
+  'Delayed': 'bg-danger',
+  'Awaiting Payment': 'bg-warning text-dark',
+  'In Customs': 'bg-info',
+  'Completed': 'bg-success',
+  'Active': 'bg-primary',
+  '': 'bg-secondary',
+};
+
+// Progress steps for delivery status
+const DELIVERY_STATUS_STEPS = [
+  'Pending',
+  'At Mine',
+  'In Transit',
+  'At Border',
+  'At Port',
+  'At Port of Destination',
+  'At Warehouse',
+  'Delivered',
+  'Cancelled'
+];
+
+function DeliveryProgressBar({ status }) {
+  const idx = DELIVERY_STATUS_STEPS.indexOf(status);
+  const percent = idx === -1 ? 0 : Math.round((idx / (DELIVERY_STATUS_STEPS.length - 1)) * 100);
+  let barColor = '#1F2120';
+  if (status === 'Delivered') barColor = '#198754'; // Bootstrap green
+  else if (status === 'Cancelled') barColor = '#dc3545'; // Bootstrap red
+  return (
+    <div className="progress" style={{ height: 8, background: '#f3ede7', marginBottom: 6 }} title={`Status: ${status} (${idx + 1}/${DELIVERY_STATUS_STEPS.length})`}>
+      <div
+        className="progress-bar"
+        role="progressbar"
+        style={{ width: `${percent}%`, backgroundColor: barColor, transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)' }}
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+      </div>
+    </div>
+  );
+}
+
+const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSelectDelivery, page, setPage, pageSize, setPageSize, total, search, setSearch, progressFilter, setProgressFilter, progressSort, setProgressSort, progressSortOrder, setProgressSortOrder, customStatusFilter, setCustomStatusFilter }) => {
   const [openBookingId, setOpenBookingId] = useState(null);
 
   return (
@@ -204,6 +248,23 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSele
               <option value="in-progress">In Progress</option>
               <option value="not-started">Not Started</option>
               <option value="overdue">Overdue</option>
+            </select>
+          </div>
+          <div className="d-flex align-items-center gap-1" style={{ minWidth: 120 }}>
+            <label htmlFor="customStatusFilter" className="form-label text-muted mb-0 small" style={{ fontSize: '0.95em' }}>Custom Status:</label>
+            <select
+              id="customStatusFilter"
+              className="form-select form-select-sm"
+              style={{ flexBasis: '100px', fontSize: '0.95em', padding: '0.2em 0.5em' }}
+              value={customStatusFilter}
+              onChange={e => { setCustomStatusFilter(e.target.value); setPage(1); }}
+            >
+              <option value="all">All</option>
+              <option value="Delayed">Delayed</option>
+              <option value="Awaiting Payment">Awaiting Payment</option>
+              <option value="In Customs">In Customs</option>
+              <option value="Completed">Completed</option>
+              <option value="Active">Active</option>
             </select>
           </div>
           <div className="d-flex align-items-center gap-1" style={{ minWidth: 120 }}>
@@ -332,7 +393,20 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSele
                       {(booking.deliveries || []).length > 0 ? (
                         <ul className="list-group list-group-flush" style={{ marginTop: 2 }}>
                           {(booking.deliveries || []).map((delivery, index) => {
-                            const isSelected = selectedId === delivery.trackingId;
+                            // Normalize fields for both camelCase and snake_case
+                            const trackingId = delivery.trackingId || delivery.tracking_id || index;
+                            const driverDetails = delivery.driverDetails || delivery.driver_details || {};
+                            const driverName = driverDetails.name || 'N/A';
+                            const vehicleReg = driverDetails.vehicleReg || driverDetails.vehicle_reg || 'N/A';
+                            const currentStatus = delivery.currentStatus || delivery.current_status || 'Pending';
+                            const isCompleted = delivery.isCompleted ?? delivery.is_completed ?? false;
+                            const tonnage = Number(delivery.tonnage || 0);
+                            const containerCount = Number(delivery.containerCount ?? delivery.container_count ?? 0);
+                            const value = Number(delivery.value ?? 0);
+                            const cost = Number(delivery.cost ?? 0);
+                            const customStatus = delivery.customStatus || delivery.custom_status || '';
+
+                            const isSelected = selectedId === trackingId;
                             const itemStyle = {
                               cursor: 'pointer',
                               fontSize: '0.96em',
@@ -350,23 +424,47 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSele
 
                             return (
                               <li
-                                key={delivery.trackingId || delivery.tracking_id || index}
+                                key={trackingId}
                                 className="list-group-item list-group-item-action p-2"
                                 style={itemStyle}
-                                onClick={() => onSelectDelivery(delivery.trackingId)}
+                                onClick={() => onSelectDelivery(trackingId)}
                               >
-                                <div className="d-flex justify-content-between align-items-center">
-                                  <div>
-                                    <strong className="d-block" style={headerStyle}>{delivery.trackingId}</strong>
-                                    <small className={isSelected ? 'text-white-50' : 'text-muted'} style={{ fontSize: '0.92em' }}>
-                                      {(delivery.driverDetails?.name || 'N/A')} ({delivery.driverDetails?.vehicleReg || 'N/A'})
-                                    </small>
+                                {/* Modern Card Layout */}
+                                <div className="row align-items-center g-2">
+                                  <div className="col-12 col-md-8">
+                                    <div className="d-flex justify-content-between align-items-center">
+                                      <div>
+                                        <strong className="d-block" style={headerStyle}>{trackingId}</strong>
+                                        <small className={isSelected ? 'text-white-50' : 'text-muted'} style={{ fontSize: '0.92em' }}>
+                                          {driverName} ({vehicleReg})
+                                        </small>
+                                      </div>
+                                      <span className={`badge rounded-pill align-self-center fs-6 ${isCompleted ? 'bg-success' : 'bg-info'}`} style={{ fontSize: '0.93em', padding: '0.3em 0.7em' }}>
+                                        {currentStatus}
+                                      </span>
+                                    </div>
+                                    {/* Progress Bar for Delivery Status */}
+                                    <DeliveryProgressBar status={currentStatus} />
                                   </div>
-                                  <span className={`badge rounded-pill align-self-center fs-6 ${delivery.isCompleted ? 'bg-success' : 'bg-info'}`} style={{ fontSize: '0.93em', padding: '0.3em 0.7em' }}>
-                                    {delivery.currentStatus}
-                                  </span>
+                                  <div className="col-12 col-md-4">
+                                    <div className="d-flex flex-wrap gap-2 justify-content-end">
+                                      <span className="badge bg-light text-dark border" title="Tonnage" style={{ fontSize: '0.92em' }}>
+                                        <span className="material-icons-outlined align-middle" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>scale</span> {tonnage.toLocaleString()}t
+                                      </span>
+                                      <span className="badge bg-light text-dark border" title="Containers" style={{ fontSize: '0.92em' }}>
+                                        <span className="material-icons-outlined align-middle" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>inventory_2</span> {containerCount}
+                                      </span>
+                                      <span className="badge bg-light text-success border" title="Value" style={{ fontSize: '0.92em' }}>
+                                        <span className="material-icons-outlined align-middle" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>attach_money</span> ${value.toLocaleString()}
+                                      </span>
+                                      <span className="badge bg-light text-danger border" title="Cost" style={{ fontSize: '0.92em' }}>
+                                        <span className="material-icons-outlined align-middle" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>money_off</span> ${cost.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className={`mt-2 pt-2 border-top d-flex justify-content-between small ${isSelected ? 'text-white-50 border-top-light' : 'text-muted'}`} style={{ fontSize: '0.91em' }}>
+                                {/* Old meta row can be removed or left for redundancy */}
+                                {/* <div className={`mt-2 pt-2 border-top d-flex justify-content-between small ${isSelected ? 'text-white-50 border-top-light' : 'text-muted'}`} style={{ fontSize: '0.91em' }}>
                                   <span>
                                     <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>scale</span>
                                     {' '}{delivery.tonnage}t
@@ -379,7 +477,12 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, selectedId, onSele
                                     <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>diamond</span>
                                     {' '}{delivery.mineralType || 'N/A'}
                                   </span>
-                                </div>
+                                  <span className="badge ms-2" style={{ fontSize: '0.93em', padding: '0.3em 0.7em', background: statusBadgeColors[delivery.customStatus] || 'bg-secondary' }} title={delivery.customStatus}>
+                                    {delivery.customStatus || 'N/A'}
+                                  </span>
+                                  <span className="ms-2 text-success" title="Value">${delivery.value?.toLocaleString() || '0'}</span>
+                                  <span className="ms-2 text-danger" title="Cost">${delivery.cost?.toLocaleString() || '0'}</span>
+                                </div> */}
                               </li>
                             );
                           })}

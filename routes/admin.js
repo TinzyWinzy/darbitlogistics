@@ -24,14 +24,17 @@ router.get('/users', authenticateJWT, requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/admin/logs - return recent system logs (MVP: fake logs)
+// GET /api/admin/logs - return recent system logs (real logs from DB)
 router.get('/logs', authenticateJWT, requireAdmin, async (req, res) => {
-  // TODO: Replace with real logs from DB or file
-  res.json([
-    { id: 1, message: 'User admin created a new user.', timestamp: new Date().toISOString() },
-    { id: 2, message: 'Subscription upgraded for user johndoe.', timestamp: new Date().toISOString() },
-    { id: 3, message: 'System maintenance scheduled.', timestamp: new Date().toISOString() },
-  ]);
+  try {
+    const result = await pool.query(
+      'SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT 50'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching admin logs:', err);
+    res.status(500).json({ error: 'Failed to fetch admin logs' });
+  }
 });
 
 // GET /api/admin/subscriptions - list all subscriptions

@@ -330,11 +330,11 @@ const AdminDashboard = () => {
                   ) : subscriptions.length === 0 ? (
                     <tr><td colSpan={8}><EmptyState message="No subscriptions found." /></td></tr>
                   ) : (
-                    subscriptions.map(sub => (
-                      <tr key={sub.id}>
+                    subscriptions.map((sub, idx) => (
+                      <tr key={sub.subscription_id || sub.id || idx} className={idx % 2 === 0 ? 'table-light' : ''} style={{ transition: 'background 0.2s' }}>
                         <td>{sub.username || sub.user_id}</td>
                         <td>
-                          {editSubId === sub.id ? (
+                          {editSubId === (sub.subscription_id || sub.id) ? (
                             <select name="tier" value={editSubData.tier} onChange={handleEditSubChange} className="form-select form-select-sm">
                               <option value="starter">Starter</option>
                               <option value="basic">Basic</option>
@@ -346,7 +346,7 @@ const AdminDashboard = () => {
                           )}
                         </td>
                         <td>
-                          {editSubId === sub.id ? (
+                          {editSubId === (sub.subscription_id || sub.id) ? (
                             <select name="status" value={editSubData.status} onChange={handleEditSubChange} className="form-select form-select-sm">
                               <option value="active">Active</option>
                               <option value="trial">Trial</option>
@@ -362,9 +362,9 @@ const AdminDashboard = () => {
                         <td>{sub.start_date ? new Date(sub.start_date).toLocaleDateString() : '-'}</td>
                         <td>{sub.end_date ? new Date(sub.end_date).toLocaleDateString() : '-'}</td>
                         <td>
-                          {editSubId === sub.id ? (
+                          {editSubId === (sub.subscription_id || sub.id) ? (
                             <>
-                              <button className="btn btn-success btn-sm me-2" onClick={() => handleSaveSub(sub.id)}>{/* <FaCheck /> */} Save</button>
+                              <button className="btn btn-success btn-sm me-2" onClick={() => handleSaveSub(sub.subscription_id || sub.id)}>{/* <FaCheck /> */} Save</button>
                               <button className="btn btn-secondary btn-sm" onClick={() => setEditSubId(null)}>{/* <FaTimes /> */} Cancel</button>
                             </>
                           ) : (

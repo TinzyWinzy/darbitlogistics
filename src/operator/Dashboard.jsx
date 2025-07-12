@@ -1,17 +1,21 @@
-import { useEffect, useState, useContext, useRef } from 'react';
+import { useEffect, useState, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
-import { deliveryApi } from '../services/api';
+import { deliveryApi, notificationApi, invoiceApi } from '../services/api';
 import { useDeliveries } from '../services/useDeliveries';
 import { useParentBookings } from '../services/useParentBookings';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import axios from 'axios';
 import ParentBookingDetails from './ParentBookingDetails';
 import ConsignmentMonitor from './ConsignmentMonitor';
 import ParentBookingForm from './ParentBookingForm';
 import DeliveryDispatchForm from './DeliveryDispatchForm';
 import CheckpointLoggerForm from './CheckpointLoggerForm';
+import { Bar, Pie, Line } from 'react-chartjs-2';
+import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Title } from 'chart.js';
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Title);
+import { FaUsers, FaTruck, FaCheckCircle, FaHourglassHalf, FaBell, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaFileDownload } from 'react-icons/fa';
+import { useRef } from 'react';
 
 const mineralTypes = [
   'Agate', 'Adamite', 'Andalusite', 'Anhydrite', 'Angelisite', 'Anthophyllite', 'Antimony', 'Aragonite', 'Arucite', 'Arsenic',
@@ -155,9 +159,9 @@ export default function OperatorDashboard() {
   });
   const navigate = useNavigate();
   const { setUser, user } = useContext(AuthContext);
-  const customerNameRef = useRef();
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const toastTimeout = useRef();
   const [showSmsPreview, setShowSmsPreview] = useState(false);
   const [smsPreview, setSmsPreview] = useState('');
   
@@ -166,10 +170,51 @@ export default function OperatorDashboard() {
   const [showParentDetails, setShowParentDetails] = useState(false);
   const [showCreateParentBookingModal, setShowCreateParentBookingModal] = useState(false);
 
-  const [deliveries, setLocalDeliveries] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [localDeliveries, setLocalDeliveries] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [analytics, setAnalytics] = useState(null);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [invoices, setInvoices] = useState([]);
+  const [activeChartTab, setActiveChartTab] = useState('bar');
+
+  // Fetch notifications on mount
+  useEffect(() => {
+    notificationApi.getNotifications().then(setNotifications).catch(() => setNotifications([]));
+  }, []);
+
+  // Dismiss notification (mark as read)
+  const dismissNotification = useCallback(async (id) => {
+    await notificationApi.markNotificationRead(id);
+    setNotifications(n => n.filter(notif => notif.id !== id));
+    setToastMsg('Notification dismissed');
+    setShowToast(true);
+    clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setShowToast(false), 2500);
+  }, []);
+
+  const markAllNotificationsRead = async () => {
+    await Promise.all(notifications.map(n => notificationApi.markNotificationRead(n.id)));
+    setNotifications([]);
+    setToastMsg('All notifications marked as read');
+    setShowToast(true);
+    clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setShowToast(false), 2500);
+  };
+
+  // Fetch analytics on mount
+  useEffect(() => {
+    setLoadingAnalytics(true);
+    deliveryApi.getAnalytics?.().then(setAnalytics).finally(() => setLoadingAnalytics(false));
+  }, []);
+
+  // Fetch invoices on mount
+  useEffect(() => {
+    setLoadingInvoices(true);
+    invoiceApi.getInvoices().then(setInvoices).finally(() => setLoadingInvoices(false));
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -188,10 +233,6 @@ export default function OperatorDashboard() {
       setLocalDeliveries(initialDeliveries);
     }
   }, [initialDeliveries]);
-
-  useEffect(() => {
-    setLoading(loadingDeliveries);
-  }, [loadingDeliveries]);
 
   useEffect(() => {
     if (user) {
@@ -220,7 +261,7 @@ export default function OperatorDashboard() {
   }
 
   const handleUpdateCheckpoint = async (trackingId, newCheckpoint) => {
-    const delivery = deliveries.find(d => d.trackingId === trackingId);
+    const delivery = localDeliveries.find(d => d.trackingId === trackingId);
     if (!delivery) {
       setFeedback('Could not find the delivery to update.');
       return;
@@ -383,8 +424,212 @@ export default function OperatorDashboard() {
     setSelectedCustomerBookings([]);
   };
 
+  // Compute summary stats
+  const activeLoads = localDeliveries.filter(d => d.currentStatus?.toLowerCase() === 'active').length;
+  const completedLoads = localDeliveries.filter(d => d.currentStatus?.toLowerCase() === 'delivered' || d.currentStatus?.toLowerCase() === 'completed').length;
+  const pendingLoads = localDeliveries.filter(d => d.currentStatus?.toLowerCase() === 'pending' || d.currentStatus?.toLowerCase() === 'not started').length;
+  const totalCustomers = Array.isArray(parentBookings)
+    ? new Set(parentBookings.map(b => b.customerName || b.customer_id)).size
+    : 0;
+
+  // Dummy trend data for analytics (replace with real trend logic if available)
+  const analyticsTrends = {
+    total: 1, // 1 = up, -1 = down, 0 = flat
+    completed: -1,
+    pending: 0
+  };
+
   return (
     <div className="container py-5">
+      {/* Toast/Snackbar Feedback */}
+      {showToast && (
+        <div className="toast show position-fixed bottom-0 end-0 m-4" style={{zIndex:9999, minWidth: '220px'}} role="alert" aria-live="assertive" aria-atomic="true">
+          <div className="toast-header bg-primary text-white">
+            <strong className="me-auto">Info</strong>
+            <button type="button" className="btn-close btn-close-white" onClick={() => setShowToast(false)} aria-label="Close"></button>
+          </div>
+          <div className="toast-body">{toastMsg}</div>
+        </div>
+      )}
+      {/* Summary Widgets Row */}
+      <div className="row g-4 mb-4">
+        <div className="col-6 col-md-3">
+          <div className="card shadow-sm border-0 text-center py-3 position-relative" style={{ background: '#fffbe6' }} title="Currently active loads">
+            <FaTruck className="fs-2 mb-2 text-warning" aria-label="Active Loads" />
+            <div className="fw-bold fs-4" style={{ color: '#1F2120' }}>{activeLoads}
+              <span className="ms-2">{analyticsTrends.total === 1 ? <FaArrowUp className="text-success" title="Up" /> : analyticsTrends.total === -1 ? <FaArrowDown className="text-danger" title="Down" /> : null}</span>
+            </div>
+            <div className="text-muted small">Active Loads</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-3">
+          <div className="card shadow-sm border-0 text-center py-3 position-relative" style={{ background: '#e0ffe6' }} title="Loads delivered or completed">
+            <FaCheckCircle className="fs-2 mb-2 text-success" aria-label="Completed Loads" />
+            <div className="fw-bold fs-4" style={{ color: '#16a34a' }}>{completedLoads}
+              <span className="ms-2">{analyticsTrends.completed === 1 ? <FaArrowUp className="text-success" title="Up" /> : analyticsTrends.completed === -1 ? <FaArrowDown className="text-danger" title="Down" /> : null}</span>
+            </div>
+            <div className="text-muted small">Completed Loads</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-3">
+          <div className="card shadow-sm border-0 text-center py-3 position-relative" style={{ background: '#fff0e6' }} title="Loads not yet started or pending">
+            <FaHourglassHalf className="fs-2 mb-2 text-warning" aria-label="Pending Loads" />
+            <div className="fw-bold fs-4" style={{ color: '#d2691e' }}>{pendingLoads}
+              <span className="ms-2">{analyticsTrends.pending === 1 ? <FaArrowUp className="text-success" title="Up" /> : analyticsTrends.pending === -1 ? <FaArrowDown className="text-danger" title="Down" /> : null}</span>
+            </div>
+            <div className="text-muted small">Pending Loads</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-3">
+          <div className="card shadow-sm border-0 text-center py-3 position-relative" style={{ background: '#e6f0ff' }} title="Unique customers with bookings">
+            <FaUsers className="fs-2 mb-2 text-primary" aria-label="Total Customers" />
+            <div className="fw-bold fs-4" style={{ color: '#1e40af' }}>{totalCustomers}</div>
+            <div className="text-muted small">Total Customers</div>
+          </div>
+        </div>
+      </div>
+      {/* Notifications/Alerts Area */}
+      {notifications.length > 0 && (
+        <div className="mb-4">
+          <div className="card shadow-sm border-0">
+            <div className="card-header bg-light d-flex align-items-center">
+              <FaBell className="me-2 text-warning" />
+              <span className="fw-bold">Notifications</span>
+              <button className="btn btn-sm btn-outline-secondary ms-auto" onClick={markAllNotificationsRead} aria-label="Mark all as read">Mark all as read</button>
+            </div>
+            <ul className="list-group list-group-flush">
+              {notifications.map(n => (
+                <li key={n.id} className="list-group-item d-flex align-items-center justify-content-between">
+                  <div className="d-flex align-items-center">
+                    <span className="me-3">
+                      {n.type === 'warning' ? <FaExclamationTriangle className="text-warning" title="Warning" /> : <FaBell className="text-info" title="Info" />}
+                    </span>
+                    <span>{n.message}</span>
+                    <span className="text-muted small ms-3">{new Date(n.created_at).toLocaleString()}</span>
+                  </div>
+                  <button className="btn btn-sm btn-outline-secondary ms-2" aria-label="Dismiss notification" onClick={() => dismissNotification(n.id)}>&times;</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+      {/* Analytics Charts */}
+      <div className="mb-4">
+        <div className="card shadow-sm border-0">
+          <div className="card-header bg-light fw-bold d-flex align-items-center">
+            <span>Dashboard Analytics</span>
+            <ul className="nav nav-tabs ms-auto" style={{ borderBottom: 'none' }}>
+              <li className="nav-item">
+                <button className={`nav-link${activeChartTab === 'bar' ? ' active' : ''}`} onClick={() => setActiveChartTab('bar')} type="button">Bar</button>
+              </li>
+              <li className="nav-item">
+                <button className={`nav-link${activeChartTab === 'pie' ? ' active' : ''}`} onClick={() => setActiveChartTab('pie')} type="button">Pie</button>
+              </li>
+              <li className="nav-item">
+                <button className={`nav-link${activeChartTab === 'line' ? ' active' : ''}`} onClick={() => setActiveChartTab('line')} type="button">Line</button>
+              </li>
+            </ul>
+          </div>
+          <div className="card-body">
+            {loadingAnalytics ? <Spinner /> : analytics ? (
+              <>
+                {activeChartTab === 'bar' && (
+                  <Bar
+                    data={{
+                      labels: ['Total', 'Completed', 'Pending'],
+                      datasets: [{
+                        label: 'Deliveries',
+                        data: [analytics.totalDeliveries, analytics.completedDeliveries, analytics.pendingDeliveries],
+                        backgroundColor: ['#1e40af', '#16a34a', '#d2691e']
+                      }]
+                    }}
+                    options={{ responsive: true, plugins: { legend: { display: false } } }}
+                    height={80}
+                  />
+                )}
+                {activeChartTab === 'pie' && (
+                  <Pie
+                    data={{
+                      labels: ['Completed', 'Pending', 'Other'],
+                      datasets: [{
+                        label: 'Deliveries by Status',
+                        data: [analytics.completedDeliveries, analytics.pendingDeliveries, Math.max(0, (analytics.totalDeliveries - analytics.completedDeliveries - analytics.pendingDeliveries))],
+                        backgroundColor: ['#16a34a', '#d2691e', '#1e40af']
+                      }]
+                    }}
+                    options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+                  />
+                )}
+                {activeChartTab === 'line' && (
+                  <Line
+                    data={{
+                      labels: analytics.monthlyLabels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                      datasets: [{
+                        label: 'Deliveries per Month',
+                        data: analytics.monthlyData || Array(12).fill(0),
+                        fill: false,
+                        borderColor: '#1e40af',
+                        backgroundColor: '#1e40af',
+                        tension: 0.3
+                      }]
+                    }}
+                    options={{ responsive: true, plugins: { legend: { position: 'top' } } }}
+                    height={80}
+                  />
+                )}
+              </>
+            ) : <div className="text-muted">No analytics data.</div>}
+          </div>
+        </div>
+      </div>
+      {/* Invoice History */}
+      <div className="mb-4">
+        <div className="card shadow-sm border-0">
+          <div className="card-header bg-light fw-bold">Invoice History</div>
+          <div className="card-body">
+            {loadingInvoices ? <Spinner /> : invoices.length > 0 ? (
+              <table className="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Invoice #</th>
+                    <th>Amount</th>
+                    <th>Currency</th>
+                    <th>Paid</th>
+                    <th>Date</th>
+                    <th>Download</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map(inv => (
+                    <tr key={inv.invoiceId || inv.invoice_id}>
+                      <td>{inv.invoiceId || inv.invoice_id}</td>
+                      <td>{inv.amount}</td>
+                      <td>{inv.currency}</td>
+                      <td>
+                        <span className={`badge bg-${inv.paid ? 'success' : 'danger'}`}>{inv.paid ? 'Yes' : 'No'}</span>
+                      </td>
+                      <td>{inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : ''}</td>
+                      <td>
+                        <a
+                          href={`$${process.env.VITE_API_URL || ''}/api/invoices/${inv.invoiceId || inv.invoice_id}/download`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-sm btn-outline-primary"
+                          title="Download invoice"
+                          aria-label="Download invoice"
+                        >
+                          <FaFileDownload className="me-1" />Download
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : <div className="text-muted">No invoices found.</div>}
+          </div>
+        </div>
+      </div>
       {/* Strategic Operations Console Banner */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
         STRATEGIC OPERATIONS CONSOLE
@@ -398,8 +643,8 @@ export default function OperatorDashboard() {
               Dashboard
           </h2>
           <button
-              className="btn btn-primary fw-bold"
-              style={{ background: '#1F2120', border: 'none', color: '#EBD3AD' }}
+              className="btn fw-bold"
+              style={{ background: '#1F2120', border: 'none', color: '#EBD3AD', borderRadius: '0.5rem', padding: '0.5rem 1.25rem' }}
               onClick={() => setShowCreateParentBookingModal(true)}
               aria-label="Log new consignment"
           >
@@ -473,6 +718,7 @@ export default function OperatorDashboard() {
             progressSortOrder={progressSortOrder}
             setProgressSortOrder={val => { setProgressSortOrder(val); setParentBookingsPage(1); }}
           />
+          {/* Highlight selected consignment visually (handled in ConsignmentMonitor if possible) */}
           {/* Pagination Controls for Deliveries */}
           <div className="d-flex justify-content-between align-items-center mt-3">
             <div className="small text-muted">
@@ -485,7 +731,8 @@ export default function OperatorDashboard() {
             </div>
             <div className="btn-group" role="group" aria-label="Pagination controls">
               <button
-                className="btn btn-outline-secondary btn-sm"
+                className="btn fw-bold"
+                style={{ background: '#fff', border: '1px solid #1F2120', color: '#1F2120', borderRadius: '0.5rem', padding: '0.5rem 1.25rem' }}
                 onClick={() => setParentBookingsPage(parentBookingsPage - 1)}
                 disabled={parentBookingsPage === 1}
                 aria-label="Previous page"
@@ -496,7 +743,8 @@ export default function OperatorDashboard() {
                 Page {parentBookingsPage} of {Math.max(1, Math.ceil(parentBookingsTotal / parentBookingsPageSize))}
               </span>
               <button
-                className="btn btn-outline-secondary btn-sm"
+                className="btn fw-bold"
+                style={{ background: '#fff', border: '1px solid #1F2120', color: '#1F2120', borderRadius: '0.5rem', padding: '0.5rem 1.25rem' }}
                 onClick={() => setParentBookingsPage(parentBookingsPage + 1)}
                 disabled={parentBookingsPage * parentBookingsPageSize >= parentBookingsTotal}
                 aria-label="Next page"
@@ -528,9 +776,12 @@ export default function OperatorDashboard() {
               <h2 className="h5 fw-bold mb-3" style={{ color: '#1F2120' }}>
                 <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>edit_location_alt</span>
                 Log Checkpoint
+                <span className="ms-2" title="Log the current status and location of a load">
+                  <span className="badge bg-info">?</span>
+                </span>
               </h2>
               {selectedId && (() => {
-                const sel = deliveries.find(d => d.trackingId === selectedId);
+                const sel = localDeliveries.find(d => d.trackingId === selectedId);
                 if (!sel) return null;
                 return (
                   <div className="alert alert-info mb-3 p-2">
@@ -542,12 +793,16 @@ export default function OperatorDashboard() {
                 );
               })()}
               <CheckpointLoggerForm
-                deliveries={deliveries}
+                deliveries={localDeliveries}
                 user={user}
                 onSubmitCheckpoint={handleUpdateCheckpoint}
                 onSuccess={async () => {
                   await fetchParentBookings();
                   await fetchDeliveries();
+                  setToastMsg('Checkpoint logged successfully!');
+                  setShowToast(true);
+                  clearTimeout(toastTimeout.current);
+                  toastTimeout.current = setTimeout(() => setShowToast(false), 2500);
                 }}
                 onFeedback={setFeedback}
                 selectedId={selectedId}

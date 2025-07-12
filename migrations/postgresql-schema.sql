@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS parent_bookings (
     status TEXT DEFAULT 'Active' CHECK (status IN ('Active', 'Completed', 'Cancelled')),
     remaining_tonnage DECIMAL(10,2),
     completed_tonnage DECIMAL(10,2) DEFAULT 0,
+    cost DECIMAL(12,2) DEFAULT 0, -- Consignment cost
     created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -164,6 +165,10 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parent_bookings' AND column_name = 'environmental_concerns') THEN
         ALTER TABLE parent_bookings ADD COLUMN environmental_concerns TEXT;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parent_bookings' AND column_name = 'cost') THEN
+        ALTER TABLE parent_bookings ADD COLUMN cost DECIMAL(12,2) DEFAULT 0;
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parent_bookings' AND column_name = 'created_by_user_id') THEN
@@ -671,6 +676,15 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     UNIQUE(user_id, subscription_info)
 );
 
+-- Ensure 'pending' is included in subscription_status ENUM
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_status') AND
+       NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'pending' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'subscription_status')) THEN
+        ALTER TYPE subscription_status ADD VALUE 'pending';
+    END IF;
+END$$;
+
 -- Insert the admin and operator users with pre-hashed passwords.
 INSERT INTO users (username, role, password)
 VALUES
@@ -682,3 +696,21 @@ ON CONFLICT (username) DO UPDATE
 SET 
     password = EXCLUDED.password,
     role = EXCLUDED.role; 
+
+-- Add value and cost columns if missing (for analytics and reporting)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'value') THEN
+        ALTER TABLE deliveries ADD COLUMN value NUMERIC(12,2) DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'cost') THEN
+        ALTER TABLE deliveries ADD COLUMN cost NUMERIC(12,2) DEFAULT 0;
+    END IF;
+END $$; 
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'custom_status') THEN
+        ALTER TABLE deliveries ADD COLUMN custom_status TEXT;
+    END IF;
+END $$; 

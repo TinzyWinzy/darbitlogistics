@@ -10,6 +10,10 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_status') THEN
     CREATE TYPE subscription_status AS ENUM ('active', 'trial', 'expired', 'canceled');
   END IF;
+  -- Add 'pending' to subscription_status if missing
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_status') AND NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'pending' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'subscription_status')) THEN
+    ALTER TYPE subscription_status ADD VALUE 'pending';
+  END IF;
 END $$;
 
 -- 2. Create subscriptions table if missing (uuid PK)
@@ -67,6 +71,41 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='payment_method') THEN
     ALTER TABLE subscriptions ADD COLUMN payment_method TEXT;
+  END IF;
+END $$;
+
+-- 4. Create one_time_deliveries table for public one-time orders
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'one_time_deliveries') THEN
+    CREATE TABLE one_time_deliveries (
+      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+      paynow_poll_url TEXT NOT NULL,
+      customer_name TEXT NOT NULL,
+      phone_number TEXT NOT NULL,
+      loading_point TEXT NOT NULL,
+      destination TEXT NOT NULL,
+      tonnage NUMERIC NOT NULL,
+      container_count INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  END IF;
+END $$;
+
+-- 5. Create addon_purchases table for tracking add-on purchases
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'addon_purchases') THEN
+    CREATE TABLE addon_purchases (
+      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL, -- 'deliveries' or 'sms'
+      quantity INTEGER NOT NULL,
+      paynow_poll_url TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   END IF;
 END $$;
 
@@ -162,4 +201,18 @@ DROP TRIGGER IF EXISTS trigger_create_trial_subscription ON users;
 CREATE TRIGGER trigger_create_trial_subscription
 AFTER INSERT ON users
 FOR EACH ROW
-EXECUTE FUNCTION create_trial_subscription(); 
+EXECUTE FUNCTION create_trial_subscription();
+
+-- Create admin_logs table for real admin action logging
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'admin_logs') THEN
+    CREATE TABLE admin_logs (
+      id SERIAL PRIMARY KEY,
+      action TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      target TEXT,
+      details JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  END IF;
+END $$; 

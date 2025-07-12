@@ -41,6 +41,15 @@ export default function Offerings() {
           ))}
         </div>
       </section>
+      <div className="text-center my-4">
+        <Link
+          to={isAuthenticated ? "/plans" : "/login"}
+          className="btn btn-primary fw-bold"
+          style={{ background: '#1F2120', color: '#EBD3AD', border: 'none', borderRadius: '0.5rem', padding: '0.7rem 2rem', fontSize: '1.1em' }}
+        >
+          See our Subscription Plans
+        </Link>
+      </div>
       <div className="d-flex flex-column flex-sm-row justify-content-center gap-3 gap-md-4 mt-5">
         {isAuthenticated ? (
           <>
