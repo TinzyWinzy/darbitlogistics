@@ -113,7 +113,9 @@ export default function OperatorDashboard() {
     pageSize,
     setPageSize,
     total,
-    fetchDeliveries
+    fetchDeliveries,
+    pendingDeliveries,
+    hasPendingSync
   } = useDeliveries();
   
   const { 
@@ -465,6 +467,14 @@ export default function OperatorDashboard() {
 
   return (
     <div className="container py-5">
+      {hasPendingSync && (
+        <div className="alert alert-warning d-flex align-items-center" role="alert">
+          <FaExclamationTriangle className="me-2" />
+          <span>
+            You have offline deliveries pending sync. They will be sent automatically when you reconnect.
+          </span>
+        </div>
+      )}
       {/* Toast/Snackbar Feedback */}
       {showToast && (
         <div className="toast show position-fixed bottom-0 end-0 m-4" style={{zIndex:9999, minWidth: '220px'}} role="alert" aria-live="assertive" aria-atomic="true">

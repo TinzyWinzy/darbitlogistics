@@ -25,6 +25,7 @@ import { useDeliveries } from './services/useDeliveries';
 import { useParentBookings } from './services/useParentBookings';
 import Reports from './operator/Reports';
 import InvoiceHistory from './components/InvoiceHistory';
+import { processOutbox } from './services/api';
 
 export const AuthContext = createContext(null);
 
@@ -179,6 +180,19 @@ export default function App() {
   }, [user]);
 
   const isAuthenticated = !!user;
+
+  useEffect(() => {
+    // On app start, try to process outbox
+    processOutbox();
+    // On network reconnect, process outbox
+    function handleOnline() {
+      processOutbox();
+    }
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
 
   return (
     <>

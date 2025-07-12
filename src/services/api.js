@@ -1,5 +1,10 @@
 import axios from 'axios';
 import { normalizeKeys } from './normalizeKeys';
+import db from './db';
+
+function isOnline() {
+  return typeof navigator !== 'undefined' ? navigator.onLine : true;
+}
 
 // Create axios instance with default config
 const api = axios.create({
@@ -163,14 +168,20 @@ export const toSnake = d => ({
 
 // API endpoints
 export const deliveryApi = {
-  // Get all deliveries
-  /**
-   * Fetch deliveries with optional search, pagination
-   * @param {number} limit
-   * @param {number} offset
-   * @param {string} search - optional search string
-   */
+  // Get all deliveries (offline-first)
   getAll: async (limit = 20, offset = 0, search = '') => {
+    if (!isOnline()) {
+      // Offline: query IndexedDB
+      let deliveries = await db.deliveries.toArray();
+      if (search) {
+        deliveries = deliveries.filter(d =>
+          d.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+          d.trackingId?.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+      return { deliveries: deliveries.slice(offset, offset + limit), total: deliveries.length };
+    }
+    // Online: fetch from API, update IndexedDB
     try {
       const params = new URLSearchParams({
         limit: limit.toString(),
@@ -178,40 +189,104 @@ export const deliveryApi = {
         ...(search ? { search } : {})
       });
       const res = await api.get(`/deliveries?${params.toString()}`);
-      // Defensive normalization
       const data = normalizeKeys(res.data);
+      // Update IndexedDB
+      if (Array.isArray(data.deliveries)) {
+        await db.deliveries.bulkPut(data.deliveries);
+      }
       return { deliveries: data.deliveries, total: data.total };
     } catch (error) {
-      console.error('Failed to fetch deliveries:', error);
-      throw error;
+      // Fallback to IndexedDB if API fails
+      let deliveries = await db.deliveries.toArray();
+      if (search) {
+        deliveries = deliveries.filter(d =>
+          d.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+          d.trackingId?.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+      return { deliveries: deliveries.slice(offset, offset + limit), total: deliveries.length };
     }
   },
 
-  // Get delivery by tracking ID
+  // Get delivery by tracking ID (offline-first)
   getById: async (trackingId) => {
+    if (!isOnline()) {
+      // Offline: query IndexedDB
+      return await db.deliveries.get(trackingId);
+    }
     try {
       const res = await api.get(`/deliveries/${trackingId}`);
-      return normalizeKeys(res.data);
+      const delivery = normalizeKeys(res.data);
+      if (delivery) {
+        await db.deliveries.put(delivery);
+      }
+      return delivery;
     } catch (error) {
-      console.error(`Failed to fetch delivery ${trackingId}:`, error);
-      throw error;
+      // Fallback to IndexedDB if API fails
+      return await db.deliveries.get(trackingId);
     }
   },
 
-  // Create new delivery
+  // Create new delivery (offline-capable)
   create: async (deliveryData) => {
+    if (!isOnline()) {
+      // Queue in outbox and update local DB
+      const now = new Date().toISOString();
+      await db.outbox.add({
+        type: 'createDelivery',
+        entity: 'delivery',
+        payload: deliveryData,
+        createdAt: now,
+      });
+      // Generate a temporary trackingId if not present
+      const tempId = deliveryData.trackingId || `offline-${Date.now()}`;
+      await db.deliveries.put({ ...deliveryData, trackingId: tempId, updatedAt: now });
+      return { ...deliveryData, trackingId: tempId, offline: true };
+    }
     try {
-      console.log('Sending delivery data to API:', deliveryData);
       const res = await api.post('/deliveries', deliveryData);
-      return normalizeKeys(res.data);
+      const delivery = normalizeKeys(res.data);
+      if (delivery) {
+        await db.deliveries.put(delivery);
+      }
+      return delivery;
     } catch (error) {
-      console.error('Failed to create delivery:', error);
-      throw error;
+      // If API fails, fallback to outbox
+      const now = new Date().toISOString();
+      await db.outbox.add({
+        type: 'createDelivery',
+        entity: 'delivery',
+        payload: deliveryData,
+        createdAt: now,
+      });
+      const tempId = deliveryData.trackingId || `offline-${Date.now()}`;
+      await db.deliveries.put({ ...deliveryData, trackingId: tempId, updatedAt: now });
+      return { ...deliveryData, trackingId: tempId, offline: true };
     }
   },
 
-  // Update a delivery's checkpoints and status
+  // Update a delivery's checkpoints and status (offline-capable)
   updateCheckpoint: async (trackingId, data) => {
+    if (!isOnline()) {
+      const now = new Date().toISOString();
+      await db.outbox.add({
+        type: 'updateCheckpoint',
+        entity: 'delivery',
+        payload: { trackingId, ...data },
+        createdAt: now,
+      });
+      // Update local delivery
+      const delivery = await db.deliveries.get(trackingId);
+      if (delivery) {
+        await db.deliveries.put({
+          ...delivery,
+          checkpoints: data.checkpoints,
+          currentStatus: data.currentStatus,
+          updatedAt: now,
+        });
+      }
+      return { trackingId, ...data, offline: true };
+    }
     try {
       const payload = {
         trackingId,
@@ -219,10 +294,30 @@ export const deliveryApi = {
         currentStatus: data.currentStatus,
       };
       const res = await api.post('/updateCheckpoint', payload);
-      return normalizeKeys(res.data);
+      const updated = normalizeKeys(res.data);
+      if (updated) {
+        await db.deliveries.put(updated);
+      }
+      return updated;
     } catch (error) {
-      console.error(`Failed to update checkpoint for ${trackingId}:`, error);
-      throw error;
+      // If API fails, fallback to outbox
+      const now = new Date().toISOString();
+      await db.outbox.add({
+        type: 'updateCheckpoint',
+        entity: 'delivery',
+        payload: { trackingId, ...data },
+        createdAt: now,
+      });
+      const delivery = await db.deliveries.get(trackingId);
+      if (delivery) {
+        await db.deliveries.put({
+          ...delivery,
+          checkpoints: data.checkpoints,
+          currentStatus: data.currentStatus,
+          updatedAt: now,
+        });
+      }
+      return { trackingId, ...data, offline: true };
     }
   },
 
@@ -464,6 +559,39 @@ export const scheduledReportApi = {
     return res.data;
   }
 };
+
+// Background sync worker for outbox
+export async function processOutbox() {
+  if (!isOnline()) return;
+  const outboxItems = await db.outbox.orderBy('createdAt').toArray();
+  for (const item of outboxItems) {
+    try {
+      if (item.type === 'createDelivery') {
+        const res = await api.post('/deliveries', item.payload);
+        const delivery = normalizeKeys(res.data);
+        if (delivery) {
+          await db.deliveries.put(delivery);
+        }
+      } else if (item.type === 'updateCheckpoint') {
+        const payload = {
+          trackingId: item.payload.trackingId,
+          checkpoints: item.payload.checkpoints,
+          currentStatus: item.payload.currentStatus,
+        };
+        const res = await api.post('/updateCheckpoint', payload);
+        const updated = normalizeKeys(res.data);
+        if (updated) {
+          await db.deliveries.put(updated);
+        }
+      }
+      // Remove item from outbox if successful
+      await db.outbox.delete(item.id);
+    } catch (err) {
+      // Stop processing on first failure to avoid rapid retries
+      break;
+    }
+  }
+}
 
 // Request interceptor to attach JWT token
 api.interceptors.request.use(

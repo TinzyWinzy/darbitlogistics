@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { deliveryApi } from './api';
+import db from './db';
 
 export function useDeliveries() {
   const [deliveries, setDeliveries] = useState([]);
@@ -8,6 +9,8 @@ export function useDeliveries() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
+  const [pendingDeliveries, setPendingDeliveries] = useState([]);
+  const [hasPendingSync, setHasPendingSync] = useState(false);
 
   const fetchDeliveries = useCallback(async (pageArg = page, pageSizeArg = pageSize) => {
     try {
@@ -27,9 +30,20 @@ export function useDeliveries() {
     }
   }, [page, pageSize]);
 
+  // Fetch pending (unsynced) deliveries from outbox
+  const fetchPendingDeliveries = useCallback(async () => {
+    const outboxItems = await db.outbox.where('type').equals('createDelivery').toArray();
+    setPendingDeliveries(outboxItems.map(item => ({ ...item.payload, offline: true })));
+    setHasPendingSync(outboxItems.length > 0);
+  }, []);
+
   useEffect(() => {
     fetchDeliveries(page, pageSize);
-  }, [fetchDeliveries, page, pageSize]);
+    fetchPendingDeliveries();
+    // Optionally, listen for outbox changes (Dexie live queries or polling)
+    const interval = setInterval(fetchPendingDeliveries, 5000);
+    return () => clearInterval(interval);
+  }, [fetchDeliveries, page, pageSize, fetchPendingDeliveries]);
 
   const createDelivery = useCallback(async (deliveryData) => {
     try {
@@ -64,5 +78,7 @@ export function useDeliveries() {
     pageSize,
     setPageSize,
     total,
+    pendingDeliveries,
+    hasPendingSync,
   };
 } 
