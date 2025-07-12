@@ -108,12 +108,11 @@ export default function TrackDelivery() {
   };
 
   return (
-    <div className="bg-gradient" style={{ minHeight: '90vh', background: 'linear-gradient(135deg, #EBD3AD 0%, #fffbe6 100%)' }} role="main">
-      <div className="container py-5">
-        <h1 className="display-6 fw-bold text-center mb-1" style={{ color: '#1F2120' }}>
+    <div className="bg-gradient min-vh-100 d-flex flex-column" style={{ background: 'linear-gradient(135deg, #EBD3AD 0%, #fffbe6 100%)' }} role="main">
+      <div className="container flex-grow-1 d-flex flex-column justify-content-center py-4 px-2 px-md-0">
+        <h1 className="display-6 fw-bold text-center mb-2" style={{ color: '#1F2120' }}>
           Track Your Consignment
         </h1>
-        {/* Strategic Operations Console subtitle */}
         <div className="text-center text-warning small fw-semibold mb-3" style={{ letterSpacing: '0.5px', fontSize: '1em', opacity: 0.7 }}>
           Strategic Operations Console
         </div>
@@ -122,15 +121,15 @@ export default function TrackDelivery() {
         </div>
         <div className="row justify-content-center">
           <div className="col-12 col-md-8 col-lg-6">
-            <div className="card shadow-lg border-0 rounded-lg overflow-hidden" style={{ background: 'rgba(255,255,255,0.97)' }}>
+            <div className="card shadow-lg border-0 rounded-4 overflow-hidden" style={{ background: 'rgba(255,255,255,0.97)' }}>
               <div className="card-body p-4 p-md-5">
                 <div className="text-center mb-4">
                   {renderIcon()}
                   <p className="text-muted" style={{ fontSize: '1.08em' }}>Enter your tracking ID to see delivery status and updates</p>
                 </div>
-
-                <form onSubmit={handleSubmit} className="mb-4">
-                  <div className="input-group">
+                {/* Sticky action bar for mobile */}
+                <form onSubmit={handleSubmit} className="mb-4 sticky-bottom bg-white py-2 px-2 rounded-3 shadow-sm" style={{ zIndex: 10, position: 'sticky', bottom: 0, left: 0, right: 0, maxWidth: '100vw' }}>
+                  <div className="input-group flex-nowrap">
                     <span className="input-group-text bg-white border-end-0" id="trackingId-label">
                       <span className="material-icons-outlined me-2">local_shipping</span>
                     </span>
@@ -229,25 +228,37 @@ export default function TrackDelivery() {
 
                       <h3 className="h6 mt-4 fw-bold mb-3" style={{ color: '#1F2120', letterSpacing: '0.01em' }}>Tracking History</h3>
                       {delivery.checkpoints && delivery.checkpoints.length > 0 ? (
-                        <div className="timeline-container mt-3" style={{ position: 'relative', paddingLeft: 24, borderLeft: '3px solid #D2691E' }}>
+                        <div className="timeline-container mt-3 position-relative" style={{ paddingLeft: 24, borderLeft: '3px solid #D2691E', maxWidth: 600, margin: '0 auto' }}>
+                          {/* Vertical line for stepper */}
+                          <div className="position-absolute top-0 bottom-0 start-0" style={{ left: 10, width: 4, background: 'linear-gradient(to bottom, #D2691E 0%, #1976d2 100%)', borderRadius: 2, zIndex: 0 }}></div>
                           {delivery.checkpoints.slice().reverse().map((cp, index) => {
                             // Determine status color/icon
                             let dotColor = '#D2691E';
                             let icon = 'radio_button_unchecked';
+                            let stepBg = '#fff';
+                            let stepShadow = '0 1px 4px rgba(31,33,32,0.04)';
                             if (cp.status === delivery.currentStatus) {
                               dotColor = '#1976d2';
                               icon = 'fiber_manual_record';
+                              stepBg = '#e6f0ff';
+                              stepShadow = '0 2px 8px rgba(25,118,210,0.08)';
                             } else if (cp.status === 'Delivered') {
                               dotColor = '#198754';
                               icon = 'check_circle';
+                              stepBg = '#e0ffe6';
+                              stepShadow = '0 2px 8px rgba(22,163,74,0.08)';
                             } else if (cp.hasIssue) {
                               dotColor = '#ffc107';
                               icon = 'warning';
+                              stepBg = '#fffbe6';
+                              stepShadow = '0 2px 8px rgba(255,193,7,0.08)';
                             }
                             return (
-                              <div className="timeline-item d-flex mb-4" key={index} style={{ alignItems: 'flex-start', position: 'relative' }}>
-                                <span className="material-icons-outlined" style={{ color: dotColor, fontSize: '2rem', position: 'absolute', left: -32, top: 0 }}>{icon}</span>
-                                <div className="timeline-content flex-grow-1 ms-3" style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 4px rgba(31,33,32,0.04)', padding: '0.7em 1em', minWidth: 0 }}>
+                              <div className="timeline-item d-flex mb-4 position-relative" key={index} style={{ alignItems: 'flex-start', zIndex: 1 }}>
+                                {/* Stepper dot */}
+                                <span className="material-icons-outlined flex-shrink-0" style={{ color: dotColor, fontSize: '2.2rem', position: 'absolute', left: -32, top: 0, background: '#fff', borderRadius: '50%', boxShadow: '0 1px 4px rgba(31,33,32,0.08)' }}>{icon}</span>
+                                {/* Step content */}
+                                <div className="timeline-content flex-grow-1 ms-4" style={{ background: stepBg, borderRadius: 12, boxShadow: stepShadow, padding: '0.9em 1.1em', minWidth: 0 }}>
                                   <div className="d-flex justify-content-between align-items-center mb-1">
                                     <strong className="text-dark" style={{ fontSize: '1.08em' }}>{cp.status}</strong>
                                     <small className="text-muted" style={{ fontSize: '0.98em' }}>{formatDate(cp.timestamp)}</small>

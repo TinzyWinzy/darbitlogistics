@@ -611,32 +611,43 @@ export default function OperatorDashboard() {
       <h1 className="display-6 fw-bold mb-4" style={{ color: '#1F2120' }}>Morres Logistics - Operations Hub</h1>
       
       {/* Trigger button for Parent Booking Modal */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2 className="h5 fw-bold mb-0" style={{ color: '#1F2120' }}>
-              <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>apps</span>
-              Dashboard
-          </h2>
-          <button
-              className="btn fw-bold"
-              style={{ background: '#1F2120', border: 'none', color: '#EBD3AD', borderRadius: '0.5rem', padding: '0.5rem 1.25rem' }}
-              onClick={() => setShowCreateParentBookingModal(true)}
-              aria-label="Log new consignment"
-          >
-              <span className="material-icons-outlined align-middle me-1">add_box</span>
-              Log New Consignment
-          </button>
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-2 gap-md-0">
+        <h2 className="h5 fw-bold mb-0" style={{ color: '#1F2120' }}>
+          <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>apps</span>
+          Dashboard
+        </h2>
+        <button
+          className="btn fw-bold w-100 w-md-auto"
+          style={{ background: '#1F2120', border: 'none', color: '#EBD3AD', borderRadius: '0.5rem', padding: '0.75rem 1.25rem', fontSize: '1.1em' }}
+          onClick={() => setShowCreateParentBookingModal(true)}
+          aria-label="Log new consignment"
+        >
+          <span className="material-icons-outlined align-middle me-1">add_box</span>
+          Log New Consignment
+        </button>
       </div>
       
       {/* Parent Booking Form Modal */}
       {showCreateParentBookingModal && (
-        <ParentBookingForm
-          show={showCreateParentBookingModal}
-          onClose={() => setShowCreateParentBookingModal(false)}
-          onSuccess={fetchParentBookings}
-          createParentBooking={createParentBooking}
-          mineralTypes={mineralTypes}
-          mineralLocations={mineralLocations}
-        />
+        <div className="modal fade show d-block" tabIndex="-1" role="dialog" aria-modal="true" aria-labelledby="parentBookingModalLabel" style={{ background: 'rgba(0,0,0,0.3)', zIndex: 1050 }}>
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down" role="document">
+            <div className="modal-content rounded-3 shadow-lg">
+              <div className="modal-header">
+                <h5 className="modal-title" id="parentBookingModalLabel">Log New Consignment</h5>
+                <button type="button" className="btn-close" aria-label="Close" onClick={() => setShowCreateParentBookingModal(false)}></button>
+              </div>
+              <div className="modal-body p-3 p-md-4" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
+                <ParentBookingForm
+                  onClose={() => setShowCreateParentBookingModal(false)}
+                  onSuccess={fetchParentBookings}
+                  createParentBooking={createParentBooking}
+                  mineralTypes={mineralTypes}
+                  mineralLocations={mineralLocations}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Parent Booking Details Modal */}
