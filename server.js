@@ -241,7 +241,11 @@ app.post('/login', async (req, res) => {
     // --- Issue refresh token ---
     const refreshToken = generateRefreshToken();
     const refreshExpiry = new Date(Date.now() + 30*24*60*60*1000); // 30 days
-    await pool.query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, refreshExpiry]);
+    await pool.query(
+      `INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) DO UPDATE SET token = $2, expires_at = $3`,
+      [user.id, refreshToken, refreshExpiry]
+    );
     res.cookie('refresh_token', refreshToken, { httpOnly: true, secure: true, sameSite: 'strict', path: '/api/auth/refresh', maxAge: 30*24*60*60*1000 });
     res.json({ success: true, user: userForClient, token });
   } catch (err) {
