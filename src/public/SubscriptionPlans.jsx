@@ -3,6 +3,7 @@ import { subscriptionTiers } from '../../config/subscriptions.js';
 import { deliveryApi } from '../services/api.js';
 import { AuthContext } from '../App';
 import { FaRegStar, FaRegCheckCircle, FaRegEnvelope, FaRegChartBar, FaRegListAlt, FaRegBell, FaRegUser, FaRegBuilding, FaRegPaperPlane, FaCrown, FaRegQuestionCircle } from 'react-icons/fa';
+import { normalizeKeys } from '../services/normalizeKeys';
 
 const tierOrder = ['starter', 'basic', 'pro', 'enterprise'];
 const tierIcons = {
@@ -45,7 +46,7 @@ export default function SubscriptionPlans() {
     }
     setLoading(true);
     deliveryApi.getMyAllSubscriptions()
-      .then(subs => setSubscriptions(subs || []))
+      .then(subs => setSubscriptions(normalizeKeys(subs || [])))
       .catch(err => {
         const msg = err.response?.data?.error || 'Failed to fetch subscription.';
         if (msg.includes('No active subscription found') || msg.includes('expired')) {
@@ -99,19 +100,19 @@ export default function SubscriptionPlans() {
   const maxDeliveries = Number(tierDetails.maxDeliveries || activeSub?.maxDeliveries || planConfig.maxDeliveries);
   const maxSms = Number(tierDetails.maxSms || activeSub?.maxSms || planConfig.maxSms);
   const features = tierDetails.features || activeSub?.features || planConfig.features || [];
-  const deliveriesUsed = Number(activeSub?.deliveries_used) || 0;
+  const deliveriesUsed = Number(activeSub?.deliveriesUsed) || 0;
   const deliveryQuotaPercentage =
     maxDeliveries && isFinite(maxDeliveries) && maxDeliveries > 0
       ? Math.min((deliveriesUsed / maxDeliveries) * 100, 100)
       : 0;
 
-  const smsUsed = Number(activeSub?.sms_used) || 0;
+  const smsUsed = Number(activeSub?.smsUsed) || 0;
   const smsQuotaPercentage =
     maxSms && isFinite(maxSms) && maxSms > 0
       ? Math.min((smsUsed / maxSms) * 100, 100)
       : 0;
 
-  const remainingDays = activeSub ? getRemainingDays(activeSub.end_date) : null;
+  const remainingDays = activeSub ? getRemainingDays(activeSub.endDate) : null;
 
   const handleRequestUpgrade = () => {
     window.location.href = 'mailto:sales@morreslogistics.com?subject=Subscription Upgrade Request';
@@ -358,16 +359,16 @@ export default function SubscriptionPlans() {
             {subscriptions.length === 0 ? (
               <tr><td colSpan={6}>No previous subscriptions.</td></tr>
             ) : (
-              [...subscriptions].sort((a, b) => new Date(b.start_date) - new Date(a.start_date)).map(sub => {
+              [...subscriptions].sort((a, b) => new Date(b.startDate) - new Date(a.startDate)).map(sub => {
                 const planConfig = subscriptionTiers[sub.tier] || {};
                 return (
                   <tr key={sub.id || sub.tier}>
                     <td>{planConfig.name || sub.tier}</td>
                     <td>{sub.status}</td>
-                    <td>{new Date(sub.start_date).toLocaleDateString()}</td>
-                    <td>{new Date(sub.end_date).toLocaleDateString()}</td>
-                    <td>{Number(sub.deliveries_used) || 0}</td>
-                    <td>{Number(sub.sms_used) || 0}</td>
+                    <td>{new Date(sub.startDate).toLocaleDateString()}</td>
+                    <td>{new Date(sub.endDate).toLocaleDateString()}</td>
+                    <td>{Number(sub.deliveriesUsed) || 0}</td>
+                    <td>{Number(sub.smsUsed) || 0}</td>
                   </tr>
                 );
               })
