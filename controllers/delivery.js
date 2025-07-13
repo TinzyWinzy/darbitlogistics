@@ -5,7 +5,6 @@ import pool from '../config/database.js';
 
 // Placeholder functions until helpers are refactored
 export async function sendSMS(to, message) { 
-  console.log(`Placeholder SMS to ${to}: ${message}`); 
   return { success: true }; 
 }
 export function validateZimPhone(phone) { return true; }
@@ -103,4 +102,17 @@ export async function createDelivery(req, res) {
         );
         
         const trackingBaseUrl = process.env.FRONTEND_URL || 'https://morres-logistics.vercel.app';
-        const smsMessage = `Hi ${customer_name}, your delivery with tracking ID ${tracking_id} has been dispatched. Track its progress here: ${trackingBaseUrl}/track-delivery?id=${tracking_id}`
+        const smsMessage = `Hi ${customer_name}, your delivery with tracking ID ${tracking_id} has been dispatched. Track its progress here: ${trackingBaseUrl}/track-delivery?id=${tracking_id}`;
+        // ... (rest of the delivery creation logic, e.g., sendSMS, response, etc.)
+      } catch (err) {
+        if (err.code === '23505') { // Unique violation
+          return tryInsert(attempt + 1);
+        }
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+    tryInsert();
+  } catch (err) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}

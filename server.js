@@ -56,7 +56,7 @@ const corsOptions = {
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('Blocked origin:', origin);
+      console.warn(`[WARN][CORS] Blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -102,7 +102,7 @@ async function sendSMS(to, message) {
       }
     );
     if (response.data && response.data.data && response.data.data.success) {
-      console.log('TextBee SMS sent:', response.data);
+      console.info(`[INFO][SMS][TextBee] SMS sent:`, response.data);
       return { success: true, provider: 'textbee', data: response.data };
     } else {
       console.error('TextBee SMS error:', response.data);
@@ -191,6 +191,7 @@ function checkQuota(resource) {
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
+    console.warn(`[WARN][API][POST /login] Missing username or password`);
     return res.status(400).json({ error: 'Username and password are required' });
   }
   try {
@@ -199,11 +200,13 @@ app.post('/login', async (req, res) => {
       [username]
     );
     if (result.rows.length === 0) {
+      console.info(`[INFO][API][POST /login] Invalid credentials for username: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const user = result.rows[0];
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
+      console.info(`[INFO][API][POST /login] Invalid password for username: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     // Sanitize the user object to send to the client
@@ -218,9 +221,10 @@ app.post('/login', async (req, res) => {
       jwtSecret,
       { expiresIn: '12h' }
     );
+    console.info(`[INFO][API][POST /login] User ${username} logged in successfully`);
     res.json({ success: true, user: userForClient, token });
   } catch (err) {
-    console.error('Login error:', err);
+    console.error(`[ERROR][API][POST /login] Login error for username: ${username} | ${err.message}`);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -353,7 +357,7 @@ app.post('/parent-bookings', authenticateJWT, async (req, res) => {
     const smsRes = await sendSMS(phone_number, smsMessage);
 
     // Audit log
-    console.log(`[AUDIT] Parent booking created by ${req.user.username} at ${new Date().toISOString()} | BookingCode: ${bookingCode}`);
+    console.info(`[AUDIT][API][POST /parent-bookings] Parent booking created by ${req.user.username} at ${new Date().toISOString()} | BookingCode: ${bookingCode}`);
 
     if (!smsRes.success) {
       return res.status(207).json({
@@ -393,10 +397,10 @@ app.patch('/parent-bookings/:id/status', authenticateJWT, async (req, res) => {
       return res.status(404).json({ error: 'Parent booking not found.' });
     }
 
-    console.log(`[AUDIT] Parent booking ${id} status updated to ${status} by ${req.user.username}`);
+    console.info(`[AUDIT][API][PATCH /parent-bookings/:id/status] Parent booking ${id} status updated to ${status} by ${req.user.username}`);
     res.json({ success: true, booking: result.rows[0] });
   } catch (err) {
-    console.error(`Update parent booking status error for id ${id}:`, err);
+    console.error(`[ERROR][API][PATCH /parent-bookings/:id/status] Update parent booking status error for id ${id}:`, err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -418,7 +422,7 @@ app.patch('/parent-bookings/:id/cost', authenticateJWT, async (req, res) => {
     }
     res.json({ success: true, booking: result.rows[0] });
   } catch (err) {
-    console.error(`Update parent booking cost error for id ${id}:`, err);
+    console.error(`[ERROR][API][PATCH /parent-bookings/:id/cost] Update parent booking cost error for id ${id}:`, err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -562,7 +566,7 @@ app.post('/deliveries', authenticateJWT, checkQuota('delivery'), async (req, res
         const smsRes = await sendSMS(phone_number, smsMessage);
 
         // 6. Audit log
-        console.log(`[AUDIT] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${tracking_id}`);
+        console.info(`[AUDIT][API][POST /deliveries] Delivery created by ${req.user.username} at ${new Date().toISOString()} | TrackingID: ${tracking_id}`);
 
         if (!smsRes.success) {
           return res.status(207).json({
@@ -802,7 +806,7 @@ app.get('/deliveries/analytics', authenticateJWT, async (req, res) => {
 });
 
 app.post('/updateCheckpoint', authenticateJWT, checkQuota('sms'), async (req, res) => {
-  console.log('UpdateCheckpoint body:', req.body);
+  console.info(`[INFO][API][POST /updateCheckpoint] Body:`, req.body);
   const { trackingId, checkpoints, currentStatus } = req.body;
   
   // Validate required fields
@@ -913,7 +917,7 @@ app.post('/updateCheckpoint', authenticateJWT, checkQuota('sms'), async (req, re
     const smsRes = await sendSMS(row.phone_number, smsMessage);
     
     // Audit log
-    console.log(`[AUDIT] Checkpoint updated for ${trackingId} by ${req.user.username} at ${new Date().toISOString()} | Status: ${currentStatus}`);
+    console.info(`[AUDIT][API][POST /updateCheckpoint] Checkpoint updated for ${trackingId} by ${req.user.username} at ${new Date().toISOString()} | Status: ${currentStatus}`);
     
     if (!smsRes.success) {
       return res.status(207).json({
@@ -1039,7 +1043,7 @@ app.get('/api/subscriptions/me', authenticateJWT, async (req, res) => {
           [req.user.id, trialSettings.tier, now, trialEndDate]
         );
         // Audit log
-        console.log(`[SUBSCRIPTION] Attempted auto-create trial for user ${req.user.id} at ${now.toISOString()}`);
+        console.info(`[AUDIT][API][GET /api/subscriptions/me] Attempted auto-create trial for user ${req.user.id} at ${now.toISOString()}`);
       } catch (insertErr) {
         if (insertErr.code !== '23505') {
           // Only ignore unique violation, otherwise throw
@@ -1157,11 +1161,11 @@ app.patch('/api/admin/subscriptions/:userId', authenticateJWT, adminOnly, async 
       );
     }
     
-    console.log(`[AUDIT] Subscription for user ${userId} updated by admin ${req.user.username}. New tier: ${newTier}`);
+    console.info(`[AUDIT][API][PATCH /api/admin/subscriptions/:userId] Subscription for user ${userId} updated by admin ${req.user.username}. New tier: ${newTier}`);
     res.json({ success: true, subscription: result.rows[0] });
 
   } catch (err) {
-    console.error(`Admin update subscription error for user ${userId}:`, err);
+    console.error(`[ERROR][API][PATCH /api/admin/subscriptions/:userId] Admin update subscription error for user ${userId}:`, err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1573,7 +1577,7 @@ cron.schedule('*/5 * * * *', async () => {
           'UPDATE scheduled_reports SET last_run = $1, next_run = $2 WHERE id = $3',
           [now, nextRun, report.id]
         );
-        console.log(`[SCHEDULED REPORT] Sent to ${report.recipients} at ${now}`);
+        console.info(`[SCHEDULED REPORT] Sent to ${report.recipients} at ${now}`);
       } catch (err) {
         console.error(`[SCHEDULED REPORT ERROR] Email failed for report ${report.id}:`, err);
       }

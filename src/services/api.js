@@ -377,7 +377,6 @@ export const deliveryApi = {
 
   async createParentBooking(bookingData) {
     try {
-      console.log('Sending parent booking data to API:', bookingData);
       const res = await api.post('/parent-bookings', bookingData);
       return normalizeKeys(res.data);
     } catch (error) {
@@ -501,6 +500,17 @@ export const deliveryApi = {
       console.error('Failed to fetch analytics:', error);
       throw error;
     }
+  },
+  createAddonPurchase: async ({ type, quantity }) => {
+    if (type === 'extra_delivery') {
+      const res = await api.post('/api/addons/purchase-deliveries', { quantity: quantity || 1 });
+      return res.data;
+    }
+    if (type === 'sms_topup') {
+      const res = await api.post('/api/addons/purchase-sms', { quantity: quantity || 100 });
+      return res.data;
+    }
+    throw new Error('Invalid add-on type');
   }
 };
 

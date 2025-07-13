@@ -17,8 +17,6 @@ async function createAdmin() {
     process.exit(1);
   }
 
-  console.log(`Attempting to create admin user: ${username}...`);
-
   try {
     const hash = await bcrypt.hash(password, saltRounds);
     
@@ -27,9 +25,6 @@ async function createAdmin() {
       [username, hash, 'admin']
     );
     
-    console.log(`✅ Admin user '${username}' created successfully.`);
-    console.log('You can now log in with this user.');
-
   } catch (error) {
     if (error.code === '23505') { // unique_violation
       console.error(`❌ Error: Username '${username}' already exists.`);

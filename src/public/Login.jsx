@@ -202,10 +202,29 @@ export default function Login() {
           .form-check-label, .form-floating > label {
             font-size: 1.05em !important;
           }
+          /* PATCH: Restrict togglePassword and checkbox size on mobile */
           #togglePassword {
-            min-width: 40px !important;
-            min-height: 40px !important;
+            min-width: 44px !important;
+            min-height: 44px !important;
+            width: 44px !important;
+            height: 44px !important;
             font-size: 1.15em !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            max-width: 44px !important;
+            max-height: 44px !important;
+          }
+          .form-check-input {
+            width: 22px !important;
+            height: 22px !important;
+            min-width: 22px !important;
+            min-height: 22px !important;
+            max-width: 22px !important;
+            max-height: 22px !important;
+            margin-top: 0.2em !important;
+            margin-right: 0.5em !important;
+            vertical-align: middle !important;
           }
         }
         .btn.fw-bold:not(:disabled):hover, .btn.fw-bold:not(:disabled):focus-visible {

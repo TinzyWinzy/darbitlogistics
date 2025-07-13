@@ -16,6 +16,9 @@ import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Lege
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Title);
 import { FaUsers, FaTruck, FaCheckCircle, FaHourglassHalf, FaBell, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaFileDownload } from 'react-icons/fa';
 import { useRef } from 'react';
+import SummaryWidgets from './SummaryWidgets';
+import DashboardNotifications from './DashboardNotifications';
+import DashboardAnalytics from './DashboardAnalytics';
 
 const mineralTypes = [
   'Agate', 'Adamite', 'Andalusite', 'Anhydrite', 'Angelisite', 'Anthophyllite', 'Antimony', 'Aragonite', 'Arucite', 'Arsenic',
@@ -453,7 +456,7 @@ export default function OperatorDashboard() {
   };
 
   return (
-    <div className="container py-5">
+    <div className="container py-5 px-2 px-md-4">
       {hasPendingSync && (
         <div className="alert alert-warning d-flex align-items-center" role="alert">
           <FaExclamationTriangle className="me-2" />
@@ -473,137 +476,28 @@ export default function OperatorDashboard() {
         </div>
       )}
       {/* Summary Widgets Row */}
-      <div className="row g-4 mb-4">
-        <div className="col-6 col-md-3">
-          <div className="card shadow-sm border-0 text-center py-3 position-relative" style={{ background: '#fffbe6' }} title="Currently active loads">
-            <FaTruck className="fs-2 mb-2 text-warning" aria-label="Active Loads" />
-            <div className="fw-bold fs-4" style={{ color: '#1F2120' }}>{activeLoads}
-              <span className="ms-2">{analyticsTrends.total === 1 ? <FaArrowUp className="text-success" title="Up" /> : analyticsTrends.total === -1 ? <FaArrowDown className="text-danger" title="Down" /> : null}</span>
-            </div>
-            <div className="text-muted small">Active Loads</div>
-          </div>
-        </div>
-        <div className="col-6 col-md-3">
-          <div className="card shadow-sm border-0 text-center py-3 position-relative" style={{ background: '#e0ffe6' }} title="Loads delivered or completed">
-            <FaCheckCircle className="fs-2 mb-2 text-success" aria-label="Completed Loads" />
-            <div className="fw-bold fs-4" style={{ color: '#16a34a' }}>{completedLoads}
-              <span className="ms-2">{analyticsTrends.completed === 1 ? <FaArrowUp className="text-success" title="Up" /> : analyticsTrends.completed === -1 ? <FaArrowDown className="text-danger" title="Down" /> : null}</span>
-            </div>
-            <div className="text-muted small">Completed Loads</div>
-          </div>
-        </div>
-        <div className="col-6 col-md-3">
-          <div className="card shadow-sm border-0 text-center py-3 position-relative" style={{ background: '#fff0e6' }} title="Loads not yet started or pending">
-            <FaHourglassHalf className="fs-2 mb-2 text-warning" aria-label="Pending Loads" />
-            <div className="fw-bold fs-4" style={{ color: '#d2691e' }}>{pendingLoads}
-              <span className="ms-2">{analyticsTrends.pending === 1 ? <FaArrowUp className="text-success" title="Up" /> : analyticsTrends.pending === -1 ? <FaArrowDown className="text-danger" title="Down" /> : null}</span>
-            </div>
-            <div className="text-muted small">Pending Loads</div>
-          </div>
-        </div>
-        <div className="col-6 col-md-3">
-          <div className="card shadow-sm border-0 text-center py-3 position-relative" style={{ background: '#e6f0ff' }} title="Unique customers with bookings">
-            <FaUsers className="fs-2 mb-2 text-primary" aria-label="Total Customers" />
-            <div className="fw-bold fs-4" style={{ color: '#1e40af' }}>{totalCustomers}</div>
-            <div className="text-muted small">Total Customers</div>
-          </div>
-        </div>
-      </div>
+      <SummaryWidgets
+        activeLoads={activeLoads}
+        completedLoads={completedLoads}
+        pendingLoads={pendingLoads}
+        totalCustomers={totalCustomers}
+        analyticsTrends={analyticsTrends}
+      />
       {/* Notifications/Alerts Area */}
-      {notifications.length > 0 && (
-        <div className="mb-4">
-          <div className="card shadow-sm border-0">
-            <div className="card-header bg-light d-flex align-items-center">
-              <FaBell className="me-2 text-warning" />
-              <span className="fw-bold">Notifications</span>
-              <button className="btn btn-sm btn-outline-secondary ms-auto" onClick={markAllNotificationsRead} aria-label="Mark all as read">Mark all as read</button>
-            </div>
-            <ul className="list-group list-group-flush">
-              {notifications.map(n => (
-                <li key={n.id} className="list-group-item d-flex align-items-center justify-content-between">
-                  <div className="d-flex align-items-center">
-                    <span className="me-3">
-                      {n.type === 'warning' ? <FaExclamationTriangle className="text-warning" title="Warning" /> : <FaBell className="text-info" title="Info" />}
-                    </span>
-                    <span>{n.message}</span>
-                    <span className="text-muted small ms-3">{new Date(n.created_at).toLocaleString()}</span>
-                  </div>
-                  <button className="btn btn-sm btn-outline-secondary ms-2" aria-label="Dismiss notification" onClick={() => dismissNotification(n.id)}>&times;</button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-      {/* Analytics Charts */}
-      <div className="mb-4">
-        <div className="card shadow-sm border-0">
-          <div className="card-header bg-light fw-bold d-flex align-items-center">
-            <span>Dashboard Analytics</span>
-            <ul className="nav nav-tabs ms-auto" style={{ borderBottom: 'none' }}>
-              <li className="nav-item">
-                <button className={`nav-link${activeChartTab === 'bar' ? ' active' : ''}`} onClick={() => setActiveChartTab('bar')} type="button">Bar</button>
-              </li>
-              <li className="nav-item">
-                <button className={`nav-link${activeChartTab === 'pie' ? ' active' : ''}`} onClick={() => setActiveChartTab('pie')} type="button">Pie</button>
-              </li>
-              <li className="nav-item">
-                <button className={`nav-link${activeChartTab === 'line' ? ' active' : ''}`} onClick={() => setActiveChartTab('line')} type="button">Line</button>
-              </li>
-            </ul>
-          </div>
-          <div className="card-body">
-            {loadingAnalytics ? <Spinner /> : analytics ? (
-              <>
-                {activeChartTab === 'bar' && (
-                  <Bar
-                    data={{
-                      labels: ['Total', 'Completed', 'Pending'],
-                      datasets: [{
-                        label: 'Deliveries',
-                        data: [analytics.totalDeliveries, analytics.completedDeliveries, analytics.pendingDeliveries],
-                        backgroundColor: ['#1e40af', '#16a34a', '#d2691e']
-                      }]
-                    }}
-                    options={{ responsive: true, plugins: { legend: { display: false } } }}
-                    height={80}
-                  />
-                )}
-                {activeChartTab === 'pie' && (
-                  <Pie
-                    data={{
-                      labels: ['Completed', 'Pending', 'Other'],
-                      datasets: [{
-                        label: 'Deliveries by Status',
-                        data: [analytics.completedDeliveries, analytics.pendingDeliveries, Math.max(0, (analytics.totalDeliveries - analytics.completedDeliveries - analytics.pendingDeliveries))],
-                        backgroundColor: ['#16a34a', '#d2691e', '#1e40af']
-                      }]
-                    }}
-                    options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
-                  />
-                )}
-                {activeChartTab === 'line' && (
-                  <Line
-                    data={{
-                      labels: analytics.monthlyLabels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-                      datasets: [{
-                        label: 'Deliveries per Month',
-                        data: analytics.monthlyData || Array(12).fill(0),
-                        fill: false,
-                        borderColor: '#1e40af',
-                        backgroundColor: '#1e40af',
-                        tension: 0.3
-                      }]
-                    }}
-                    options={{ responsive: true, plugins: { legend: { position: 'top' } } }}
-                    height={80}
-                  />
-                )}
-              </>
-            ) : <div className="text-muted">No analytics data.</div>}
-          </div>
-        </div>
-      </div>
+      <DashboardNotifications
+        notifications={notifications}
+        onDismiss={dismissNotification}
+        onMarkAllRead={markAllNotificationsRead}
+        showToast={showToast}
+        toastMsg={toastMsg}
+        setShowToast={setShowToast}
+      />
+      <DashboardAnalytics
+        analytics={analytics}
+        loadingAnalytics={loadingAnalytics}
+        activeChartTab={activeChartTab}
+        setActiveChartTab={setActiveChartTab}
+      />
       {/* Strategic Operations Console Banner */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
         STRATEGIC OPERATIONS CONSOLE
@@ -681,13 +575,25 @@ export default function OperatorDashboard() {
           />
         </div>
       </div>
+      {/* Replace the row/col for ConsignmentMonitor with full-width */}
       <div className="row g-4">
-        <div className="col-12 col-lg-6">
+        <div className="col-12 px-0">
           <ConsignmentMonitor
             parentBookings={parentBookings}
             loading={parentBookingsLoading}
             error={parentBookingsError}
             onSelectDelivery={setSelectedId}
+            user={user}
+            onSubmitCheckpoint={handleUpdateCheckpoint}
+            onSuccess={async () => {
+              await fetchParentBookings();
+              await fetchDeliveries();
+              setToastMsg('Checkpoint logged successfully!');
+              setShowToast(true);
+              clearTimeout(toastTimeout.current);
+              toastTimeout.current = setTimeout(() => setShowToast(false), 2500);
+            }}
+            onFeedback={setFeedback}
           />
           {/* Highlight selected consignment visually (handled in ConsignmentMonitor if possible) */}
           {/* Pagination Controls for Deliveries */}
@@ -741,51 +647,10 @@ export default function OperatorDashboard() {
             </div>
           </div>
         </div>
-        <div className="col-12 col-lg-6">
-          <div className="card shadow-sm border-0">
-            <div className="card-body">
-              <h2 className="h5 fw-bold mb-3" style={{ color: '#1F2120' }}>
-                <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>edit_location_alt</span>
-                Log Checkpoint
-                <span className="ms-2" title="Log the current status and location of a load">
-                  <span className="badge bg-info">?</span>
-                </span>
-              </h2>
-              {selectedId && (() => {
-                const sel = localDeliveries.find(d => d.trackingId === selectedId);
-                if (!sel) return null;
-                return (
-                  <div className="alert alert-info mb-3 p-2">
-                    <div><strong>Tracking ID:</strong> {sel.trackingId}</div>
-                    <div><strong>Customer:</strong> {sel.customerName}</div>
-                    <div><strong>Phone:</strong> {sel.phoneNumber}</div>
-                    <div><strong>Status:</strong> {sel.currentStatus}</div>
-                  </div>
-                );
-              })()}
-              <CheckpointLoggerForm
-                deliveries={localDeliveries}
-                user={user}
-                onSubmitCheckpoint={handleUpdateCheckpoint}
-                onSuccess={async () => {
-                  await fetchParentBookings();
-                  await fetchDeliveries();
-                  setToastMsg('Checkpoint logged successfully!');
-                  setShowToast(true);
-                  clearTimeout(toastTimeout.current);
-                  toastTimeout.current = setTimeout(() => setShowToast(false), 2500);
-                }}
-                onFeedback={setFeedback}
-                selectedId={selectedId}
-                setSelectedId={setSelectedId}
-              />
-            </div>
-          </div>
-        </div>
       </div>
       {/* Internal Support Contact */}
       <div className="text-center text-muted small mt-5">
-        For support: <a href="mailto:info@morres.com" style={{ color: '#1F2120' }}>info@morres.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+        For support: <a href="mailto:jackfeng@morres.com" style={{ color: '#1F2120' }}>jackfeng@morres.com</a> | <a href="tel:+263788888886" style={{ color: '#1F2120' }}>+263 78 888 8886</a>
       </div>
     </div>
   );

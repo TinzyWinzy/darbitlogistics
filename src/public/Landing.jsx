@@ -1,6 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import React, { useContext } from 'react';
 import { AuthContext } from '../App';
+// Add icon imports
+import { FaBullseye, FaEye, FaTruck, FaWarehouse, FaLightbulb, FaDesktop } from 'react-icons/fa';
 
 export default function Landing() {
   const { isAuthenticated } = useContext(AuthContext);
@@ -22,7 +24,8 @@ export default function Landing() {
       )}
       {/* Hero Section */}
       <section className="container py-5 my-5 text-center position-relative">
-        <span style={{ fontSize: '3.5em', zIndex: 1, position: 'relative' }} role="img" aria-label="Morres Logistics logo">🚛</span>
+        {/* Use SVG logo instead of emoji */}
+        <img src="/favicon-m.svg" alt="Morres Logistics Logo" width={64} height={64} style={{ marginBottom: 8 }} />
         <h1 className="display-4 fw-bold mb-3 mt-3" style={{ color: '#1F2120' }}>Morres Logistics</h1>
         <p className="lead mb-4 mx-auto" style={{ maxWidth: 700 }}>
           Your Partner in Efficient, Reliable, and Sustainable Logistics
@@ -56,7 +59,7 @@ export default function Landing() {
         <div className="row g-4 justify-content-center">
           <div className="col-md-4">
             <div className="card h-100 shadow-sm border-0 text-center p-4" style={{ background: 'rgba(255,255,255,0.97)' }}>
-              <div className="mb-2" style={{ fontSize: '2em' }}>🎯</div>
+              <div className="mb-2" style={{ fontSize: '2em' }}><FaBullseye aria-label="Mission" /></div>
               <h5 className="fw-bold mb-2">Our Mission</h5>
               <ul className="text-start small mb-0" style={{ lineHeight: 1.7 }}>
                 <li><b>Customer-Centric Logistics</b>: Tailored solutions that put your operational needs first.</li>
@@ -67,7 +70,7 @@ export default function Landing() {
           </div>
           <div className="col-md-4">
             <div className="card h-100 shadow-sm border-0 text-center p-4" style={{ background: 'rgba(255,255,255,0.97)' }}>
-              <div className="mb-2" style={{ fontSize: '2em' }}>👁️</div>
+              <div className="mb-2" style={{ fontSize: '2em' }}><FaEye aria-label="Vision" /></div>
               <h5 className="fw-bold mb-2">Our Vision</h5>
               <ul className="text-start small mb-0" style={{ lineHeight: 1.7 }}>
                 <li><b>Leadership through Innovation</b>: AI, blockchain, and advanced route optimization.</li>
@@ -85,7 +88,7 @@ export default function Landing() {
         <div className="row g-4 g-md-5 justify-content-center">
           <div className="col-md-6 col-lg-4">
             <div className="card h-100 shadow-sm border-0 text-center p-4" style={{ background: 'rgba(255,255,255,0.97)' }}>
-              <div className="mb-2" style={{ fontSize: '2em' }}>🚚</div>
+              <div className="mb-2" style={{ fontSize: '2em' }}><FaTruck aria-label="Transportation" /></div>
               <h5 className="fw-bold mb-2">Transportation</h5>
               <ul className="text-start small mb-0" style={{ lineHeight: 1.7 }}>
                 <li>Safe, reliable delivery solutions</li>
@@ -97,7 +100,7 @@ export default function Landing() {
           </div>
           <div className="col-md-6 col-lg-4">
             <div className="card h-100 shadow-sm border-0 text-center p-4" style={{ background: 'rgba(255,255,255,0.97)' }}>
-              <div className="mb-2" style={{ fontSize: '2em' }}>🏢</div>
+              <div className="mb-2" style={{ fontSize: '2em' }}><FaWarehouse aria-label="Warehousing" /></div>
               <h5 className="fw-bold mb-2">Warehousing</h5>
               <ul className="text-start small mb-0" style={{ lineHeight: 1.7 }}>
                 <li>Secure short-term and long-term storage</li>
@@ -118,7 +121,7 @@ export default function Landing() {
         <div className="row g-4 justify-content-center">
           <div className="col-md-4">
             <div className="card h-100 shadow-sm border-0 text-center p-4" style={{ background: 'rgba(255,255,255,0.97)' }}>
-              <div className="mb-2" style={{ fontSize: '2em' }}>💡</div>
+              <div className="mb-2" style={{ fontSize: '2em' }}><FaLightbulb aria-label="Cost-effective" /></div>
               <ul className="text-start small mb-0" style={{ lineHeight: 1.7 }}>
                 <li>Cost-effective</li>
                 <li>Digitally enhanced</li>
@@ -128,7 +131,7 @@ export default function Landing() {
           </div>
           <div className="col-md-4">
             <div className="card h-100 shadow-sm border-0 text-center p-4" style={{ background: 'rgba(255,255,255,0.97)' }}>
-              <div className="mb-2" style={{ fontSize: '2em' }}>🖥️</div>
+              <div className="mb-2" style={{ fontSize: '2em' }}><FaDesktop aria-label="Digital" /></div>
               <ul className="text-start small mb-0" style={{ lineHeight: 1.7 }}>
                 <li>Hands-on service with real-time tools</li>
                 <li>Always in control of your cargo</li>
@@ -157,15 +160,15 @@ export default function Landing() {
         <div className="row justify-content-center">
           <div className="col-md-6 text-center">
             <div className="mb-2"><b>Address:</b> 6 Victor D'arcy, Borrowdale, Harare</div>
-            <div className="mb-2"><b>Email:</b> <a href="mailto:marketing@morreslogistics.com" style={{ color: '#1F2120' }}>marketing@morreslogistics.com</a></div>
+            <div className="mb-2"><b>Email:</b> <a href="mailto:jackfeng@morres.com" style={{ color: '#1F2120' }}>jackfeng@morres.com</a></div>
             <div className="mb-2"><b>Website:</b> <a href="http://www.morreslogistics.com" style={{ color: '#1F2120' }}>www.morreslogistics.com</a></div>
-            <div className="mb-2"><b>Phone:</b> <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a></div>
+            <div className="mb-2"><b>Phone:</b> <a href="tel:+263788888886" style={{ color: '#1F2120' }}>+263 78 888 8886</a></div>
           </div>
         </div>
       </section>
 
       <div className="container text-center text-muted small mt-5 mb-3">
-        This portal is for Morres Logistics staff and clients. For support: <a href="mailto:marketing@morreslogistics.com" style={{ color: '#1F2120' }}>marketing@morreslogistics.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+        This portal is for Morres Logistics staff and clients. For support: <a href="mailto:jackfeng@morres.com" style={{ color: '#1F2120' }}>jackfeng@morres.com</a> | <a href="tel:+263788888886" style={{ color: '#1F2120' }}>+263 78 888 8886</a>
       </div>
     </div>
   );

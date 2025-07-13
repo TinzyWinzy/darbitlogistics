@@ -88,9 +88,9 @@ router.get('/', async (req, res) => {
 
     // DEBUG: Log the first booking with deliveries
     if (bookingsWithDeliveries.length > 0) {
-      console.log('First booking with deliveries:', JSON.stringify(bookingsWithDeliveries[0], null, 2));
+      console.info(`[INFO][API][GET /parent-bookings] First booking with deliveries:`, bookingsWithDeliveries[0]);
     } else {
-      console.log('No bookings found for this query.');
+      console.info(`[INFO][API][GET /parent-bookings] No bookings found for this query.`);
     }
 
     res.json({ parentBookings: bookingsWithDeliveries, total });

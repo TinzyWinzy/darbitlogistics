@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Spinner from '../components/Spinner';
 import PaginationBar from '../components/PaginationBar';
 import DeliveryProgressBar from '../components/DeliveryProgressBar';
+import CheckpointLoggerForm from './CheckpointLoggerForm';
 
 // Helper functions for deadline badges
 function getDeadlineBadgeClass(deadline) {
@@ -50,7 +51,7 @@ const DELIVERY_STATUS_STEPS = [
   'Cancelled'
 ];
 
-const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery }) => {
+const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, user, onSubmitCheckpoint, onSuccess, onFeedback }) => {
   // Internalize all control state
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -139,30 +140,18 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery }
   useEffect(() => { setPage(1); }, [search, progressFilter, customStatusFilter, progressSort, progressSortOrder]);
 
   return (
-    <div className="card shadow-sm border-0 mb-4" role="region" aria-labelledby="consignment-monitor-heading">
+    <div className="card shadow-sm border-0 mb-4 w-100" style={{ width: '100%' }} role="region" aria-labelledby="consignment-monitor-heading">
       {/* Strategic Operations Console Banner */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold" style={{ letterSpacing: '1px', borderTopLeftRadius: '0.5rem', borderTopRightRadius: '0.5rem' }}>
         STRATEGIC OPERATIONS CONSOLE
       </div>
-      <div className="card-body">
+      <div className="card-body px-2 px-md-3" style={{ width: '100%' }}>
         <h2 id="consignment-monitor-heading" className="h5 fw-bold mb-3" style={{ color: '#1F2120' }}>
           <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>list_alt</span>
           Consignment & Load Monitoring
         </h2>
         {/* Search and Filter Controls */}
-        <div
-          className="d-flex flex-wrap align-items-center gap-2 mb-2"
-          style={{
-            rowGap: '0.3rem',
-            columnGap: '0.7rem',
-            fontSize: '0.97em',
-            padding: '0.3rem 0.2rem',
-            borderRadius: 6,
-            background: '#f8f8f6',
-            boxShadow: 'none',
-            flexDirection: 'row',
-          }}
-        >
+        <div className="cm-filter-bar">
           <div className="input-group flex-grow-1" style={{ minWidth: 180, maxWidth: 320 }}>
             <span className="input-group-text bg-white" style={{ color: '#1F2120', padding: '0.2em 0.6em', fontSize: '1em' }}>
               <span className="material-icons-outlined" style={{ fontSize: '1.1em' }}>search</span>
@@ -433,6 +422,20 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery }
                                   <span className="ms-2 text-success" title="Value">${delivery.value?.toLocaleString() || '0'}</span>
                                   <span className="ms-2 text-danger" title="Cost">${delivery.cost?.toLocaleString() || '0'}</span>
                                 </div> */}
+                                {/* Inline CheckpointLoggerForm below selected delivery */}
+                                {isSelected && (
+                                  <div className="mt-3">
+                                    <CheckpointLoggerForm
+                                      deliveries={booking.deliveries}
+                                      user={user}
+                                      onSubmitCheckpoint={onSubmitCheckpoint}
+                                      onSuccess={onSuccess}
+                                      onFeedback={onFeedback}
+                                      selectedId={selectedId}
+                                      setSelectedId={setSelectedId}
+                                    />
+                                  </div>
+                                )}
                               </li>
                             );
                           })}
@@ -461,7 +464,7 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery }
           </>
         )}
         <div className="mt-4 text-center text-muted small">
-          For support: <a href="mailto:info@morres.com" style={{ color: '#1F2120' }}>info@morres.com</a> | <a href="tel:+263242303123" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+          For support: <a href="mailto:jackfeng@morres.com" style={{ color: '#1F2120' }}>jackfeng@morres.com</a> | <a href="tel:+263788888886" style={{ color: '#1F2120' }}>+263 78 888 8886</a>
         </div>
       </div>
     </div>

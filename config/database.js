@@ -40,8 +40,8 @@ const testConnection = async () => {
   while (retries) {
     try {
       const client = await pool.connect();
-      console.log('Successfully connected to PostgreSQL');
-      console.log('Connection details:', {
+      console.info('[INFO][DB] Successfully connected to PostgreSQL');
+      console.info('[INFO][DB] Connection details:', {
         user: pool.options.user,
         host: pool.options.host,
         database: pool.options.database,

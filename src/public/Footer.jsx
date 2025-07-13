@@ -9,9 +9,9 @@ export default function Footer() {
           </div>
           <div className="col-12 col-md-6 text-center text-md-end">
             <span className="me-2">Support:</span>
-            <a href="mailto:marketing@morreslogistics.com" className="text-decoration-underline" style={{ color: '#1F2120' }}>marketing@morreslogistics.com</a>
+            <a href="mailto:jackfeng@morres.com" className="text-decoration-underline" style={{ color: '#1F2120' }}>jackfeng@morres.com</a>
             <span className="mx-2">|</span>
-            <a href="tel:+263242303123" className="text-decoration-underline" style={{ color: '#1F2120' }}>+263 242 303 123</a>
+            <a href="tel:+263788888886" className="text-decoration-underline" style={{ color: '#1F2120' }}>+263 78 888 8886</a>
             <span className="mx-2">|</span>
             <a href="http://www.morreslogistics.com" className="text-decoration-underline" style={{ color: '#1F2120' }}>www.morreslogistics.com</a>
           </div>

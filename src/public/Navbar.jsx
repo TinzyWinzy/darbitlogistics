@@ -42,7 +42,7 @@ export default function Navbar({ onHamburgerClick }) {
     >
       <div className="d-flex align-items-center">
         <Link className="navbar-brand fw-bold d-flex align-items-center" to="/" style={{ color: '#EBD3AD', letterSpacing: '0.5px' }}>
-          <span style={{ fontSize: '1.7em', marginRight: 10 }} role="img" aria-label="logo">🚛</span>
+          <img src="/favicon-m.svg" alt="Morres Logistics Logo" width={36} height={36} style={{ marginRight: 10, display: 'inline-block', verticalAlign: 'middle' }} />
           Morres Logistics
         </Link>
         {/* Hamburger always visible on mobile */}
