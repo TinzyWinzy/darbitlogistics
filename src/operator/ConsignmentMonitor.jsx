@@ -3,6 +3,7 @@ import Spinner from '../components/Spinner';
 import PaginationBar from '../components/PaginationBar';
 import DeliveryProgressBar from '../components/DeliveryProgressBar';
 import CheckpointLoggerForm from './CheckpointLoggerForm';
+import { normalizeKeys } from '../services/normalizeKeys';
 
 // Helper functions for deadline badges
 function getDeadlineBadgeClass(deadline) {
@@ -52,6 +53,8 @@ const DELIVERY_STATUS_STEPS = [
 ];
 
 const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, user, onSubmitCheckpoint, onSuccess, onFeedback }) => {
+  // Normalize parentBookings to camelCase
+  const normalizedBookings = useMemo(() => normalizeKeys(parentBookings), [parentBookings]);
   // Internalize all control state
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -65,7 +68,7 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, 
 
   // Filtering, sorting, and pagination logic
   const filteredBookings = useMemo(() => {
-    let filtered = parentBookings;
+    let filtered = normalizedBookings;
     if (search) {
       filtered = filtered.filter(b =>
         (b.customerName && b.customerName.toLowerCase().includes(search.toLowerCase())) ||
@@ -112,7 +115,7 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, 
       return 0;
     });
     return filtered;
-  }, [parentBookings, search, progressFilter, customStatusFilter, progressSort, progressSortOrder]);
+  }, [normalizedBookings, search, progressFilter, customStatusFilter, progressSort, progressSortOrder]);
 
   // Pagination
   const total = filteredBookings.length;
@@ -244,6 +247,17 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, 
             }
           }
         `}</style>
+        <style>{`
+          @media (max-width: 700px) {
+            .accordion-item, .list-group-item { border-radius: 0.6rem !important; margin-bottom: 0.7em !important; }
+            .accordion-header, .accordion-button { font-size: 1.08em !important; min-height: 2.7em !important; }
+            .accordion-button { padding: 0.7em 1em !important; }
+            .accordion-body { padding: 0.8em 0.6em 0.6em 0.6em !important; }
+            .list-group-item { font-size: 1.05em !important; padding: 0.8em 1em !important; }
+            .badge, .progress-bar { font-size: 1em !important; padding: 0.4em 0.8em !important; }
+            .d-flex.flex-wrap.gap-2.justify-content-end { flex-direction: column !important; align-items: flex-start !important; gap: 0.4em !important; }
+          }
+        `}</style>
 
         {loading ? (
           <Spinner />
@@ -302,19 +316,23 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, 
                     className={`accordion-collapse collapse ${openBookingId === booking.id ? 'show' : ''}`}
                   >
                     <div className="accordion-body" style={{ padding: '0.7em 0.5em 0.5em 0.5em', fontSize: '0.97em' }}>
-                      {/* Progress Bar and Stats */}
-                      <div className="progress mb-1" style={{ height: '16px', background: '#f3ede7' }}>
-                        <div
-                          className="progress-bar"
-                          role="progressbar"
-                          style={{
-                            width: `${booking.completionPercentage}%`,
-                            backgroundColor: '#D2691E',
-                            fontSize: '0.93em',
-                            padding: 0,
-                          }}
-                        >
-                          {booking.completionPercentage}%
+                      {/* Consignment Progress Bar with label */}
+                      <div className="mb-2">
+                        <div className="fw-bold mb-1" style={{ fontSize: '0.98em', color: '#1976d2' }}>
+                          Consignment Progress: {booking.completionPercentage}% Complete
+                        </div>
+                        <div className="progress mb-2" style={{ height: '14px', background: '#f3ede7' }}>
+                          <div
+                            className="progress-bar"
+                            role="progressbar"
+                            style={{ width: `${booking.completionPercentage}%`, backgroundColor: '#1976d2', fontSize: '0.93em', padding: 0, transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)' }}
+                            aria-valuenow={booking.completionPercentage}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                          >
+                            {/* Optionally show % inside bar on desktop */}
+                            <span className="d-none d-md-inline" style={{ color: '#fff', fontWeight: 500 }}>{booking.completionPercentage}%</span>
+                          </div>
                         </div>
                       </div>
                       <div className="row g-2 text-muted small mb-2" style={{ fontSize: '0.92em' }}>
@@ -382,8 +400,11 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, 
                                         {currentStatus}
                                       </span>
                                     </div>
-                                    {/* Progress Bar for Delivery Status */}
-                                    <DeliveryProgressBar status={currentStatus} />
+                                    {/* Delivery Status Progress Bar with label */}
+                                    <div className="mt-1">
+                                      <span className="small text-muted">Delivery Status: {currentStatus}</span>
+                                      <DeliveryProgressBar status={currentStatus} />
+                                    </div>
                                   </div>
                                   <div className="col-12 col-md-4">
                                     <div className="d-flex flex-wrap gap-2 justify-content-end">

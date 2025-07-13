@@ -32,6 +32,16 @@ export default function Loads() {
   const [statusFilter, setStatusFilter] = useState('');
   const navigate = useNavigate();
 
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 700px)');
+    setIsMobile(mq.matches);
+    const handler = e => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const fetchDeliveries = async () => {
     setLoading(true);
     setError('');
@@ -121,11 +131,16 @@ export default function Loads() {
   return (
     <div className="container py-4">
       <style>{`
-        @media (max-width: 600px) {
+        @media (max-width: 700px) {
           .loads-table th, .loads-table td { font-size: 0.93em; padding: 0.4em 0.3em; }
           .loads-table th { position: sticky; top: 0; background: #f8f9fa; z-index: 2; }
           .loads-table { min-width: 700px; }
           .loads-card { display: block; margin-bottom: 1rem; border-radius: 0.5rem; box-shadow: 0 1px 4px rgba(31,33,32,0.07); border: 1px solid #eee; background: #fff; }
+          .mobile-filter-form { flex-direction: column !important; gap: 0.5rem !important; }
+          .mobile-filter-form .input-group, .mobile-filter-form > div { width: 100% !important; }
+          .mobile-modal .modal-dialog { max-width: 100vw !important; margin: 0; }
+          .mobile-modal .modal-content { border-radius: 0; padding: 0.5rem; }
+          .mobile-chart-scroll { overflow-x: auto; }
         }
       `}</style>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -134,8 +149,8 @@ export default function Loads() {
           Dispatch New Load
         </button>
       </div>
-      <form className="mb-3" onSubmit={handleSearch}>
-        <div className="input-group">
+      <form className={`mb-3 ${isMobile ? 'mobile-filter-form d-flex' : ''}`} onSubmit={handleSearch}>
+        <div className="input-group" style={isMobile ? { width: '100%' } : {}}>
           <input
             type="text"
             className="form-control"
@@ -147,7 +162,7 @@ export default function Loads() {
           />
           <button className="btn btn-outline-secondary" type="submit" style={{ fontSize: '1em' }}>Search</button>
         </div>
-        <div className="mt-2 d-flex align-items-center gap-2 flex-wrap">
+        <div className="mt-2 d-flex align-items-center gap-2 flex-wrap" style={isMobile ? { width: '100%' } : {}}>
           <label htmlFor="statusFilter" className="form-label mb-0 me-2 small">Status:</label>
           <select id="statusFilter" className="form-select form-select-sm" style={{width:'auto', fontSize:'1em'}} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
             <option value="">All</option>
@@ -164,9 +179,9 @@ export default function Loads() {
       {showCreateModal && (
         <>
           <div className="modal-backdrop fade show" onClick={() => setShowCreateModal(false)}></div>
-          <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" role="dialog" aria-modal="true">
-            <div className="modal-dialog modal-lg modal-dialog-centered" role="document" style={{ maxWidth: '98vw' }}>
-              <div className="modal-content">
+          <div className={`modal fade show${isMobile ? ' mobile-modal' : ''}`} style={{ display: 'block' }} tabIndex="-1" role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-lg modal-dialog-centered" role="document" style={isMobile ? { maxWidth: '100vw', margin: 0 } : { maxWidth: '98vw' }}>
+              <div className="modal-content" style={isMobile ? { borderRadius: 0, padding: '0.5rem' } : {}}>
                 <div className="modal-header">
                   <h5 className="modal-title">Dispatch New Load</h5>
                   <button type="button" className="btn-close" onClick={() => setShowCreateModal(false)} aria-label="Close"></button>
@@ -191,7 +206,9 @@ export default function Loads() {
         </>
       )}
       {/* Loads summary graph with Recharts */}
-      <LoadsChart deliveries={deliveries} customerKeys={customerKeys} />
+      <div className={isMobile ? 'mobile-chart-scroll' : ''} style={isMobile ? { width: '100vw', overflowX: 'auto' } : {}}>
+        <LoadsChart deliveries={deliveries} customerKeys={customerKeys} />
+      </div>
       {/* Responsive Table/Card Switch */}
       <LoadsTable
         deliveries={deliveries}

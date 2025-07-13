@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaSpinner } from 'react-icons/fa';
 
 // Simple InfoIcon component with tooltip
@@ -48,6 +48,16 @@ export default function DeliveryDispatchForm({
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const [toastType, setToastType] = useState('success');
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 700px)');
+    setIsMobile(mq.matches);
+    const handler = e => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   const handleCustomerSelect = (customerId) => {
     setCreateForm(prev => ({
@@ -242,6 +252,21 @@ export default function DeliveryDispatchForm({
 
   return (
     <>
+      <style>{`
+        @media (max-width: 700px) {
+          .mobile-dispatch-form .form-label { font-size: 1.05em; }
+          .mobile-dispatch-form .form-control, .mobile-dispatch-form .form-select, .mobile-dispatch-form textarea {
+            font-size: 1.08em;
+            min-height: 2.5em;
+            padding: 0.7em 1em;
+          }
+          .mobile-dispatch-form .row.g-3 { gap: 0.5rem 0 !important; }
+          .mobile-dispatch-form .col-md-4, .mobile-dispatch-form .col-md-3, .mobile-dispatch-form .col-12 { flex: 0 0 100%; max-width: 100%; }
+          .mobile-dispatch-form .col-12.d-flex { flex-direction: column; gap: 0.5rem !important; }
+          .mobile-dispatch-form .btn { width: 100%; font-size: 1.1em; padding: 0.9em 0; }
+          .mobile-dispatch-form .sticky-submit { position: sticky; bottom: 0; background: #fff; z-index: 10; box-shadow: 0 -2px 8px rgba(31,33,32,0.07); padding-bottom: 1em; }
+        }
+      `}</style>
       {/* Toast/Snackbar Feedback */}
       {showToast && (
         <div className={`toast show position-fixed bottom-0 end-0 m-4 bg-${toastType}`} style={{zIndex:9999, minWidth: '220px'}} role="alert" aria-live="assertive" aria-atomic="true">
@@ -252,7 +277,7 @@ export default function DeliveryDispatchForm({
           <div className="toast-body">{toastMsg}</div>
         </div>
       )}
-      <form onSubmit={handleSubmit} className="row g-3 align-items-end" autoComplete="off">
+      <form onSubmit={handleSubmit} className={`row g-3 align-items-end${isMobile ? ' mobile-dispatch-form' : ''}`} autoComplete="off">
         <div className="col-md-4">
           <label className="form-label">
             <span className="fw-bold text-danger">*</span> Select Customer
@@ -468,7 +493,8 @@ export default function DeliveryDispatchForm({
             disabled={creating || !createForm.selectedBookingId}
           />
         </div>
-        <div className="col-12 d-flex align-items-center gap-3">
+        {/* Submit button row: sticky and full-width on mobile */}
+        <div className={`col-12 d-flex align-items-center gap-3${isMobile ? ' sticky-submit' : ''}`}>
           <button
             type="submit"
             className="btn fw-bold"
@@ -477,10 +503,12 @@ export default function DeliveryDispatchForm({
               color: '#EBD3AD',
               border: 'none',
               borderRadius: '0.5rem',
-              padding: '0.5rem 1.25rem',
+              padding: isMobile ? '0.9em 0' : '0.5rem 1.25rem',
               opacity: creating ? 0.7 : 1,
               cursor: creating ? 'not-allowed' : 'pointer',
-              minWidth: '160px'
+              minWidth: isMobile ? '100%' : '160px',
+              width: isMobile ? '100%' : undefined,
+              fontSize: isMobile ? '1.1em' : undefined
             }}
             disabled={creating}
             aria-label="Dispatch load"

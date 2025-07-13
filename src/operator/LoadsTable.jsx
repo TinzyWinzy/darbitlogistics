@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 function exportToCSV(rows, columns) {
   const header = columns.map(col => col.label).join(',');
@@ -51,6 +51,15 @@ export default function LoadsTable({
   const [sortKey, setSortKey] = useState('createdAt');
   const [sortDir, setSortDir] = useState('desc');
   const [expanded, setExpanded] = useState({});
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 700px)');
+    setIsMobile(mq.matches);
+    const handler = e => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   // Filtering
   const filtered = useMemo(() => {
@@ -102,6 +111,42 @@ export default function LoadsTable({
   // Row expansion
   const toggleExpand = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
 
+  // Card view for mobile
+  const renderMobileCards = () => (
+    <div className="d-flex flex-column gap-3 mt-3">
+      {sorted.length === 0 ? (
+        <div className="text-center text-muted py-5">
+          <div className="mb-2" style={{ fontSize: '2rem' }}>&#128230;</div>
+          <div>No loads found. Try adjusting your search or filters.</div>
+        </div>
+      ) : (
+        sorted.map(delivery => (
+          <div key={delivery.trackingId} className="loads-card p-3 shadow-sm border position-relative">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <span className="fw-bold">{delivery.trackingId}</span>
+                <span className={`badge bg-${statusMap[delivery.currentStatus] || 'secondary'} ms-2`} style={{fontSize:'0.95em'}}>{delivery.currentStatus}</span>
+              </div>
+              <button className="btn btn-sm btn-outline-primary" onClick={() => toggleExpand(delivery.trackingId)} aria-label="Expand row">{expanded[delivery.trackingId] ? 'Hide' : 'Details'}</button>
+            </div>
+            <div><b>Customer:</b> {delivery.customerName}</div>
+            <div><b>Consignment:</b> {delivery.parentBookingId}</div>
+            <div><b>Tonnage:</b> {delivery.tonnage}</div>
+            <div><b>Containers:</b> {delivery.containerCount}</div>
+            <div><b>Driver:</b> {delivery.driverDetails?.name}</div>
+            <div><b>Created:</b> {delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : ''}</div>
+            {expanded[delivery.trackingId] && (
+              <div className="mt-2 bg-light p-2 rounded">
+                <div><b>Last Updated:</b> {delivery.updatedAt ? new Date(delivery.updatedAt).toLocaleString() : ''}</div>
+                {/* Add more details as needed */}
+              </div>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  );
+
   return (
     <div className="card shadow-sm border-0 mt-4">
       <div className="card-body p-0">
@@ -124,74 +169,78 @@ export default function LoadsTable({
           </form>
           <button className="btn btn-sm btn-outline-success ms-auto" onClick={handleExport}>Export CSV</button>
         </div>
-        <div className="table-responsive" style={{ maxHeight: 480, overflowY: 'auto' }}>
-          <table className="table table-hover align-middle mb-0 loads-table" style={{ minWidth: 900 }}>
-            <thead className="table-light sticky-top" style={{ top: 0, zIndex: 2 }}>
-              <tr>
-                {columns.map(col => (
-                  <th
-                    key={col.key}
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => {
-                      if (sortKey === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                      else { setSortKey(col.key); setSortDir('asc'); }
-                    }}
-                  >
-                    {col.label}
-                    {sortKey === col.key && (sortDir === 'asc' ? ' ▲' : ' ▼')}
-                  </th>
-                ))}
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.length === 0 ? (
+        {isMobile ? (
+          renderMobileCards()
+        ) : (
+          <div className="table-responsive" style={{ maxHeight: 480, overflowY: 'auto' }}>
+            <table className="table table-hover align-middle mb-0 loads-table" style={{ minWidth: 900 }}>
+              <thead className="table-light sticky-top" style={{ top: 0, zIndex: 2 }}>
                 <tr>
-                  <td colSpan={columns.length + 1} className="text-center text-muted py-5">
-                    <div className="mb-2" style={{ fontSize: '2rem' }}>&#128230;</div>
-                    <div>No loads found. Try adjusting your search or filters.</div>
-                  </td>
+                  {columns.map(col => (
+                    <th
+                      key={col.key}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => {
+                        if (sortKey === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                        else { setSortKey(col.key); setSortDir('asc'); }
+                      }}
+                    >
+                      {col.label}
+                      {sortKey === col.key && (sortDir === 'asc' ? ' ▲' : ' ▼')}
+                    </th>
+                  ))}
+                  <th></th>
                 </tr>
-              ) : (
-                sorted.map(delivery => (
-                  <React.Fragment key={delivery.trackingId}>
-                    <tr>
-                      <td>{delivery.trackingId}</td>
-                      <td>{delivery.customerName}</td>
-                      <td>{delivery.parentBookingId}</td>
-                      <td><span className={`badge bg-${statusMap[delivery.currentStatus] || 'secondary'}`}>{delivery.currentStatus}</span></td>
-                      <td>{delivery.tonnage}</td>
-                      <td>{delivery.containerCount}</td>
-                      <td>{delivery.driverDetails?.name}</td>
-                      <td>{delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : ''}</td>
-                      <td>
-                        <button className="btn btn-sm btn-outline-primary me-2" onClick={() => toggleExpand(delivery.trackingId)} aria-label="Expand row">{expanded[delivery.trackingId] ? 'Hide' : 'Details'}</button>
-                      </td>
-                    </tr>
-                    {expanded[delivery.trackingId] && (
-                      <tr className="bg-light">
-                        <td colSpan={columns.length + 1}>
-                          <div className="p-3">
-                            <strong>Tracking ID:</strong> {delivery.trackingId}<br />
-                            <strong>Customer:</strong> {delivery.customerName}<br />
-                            <strong>Consignment:</strong> {delivery.parentBookingId}<br />
-                            <strong>Status:</strong> {delivery.currentStatus}<br />
-                            <strong>Tonnage:</strong> {delivery.tonnage}<br />
-                            <strong>Containers:</strong> {delivery.containerCount}<br />
-                            <strong>Driver:</strong> {delivery.driverDetails?.name}<br />
-                            <strong>Created At:</strong> {delivery.createdAt ? new Date(delivery.createdAt).toLocaleString() : ''}<br />
-                            <strong>Last Updated:</strong> {delivery.updatedAt ? new Date(delivery.updatedAt).toLocaleString() : ''}<br />
-                            {/* Add more details as needed */}
-                          </div>
+              </thead>
+              <tbody>
+                {sorted.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length + 1} className="text-center text-muted py-5">
+                      <div className="mb-2" style={{ fontSize: '2rem' }}>&#128230;</div>
+                      <div>No loads found. Try adjusting your search or filters.</div>
+                    </td>
+                  </tr>
+                ) : (
+                  sorted.map(delivery => (
+                    <React.Fragment key={delivery.trackingId}>
+                      <tr>
+                        <td>{delivery.trackingId}</td>
+                        <td>{delivery.customerName}</td>
+                        <td>{delivery.parentBookingId}</td>
+                        <td><span className={`badge bg-${statusMap[delivery.currentStatus] || 'secondary'}`}>{delivery.currentStatus}</span></td>
+                        <td>{delivery.tonnage}</td>
+                        <td>{delivery.containerCount}</td>
+                        <td>{delivery.driverDetails?.name}</td>
+                        <td>{delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : ''}</td>
+                        <td>
+                          <button className="btn btn-sm btn-outline-primary me-2" onClick={() => toggleExpand(delivery.trackingId)} aria-label="Expand row">{expanded[delivery.trackingId] ? 'Hide' : 'Details'}</button>
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                      {expanded[delivery.trackingId] && (
+                        <tr className="bg-light">
+                          <td colSpan={columns.length + 1}>
+                            <div className="p-3">
+                              <strong>Tracking ID:</strong> {delivery.trackingId}<br />
+                              <strong>Customer:</strong> {delivery.customerName}<br />
+                              <strong>Consignment:</strong> {delivery.parentBookingId}<br />
+                              <strong>Status:</strong> {delivery.currentStatus}<br />
+                              <strong>Tonnage:</strong> {delivery.tonnage}<br />
+                              <strong>Containers:</strong> {delivery.containerCount}<br />
+                              <strong>Driver:</strong> {delivery.driverDetails?.name}<br />
+                              <strong>Created At:</strong> {delivery.createdAt ? new Date(delivery.createdAt).toLocaleString() : ''}<br />
+                              <strong>Last Updated:</strong> {delivery.updatedAt ? new Date(delivery.updatedAt).toLocaleString() : ''}<br />
+                              {/* Add more details as needed */}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
