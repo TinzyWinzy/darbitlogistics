@@ -122,7 +122,7 @@ export default function CheckpointLoggerForm({
   };
 
   return (
-    <div className="card shadow-sm border-0 mb-3 bg-light p-3">
+    <div className="card shadow-sm border-0 mb-3 bg-light p-3" onClick={e => e.stopPropagation()}>
       <div className="card-header bg-white d-flex align-items-center border-bottom pb-2 mb-2">
         <span className="material-icons-outlined me-2" style={{ color: '#1F2120' }}>edit_location_alt</span>
         <h5 className="mb-0 fw-bold" style={{ color: '#1F2120', fontSize: '1.08em' }}>Log Delivery Checkpoint</h5>
