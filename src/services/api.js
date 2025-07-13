@@ -451,6 +451,11 @@ export const deliveryApi = {
     return res.data;
   },
 
+  async getMyAllSubscriptions() {
+    const res = await api.get('/api/subscriptions/all');
+    return res.data;
+  },
+
   admin: {
     getAllUsers: async () => {
       try {

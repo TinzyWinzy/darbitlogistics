@@ -13,6 +13,8 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
+import LoadsChart from './LoadsChart';
+import LoadsTable from './LoadsTable';
 
 export default function Loads() {
   const [deliveries, setDeliveries] = useState([]);
@@ -113,22 +115,6 @@ export default function Loads() {
     return <span className={`badge bg-${map[status] || 'secondary'}`}>{status}</span>;
   };
 
-  // Compute summary data for Recharts: [{ date, [customer1]: count, [customer2]: count, ... }]
-  const chartData = useMemo(() => {
-    // Get all unique customers
-    const customers = Array.from(new Set(deliveries.map(d => d.customerName || 'Unknown')));
-    // Group by date
-    const grouped = {};
-    deliveries.forEach(delivery => {
-      const date = delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : 'Unknown';
-      const customer = delivery.customerName || 'Unknown';
-      if (!grouped[date]) grouped[date] = { date };
-      grouped[date][customer] = (grouped[date][customer] || 0) + 1;
-    });
-    // Return as array, sorted by date
-    return Object.values(grouped).sort((a, b) => new Date(a.date) - new Date(b.date));
-  }, [deliveries]);
-
   const customerKeys = useMemo(() => Array.from(new Set(deliveries.map(d => d.customerName || 'Unknown'))), [deliveries]);
   const colors = ['#1976d2', '#D2691E', '#16a34a', '#dc2626', '#6b7280', '#f59e42', '#8e24aa', '#0097a7', '#c62828', '#388e3c'];
 
@@ -205,133 +191,18 @@ export default function Loads() {
         </>
       )}
       {/* Loads summary graph with Recharts */}
-      <div className="mb-4">
-        <h5 className="fw-bold mb-2" style={{ color: '#1F2120' }}>Loads per Day by Customer</h5>
-        {chartData.length > 0 && customerKeys.length > 0 ? (
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 30 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" fontSize={13} angle={-15} textAnchor="end" height={50} />
-              <YAxis allowDecimals={false} fontSize={13} />
-              <Tooltip cursor={{ fill: '#f3f3f3' }} />
-              <Legend verticalAlign="top" height={36} />
-              {customerKeys.map((customer, idx) => (
-                <Bar
-                  key={customer}
-                  dataKey={customer}
-                  stackId="a"
-                  fill={colors[idx % colors.length]}
-                  radius={[4, 4, 0, 0]}
-                  isAnimationActive={true}
-                />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="text-muted small">No data to display.</div>
-        )}
-      </div>
+      <LoadsChart deliveries={deliveries} customerKeys={customerKeys} />
       {/* Responsive Table/Card Switch */}
-      <div className="card shadow-sm border-0 d-none d-sm-block">
-        <div className="card-body p-0">
-          {loading ? (
-            <div className="p-4 text-center">Loading...</div>
-          ) : error ? (
-            <div className="alert alert-danger m-3">{error}</div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0 loads-table">
-                <thead className="table-light">
-                  <tr>
-                    <th>Tracking ID</th>
-                    <th>Customer</th>
-                    <th>Consignment</th>
-                    <th>Status</th>
-                    <th>Tonnage</th>
-                    <th>Containers</th>
-                    <th>Driver</th>
-                    <th>Created At</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deliveries.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="text-center text-muted py-5">
-                        <div className="mb-2" style={{fontSize:'2rem'}}>&#128230;</div>
-                        <div>No loads found. Try adjusting your search or filters.</div>
-                      </td>
-                    </tr>
-                  ) : (
-                    deliveries
-                      .filter(delivery => !statusFilter || delivery.currentStatus === statusFilter)
-                      .map(delivery => (
-                        <tr key={delivery.trackingId}>
-                          <td>
-                            <button className="btn btn-link p-0 fw-bold" style={{color:'#1F2120'}} onClick={() => navigate(`/track-delivery?id=${delivery.trackingId}`)} title="Track this load">{delivery.trackingId}</button>
-                          </td>
-                          <td>
-                            <button className="btn btn-link p-0" style={{color:'#1e40af'}} onClick={() => setSearch(delivery.customerName)} title="Filter by customer">{delivery.customerName}</button>
-                          </td>
-                          <td>{delivery.parentBookingId}</td>
-                          <td>{statusBadge(delivery.currentStatus)}</td>
-                          <td>{delivery.tonnage}</td>
-                          <td>{delivery.containerCount}</td>
-                          <td>{delivery.driverDetails?.name}</td>
-                          <td>
-                            {delivery.createdAt ? (
-                              <span title={`Created: ${new Date(delivery.createdAt).toLocaleString()}`}>{new Date(delivery.createdAt).toLocaleDateString()}</span>
-                            ) : ''}
-                          </td>
-                          <td>
-                            <button className="btn btn-sm btn-outline-primary me-2" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/track-delivery?id=${delivery.trackingId}`)} aria-label="Track delivery">Track</button>
-                            <button className="btn btn-sm btn-outline-secondary" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/dashboard?delivery=${delivery.trackingId}`)} aria-label="View delivery">View</button>
-                          </td>
-                        </tr>
-                      ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-      {/* Mobile Card View */}
-      <div className="d-block d-sm-none">
-        {loading ? (
-          <div className="p-4 text-center">Loading...</div>
-        ) : error ? (
-          <div className="alert alert-danger m-3">{error}</div>
-        ) : deliveries.length === 0 ? (
-          <div className="text-center text-muted py-5">
-            <div className="mb-2" style={{fontSize:'2rem'}}>&#128230;</div>
-            <div>No loads found. Try adjusting your search or filters.</div>
-          </div>
-        ) : (
-          deliveries
-            .filter(delivery => !statusFilter || delivery.currentStatus === statusFilter)
-            .map(delivery => (
-              <div key={delivery.trackingId} className="loads-card p-3 mb-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <div>
-                    <span className="fw-bold" style={{color:'#1F2120',fontSize:'1.1em'}}>{delivery.trackingId}</span>
-                    <span className="ms-2">{statusBadge(delivery.currentStatus)}</span>
-                  </div>
-                  <button className="btn btn-sm btn-outline-primary" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/track-delivery?id=${delivery.trackingId}`)} aria-label="Track delivery">Track</button>
-                </div>
-                <div className="mb-1"><strong>Customer:</strong> <span style={{color:'#1e40af'}}>{delivery.customerName}</span></div>
-                <div className="mb-1"><strong>Consignment:</strong> {delivery.parentBookingId}</div>
-                <div className="mb-1"><strong>Tonnage:</strong> {delivery.tonnage} | <strong>Containers:</strong> {delivery.containerCount}</div>
-                <div className="mb-1"><strong>Driver:</strong> {delivery.driverDetails?.name}</div>
-                <div className="mb-1"><strong>Created:</strong> {delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : ''}</div>
-                <div className="d-flex gap-2 mt-2">
-                  <button className="btn btn-outline-secondary w-50" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/dashboard?delivery=${delivery.trackingId}`)} aria-label="View delivery">View</button>
-                  <button className="btn btn-outline-primary w-50" style={{fontSize:'1em',padding:'0.4em 0.8em'}} onClick={() => navigate(`/track-delivery?id=${delivery.trackingId}`)} aria-label="Track delivery">Track</button>
-                </div>
-              </div>
-            ))
-        )}
-      </div>
+      <LoadsTable
+        deliveries={deliveries}
+        customers={customers}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        dateRange={{ from: '', to: '' }}
+        setDateRange={() => {}}
+        search={search}
+        setSearch={setSearch}
+      />
       <div className="d-flex justify-content-between align-items-center mt-3">
         <div>
           Showing {Math.min((page - 1) * pageSize + 1, total)}-

@@ -24,6 +24,19 @@ import { subscriptionTiers } from './config/subscriptions.js';
 
 dotenv.config();
 
+// --- Ensure refresh_tokens table exists ---
+(async function ensureRefreshTokensTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      token TEXT NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+})();
+
 // VAPID keys for web push
 const vapidKeys = {
   publicKey: process.env.VAPID_PUBLIC_KEY,
@@ -187,7 +200,11 @@ function checkQuota(resource) {
   };
 }
 
-// Updated login endpoint with JWT support
+// --- Refresh Token Helpers ---
+function generateRefreshToken() {
+  return crypto.randomBytes(64).toString('hex');
+}
+// --- LOGIN: Issue refresh token ---
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -221,7 +238,11 @@ app.post('/login', async (req, res) => {
       jwtSecret,
       { expiresIn: '12h' }
     );
-    console.info(`[INFO][API][POST /login] User ${username} logged in successfully`);
+    // --- Issue refresh token ---
+    const refreshToken = generateRefreshToken();
+    const refreshExpiry = new Date(Date.now() + 30*24*60*60*1000); // 30 days
+    await pool.query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, refreshExpiry]);
+    res.cookie('refresh_token', refreshToken, { httpOnly: true, secure: true, sameSite: 'strict', path: '/api/auth/refresh', maxAge: 30*24*60*60*1000 });
     res.json({ success: true, user: userForClient, token });
   } catch (err) {
     console.error(`[ERROR][API][POST /login] Login error for username: ${username} | ${err.message}`);
@@ -1037,10 +1058,10 @@ app.get('/api/subscriptions/me', authenticateJWT, async (req, res) => {
       trialEndDate.setDate(trialEndDate.getDate() + trialSettings.durationDays);
       try {
         await pool.query(
-          `INSERT INTO subscriptions (user_id, tier, status, start_date, end_date)
-           VALUES ($1, $2, 'trial', $3, $4)
+          `INSERT INTO subscriptions (user_id, tier, status, start_date)
+           VALUES ($1, $2, 'trial', $3)
            ON CONFLICT (user_id) WHERE status IN ('active', 'trial') DO NOTHING`,
-          [req.user.id, trialSettings.tier, now, trialEndDate]
+          [req.user.id, trialSettings.tier, now]
         );
         // Audit log
         console.info(`[AUDIT][API][GET /api/subscriptions/me] Attempted auto-create trial for user ${req.user.id} at ${now.toISOString()}`);
@@ -1171,6 +1192,36 @@ app.patch('/api/admin/subscriptions/:userId', authenticateJWT, adminOnly, async 
 });
 
 app.use('/api/auth', authRouter);
+
+// --- REFRESH ENDPOINT ---
+app.post('/api/auth/refresh', async (req, res) => {
+  const { refresh_token } = req.cookies;
+  if (!refresh_token) return res.status(401).json({ error: 'No refresh token' });
+  const result = await pool.query('SELECT * FROM refresh_tokens WHERE token = $1', [refresh_token]);
+  if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid refresh token' });
+  const tokenData = result.rows[0];
+  if (new Date(tokenData.expires_at) < new Date()) return res.status(401).json({ error: 'Refresh token expired' });
+  // Rotate: delete old, issue new
+  await pool.query('DELETE FROM refresh_tokens WHERE token = $1', [refresh_token]);
+  const newRefreshToken = generateRefreshToken();
+  const newExpiry = new Date(Date.now() + 30*24*60*60*1000);
+  await pool.query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [tokenData.user_id, newRefreshToken, newExpiry]);
+  res.cookie('refresh_token', newRefreshToken, { httpOnly: true, secure: true, sameSite: 'strict', path: '/api/auth/refresh', maxAge: 30*24*60*60*1000 });
+  // Issue new access token
+  const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [tokenData.user_id]);
+  const user = userResult.rows[0];
+  const newAccessToken = jwt.sign({ id: user.id, username: user.username, role: user.role }, jwtSecret, { expiresIn: '12h' });
+  res.json({ token: newAccessToken });
+});
+// --- LOGOUT ENDPOINT ---
+app.post('/api/auth/logout', async (req, res) => {
+  const { refresh_token } = req.cookies;
+  if (refresh_token) {
+    await pool.query('DELETE FROM refresh_tokens WHERE token = $1', [refresh_token]);
+    res.clearCookie('refresh_token', { path: '/api/auth/refresh' });
+  }
+  res.json({ success: true });
+});
 
 // Public delivery tracking endpoint
 app.get('/deliveries/:trackingId', async (req, res) => {

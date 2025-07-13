@@ -44,8 +44,8 @@ export default function SubscriptionPlans() {
       return;
     }
     setLoading(true);
-    deliveryApi.getMySubscription()
-      .then(sub => setSubscriptions(sub ? [sub] : []))
+    deliveryApi.getMyAllSubscriptions()
+      .then(subs => setSubscriptions(subs || []))
       .catch(err => {
         const msg = err.response?.data?.error || 'Failed to fetch subscription.';
         if (msg.includes('No active subscription found') || msg.includes('expired')) {
@@ -87,8 +87,8 @@ export default function SubscriptionPlans() {
   };
 
   // Find the current/active subscription
-  const activeSub = subscriptions[0];
-  const historySubs = subscriptions.filter(sub => !activeSub || sub.id !== activeSub.id);
+  const activeSub = subscriptions.find(sub => sub.status === 'active' || sub.status === 'trial');
+  const historySubs = subscriptions.filter(sub => sub !== activeSub);
 
   // Defensive: prefer tierDetails, then root fields, then config
   const tierDetails = activeSub?.tierDetails && Object.keys(activeSub.tierDetails).length > 0
@@ -358,16 +358,19 @@ export default function SubscriptionPlans() {
             {subscriptions.length === 0 ? (
               <tr><td colSpan={6}>No previous subscriptions.</td></tr>
             ) : (
-              subscriptions.map(sub => (
-                <tr key={sub.id || sub.tier}>
-                  <td>{sub.tierDetails?.name || subscriptionTiers[sub.tier]?.name || sub.tier}</td>
-                  <td>{sub.status}</td>
-                  <td>{new Date(sub.start_date).toLocaleDateString()}</td>
-                  <td>{new Date(sub.end_date).toLocaleDateString()}</td>
-                  <td>{Number(sub.deliveries_used) || 0}</td>
-                  <td>{Number(sub.sms_used) || 0}</td>
-                </tr>
-              ))
+              [...subscriptions].sort((a, b) => new Date(b.start_date) - new Date(a.start_date)).map(sub => {
+                const planConfig = subscriptionTiers[sub.tier] || {};
+                return (
+                  <tr key={sub.id || sub.tier}>
+                    <td>{planConfig.name || sub.tier}</td>
+                    <td>{sub.status}</td>
+                    <td>{new Date(sub.start_date).toLocaleDateString()}</td>
+                    <td>{new Date(sub.end_date).toLocaleDateString()}</td>
+                    <td>{Number(sub.deliveries_used) || 0}</td>
+                    <td>{Number(sub.sms_used) || 0}</td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

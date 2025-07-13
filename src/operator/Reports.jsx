@@ -6,7 +6,11 @@ import {
 } from 'recharts';
 import Select from 'react-select';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import DeliveriesOverTimeChart from './DeliveriesOverTimeChart';
+import TonnageByMineralChart from './TonnageByMineralChart';
+import TopCustomersChart from './TopCustomersChart';
 
 function exportToCSV(deliveries, columns) {
   if (!deliveries.length) return;
@@ -47,6 +51,22 @@ function useIsMobile() {
     return () => window.removeEventListener('resize', handler);
   }, []);
   return isMobile;
+}
+
+// Helper to render a chart as a high-res PNG
+async function chartToImage(chartRef, scale = 3) {
+  if (!chartRef.current) return null;
+  const node = chartRef.current;
+  const width = node.offsetWidth * scale;
+  const height = node.offsetHeight * scale;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  context.scale(scale, scale);
+  // Use html2canvas for the chart only
+  const imgCanvas = await html2canvas(node, { scale });
+  return imgCanvas.toDataURL('image/png');
 }
 
 export default function Reports() {
@@ -239,22 +259,49 @@ export default function Reports() {
   // PDF Export Handler
   const handleExportPDF = async () => {
     setShowPdfModal(false);
-    const input = reportRef.current;
-    if (!input) return;
-    const canvas = await html2canvas(input, { scale: 2 });
-    const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     // Branding: Add logo and title
-    const logo = new Image();
-    logo.src = '/logo.jpg'; // Adjust path as needed
+    const logo = new window.Image();
+    logo.src = '/logo.jpg';
     await new Promise(res => { logo.onload = res; });
     pdf.addImage(logo, 'JPEG', 40, 20, 80, 40);
     pdf.setFontSize(22);
     pdf.text('Morres Logistics Report', 140, 50);
     pdf.setFontSize(12);
     pdf.text(`Generated: ${new Date().toLocaleString()}`, 140, 70);
-    // Add chart/table image
-    pdf.addImage(imgData, 'PNG', 40, 80, 750, 400);
+
+    // Add charts as images
+    let y = 100;
+    const chartImages = [];
+    for (const key of Object.keys(chartRefs)) {
+      const img = await chartToImage(chartRefs[key], 3);
+      if (img) chartImages.push({ img, key });
+    }
+    for (const { img, key } of chartImages) {
+      pdf.setFontSize(14);
+      pdf.text(
+        key === 'deliveriesOverTime' ? 'Deliveries Over Time' :
+        key === 'tonnageByMineral' ? 'Tonnage by Mineral' :
+        key === 'topCustomers' ? 'Top Customers (Tonnage)' : key,
+        40, y + 20
+      );
+      pdf.addImage(img, 'PNG', 40, y + 30, 350, 180);
+      y += 220;
+    }
+
+    // Add table using autoTable
+    pdf.setFontSize(16);
+    pdf.text('Deliveries Table', 40, y + 30);
+    autoTable(pdf, {
+      startY: y + 40,
+      head: [allColumns.map(col => col.label)],
+      body: filtered.map(d => allColumns.map(col => d[col.key])),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [31, 33, 32] },
+      margin: { left: 40, right: 40 },
+      tableWidth: 'auto',
+      theme: 'grid',
+    });
     pdf.save('morres_report.pdf');
   };
 
@@ -270,6 +317,12 @@ export default function Reports() {
   const schedPageSize = 10;
   const schedTotalPages = Math.ceil(scheduledReports.length / schedPageSize);
   const schedPaged = isMobile ? scheduledReports.slice((schedPage - 1) * schedPageSize, schedPage * schedPageSize) : scheduledReports;
+
+  const chartRefs = {
+    deliveriesOverTime: useRef(),
+    tonnageByMineral: useRef(),
+    topCustomers: useRef(),
+  };
 
   return (
     <div className="container py-5">
@@ -472,122 +525,48 @@ export default function Reports() {
               <div className="mb-3">
                 <div className="card h-100 shadow-sm">
                   <div className="card-body">
-                    <h6 className="fw-bold mb-3">Deliveries Over Time</h6>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={deliveriesOverTime} onClick={e => e && e.activeLabel && handleDrilldown('month', e.activeLabel)}>
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="count" fill="#0088FE" name="Deliveries" />
-                        <Bar dataKey="tonnage" fill="#00C49F" name="Tonnage" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <DeliveriesOverTimeChart data={deliveriesOverTime} onDrilldown={handleDrilldown} />
                   </div>
                 </div>
               </div>
               <div className="mb-3">
                 <div className="card h-100 shadow-sm">
                   <div className="card-body">
-                    <h6 className="fw-bold mb-3">Tonnage by Mineral</h6>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie
-                          data={tonnageByMineral}
-                          dataKey="tonnage"
-                          nameKey="mineral"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={70}
-                          label
-                          onClick={(_, i) => handleDrilldown('mineral', tonnageByMineral[i]?.mineral)}
-                        >
-                          {tonnageByMineral.map((entry, i) => <Cell key={entry.mineral} fill={entry.color} />)}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <TonnageByMineralChart data={tonnageByMineral} onDrilldown={handleDrilldown} />
                   </div>
                 </div>
               </div>
               <div className="mb-3">
                 <div className="card h-100 shadow-sm">
                   <div className="card-body">
-                    <h6 className="fw-bold mb-3">Top Customers (Tonnage)</h6>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={topCustomers} layout="vertical" onClick={e => e && e.activeLabel && handleDrilldown('customer', e.activeLabel)}>
-                        <XAxis type="number" dataKey="tonnage" />
-                        <YAxis type="category" dataKey="customer" width={90} />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="tonnage" fill="#FF8042" name="Tonnage" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <TopCustomersChart data={topCustomers} onDrilldown={handleDrilldown} />
                   </div>
                 </div>
               </div>
             </>
           ) : (
             <>
-          <div className="col-md-6">
-            <div className="card h-100 shadow-sm">
-              <div className="card-body">
-                <h6 className="fw-bold mb-3">Deliveries Over Time</h6>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={deliveriesOverTime} onClick={e => e && e.activeLabel && handleDrilldown('month', e.activeLabel)}>
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="count" fill="#0088FE" name="Deliveries" />
-                    <Bar dataKey="tonnage" fill="#00C49F" name="Tonnage" />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="col-md-6">
+                <div className="card h-100 shadow-sm">
+                  <div className="card-body">
+                    <DeliveriesOverTimeChart data={deliveriesOverTime} onDrilldown={handleDrilldown} />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="card h-100 shadow-sm">
-              <div className="card-body">
-                <h6 className="fw-bold mb-3">Tonnage by Mineral</h6>
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={tonnageByMineral}
-                      dataKey="tonnage"
-                      nameKey="mineral"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={70}
-                      label
-                      onClick={(_, i) => handleDrilldown('mineral', tonnageByMineral[i]?.mineral)}
-                    >
-                      {tonnageByMineral.map((entry, i) => <Cell key={entry.mineral} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="col-md-6">
+                <div className="card h-100 shadow-sm">
+                  <div className="card-body">
+                    <TonnageByMineralChart data={tonnageByMineral} onDrilldown={handleDrilldown} />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="col-md-3">
-            <div className="card h-100 shadow-sm">
-              <div className="card-body">
-                <h6 className="fw-bold mb-3">Top Customers (Tonnage)</h6>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={topCustomers} layout="vertical" onClick={e => e && e.activeLabel && handleDrilldown('customer', e.activeLabel)}>
-                    <XAxis type="number" dataKey="tonnage" />
-                    <YAxis type="category" dataKey="customer" width={90} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="tonnage" fill="#FF8042" name="Tonnage" />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="col-12">
+                <div className="card h-100 shadow-sm">
+                  <div className="card-body">
+                    <TopCustomersChart data={topCustomers} onDrilldown={handleDrilldown} />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
             </>
           )}
         </div>
