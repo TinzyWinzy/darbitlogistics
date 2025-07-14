@@ -28,6 +28,9 @@ import Reports from './operator/Reports';
 import InvoiceHistory from './components/InvoiceHistory';
 import { processOutbox } from './services/api';
 import { sendPushNotification } from './services/api';
+import { jwtDecode as jwt_decode } from 'jwt-decode';
+import Profile from './public/Profile';
+import Settings from './public/Settings';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -120,6 +123,16 @@ function AppLayout({ sidebarOpen, setSidebarOpen }) {
                     <InvoiceHistory />
                   </ProtectedRoute>
                 } />
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } />
+                <Route path="/settings" element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } />
         </Routes>
         <Footer />
       </main>
@@ -143,6 +156,32 @@ export default function App() {
   useEffect(() => {
     const checkAuth = async () => {
       let token = localStorage.getItem('jwt_token');
+      const cachedUser = localStorage.getItem('user_profile');
+      // If offline and cached user/token exist, allow offline login only if token is not expired
+      if (!navigator.onLine && cachedUser && token) {
+        try {
+          const decoded = jwt_decode(token);
+          if (decoded.exp && Date.now() < decoded.exp * 1000) {
+            setUser(JSON.parse(cachedUser));
+            setLoading(false);
+            return;
+          } else {
+            // Token expired
+            setUser(null);
+            localStorage.removeItem('user_profile');
+            localStorage.removeItem('jwt_token');
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          // Invalid token
+          setUser(null);
+          localStorage.removeItem('user_profile');
+          localStorage.removeItem('jwt_token');
+          setLoading(false);
+          return;
+        }
+      }
       if (!token) {
         // Try to refresh
         try {
@@ -165,8 +204,10 @@ export default function App() {
           }
         });
         setUser(data);
+        localStorage.setItem('user_profile', JSON.stringify(data)); // Cache user profile
       } catch (error) {
         setUser(null);
+        localStorage.removeItem('user_profile');
       } finally {
         setLoading(false);
       }
@@ -185,11 +226,12 @@ export default function App() {
     }
   }, []);
 
-  // Clear all user-specific state on logout or user change
+  // On logout, clear cached user profile
   useEffect(() => {
     if (!user) {
       setDeliveries([]);
       setParentBookings([]);
+      localStorage.removeItem('user_profile');
       // Add any other user-specific state resets here
     }
   }, [user]);

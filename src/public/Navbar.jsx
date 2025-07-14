@@ -112,8 +112,8 @@ export default function Navbar({ onHamburgerClick }) {
                   <span className="fw-semibold">{user.name || user.email || 'User'}</span>
                 </Dropdown.Toggle>
                 <Dropdown.Menu>
-                  <Dropdown.Item as={Link} to="#" className="d-flex align-items-center"><FaUserCircle className="me-2" /> Profile</Dropdown.Item>
-                  <Dropdown.Item as={Link} to="#" className="d-flex align-items-center"><FaCog className="me-2" /> Settings</Dropdown.Item>
+                  <Dropdown.Item as={Link} to="/profile" className="d-flex align-items-center"><FaUserCircle className="me-2" /> Profile</Dropdown.Item>
+                  <Dropdown.Item as={Link} to="/settings" className="d-flex align-items-center"><FaCog className="me-2" /> Settings</Dropdown.Item>
                   {user.role === 'admin' && <>
                     <Dropdown.Divider />
                     <Dropdown.Item as={Link} to="/admin/dashboard" className="d-flex align-items-center text-danger fw-bold"><FaUserShield className="me-2" /> Admin</Dropdown.Item>
