@@ -34,6 +34,14 @@ export default defineConfig(({ mode }) => {
           // Rules for runtime caching
           runtimeCaching: [
             {
+              // Always fetch /api/health from the network (never cache)
+              urlPattern: /\/api\/health$/,
+              handler: 'NetworkOnly',
+              options: {
+                cacheName: 'health-check',
+              }
+            },
+            {
               // Cache API calls to your backend
               urlPattern: ({ url }) => url.origin === env.VITE_API_URL,
               handler: 'NetworkFirst',

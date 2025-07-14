@@ -39,7 +39,12 @@ export default function Login() {
         throw new Error('Invalid login response from server.');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.error || err.message || 'Login failed. Please check your credentials.';
+      let errorMessage;
+      if (!err.response) {
+        errorMessage = 'Cannot connect to server. Please check your network and try again.';
+      } else {
+        errorMessage = err.response?.data?.error || err.message || 'Login failed. Please check your credentials.';
+      }
       setError(errorMessage);
     } finally {
       setLoading(false);

@@ -54,6 +54,7 @@ api.interceptors.response.use(
   },
   async error => {
     const originalRequest = error.config;
+    // Only handle 401 with a response (not network errors)
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       if (!isRefreshing) {
@@ -66,7 +67,10 @@ api.interceptors.response.use(
           isRefreshing = false;
         } catch (refreshError) {
           isRefreshing = false;
-          window.location.href = '/login';
+          // Only redirect if refresh also returns 401 (not network error)
+          if (refreshError.response && refreshError.response.status === 401) {
+            window.location.href = '/login';
+          }
           return Promise.reject(refreshError);
         }
       }
@@ -77,6 +81,7 @@ api.interceptors.response.use(
         });
       });
     }
+    // For network errors (no response), just propagate the error
     return Promise.reject(error);
   }
 );
@@ -606,6 +611,9 @@ export async function processOutbox(onSyncResult) {
         if (delivery) {
           await db.deliveries.put(delivery);
         }
+        // Remove item from outbox if successful
+        await db.outbox.delete(item.id);
+        success++;
       } else if (item.type === 'updateCheckpoint') {
         const payload = {
           trackingId: item.payload.trackingId,
@@ -617,14 +625,22 @@ export async function processOutbox(onSyncResult) {
         if (updated) {
           await db.deliveries.put(updated);
         }
+        await db.outbox.delete(item.id);
+        success++;
       }
-      // Remove item from outbox if successful
-      await db.outbox.delete(item.id);
-      success++;
     } catch (err) {
+      // If it's a network error (no response), stop and retry later
+      if (!err.response) {
+        break;
+      }
+      // Otherwise, mark as failed and continue
+      await db.outbox.update(item.id, {
+        failed: true,
+        errorMsg: err.response?.data?.error || err.message || 'Sync failed',
+        lastTried: new Date().toISOString(),
+      });
       failed++;
-      // Stop processing on first failure to avoid rapid retries
-      break;
+      // Continue with next item
     }
   }
   if (typeof onSyncResult === 'function') {

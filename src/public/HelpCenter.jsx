@@ -27,17 +27,17 @@ export default function HelpCenter() {
   ];
 
   return (
-    <div className="help-center-container container py-4">
-      <header className="help-center-header d-flex align-items-center mb-3 gap-3">
-        <FaRegLightbulb size={32} className="text-primary" />
-        <h2 className="mb-0 fw-bold">Morres Logistics Help Center</h2>
+    <div className="help-center-container container py-4" style={{ maxWidth: 800, margin: '0 auto' }}>
+      <header className="help-center-header d-flex flex-column align-items-center mb-4 gap-2 text-center">
+        <FaRegLightbulb size={36} className="text-primary mb-2" />
+        <h2 className="fw-bold mb-0">Morres Logistics Help Center</h2>
       </header>
       <hr className="help-center-divider my-3" />
 
       {/* Quick Links as Gravity Cards (only for logged-in users) */}
       {user && (
         <section className="mb-4">
-          <div className="gravity-card mb-3 p-3" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)' }}>
+          <div className="gravity-card mb-3 p-3 p-md-4" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)' }}>
             <div className="d-flex align-items-center gap-2 mb-3">
               <FaRegArrowAltCircleRight className="text-primary fs-3" />
               <h3 className="mb-0 fs-5 text-primary">Quick Links</h3>
@@ -45,16 +45,13 @@ export default function HelpCenter() {
             <div className="row g-3">
               {quickLinks.map(link => (
                 <div className="col-12 col-sm-6 col-md-4" key={link.to}>
-                  <Link to={link.to} className="gravity-card d-flex align-items-center gap-3 p-3 text-decoration-none h-100"
+                  <Link to={link.to} className="gravity-card d-flex align-items-center gap-3 p-3 text-decoration-none h-100 help-link-card"
                     style={{
                       background: 'rgba(255,255,255,0.97)',
                       borderRadius: '1rem',
                       boxShadow: '0 2px 8px rgba(31,33,32,0.08)',
-                      transition: 'transform 0.15s, box-shadow 0.15s',
                       color: '#1F2120',
                     }}
-                    onMouseOver={e => e.currentTarget.style.transform = 'translateY(-4px) scale(1.03)'}
-                    onMouseOut={e => e.currentTarget.style.transform = 'none'}
                   >
                     <span className="fs-2">{link.icon}</span>
                     <div>
@@ -71,19 +68,19 @@ export default function HelpCenter() {
 
       {/* Getting Started Card */}
       <section className="mb-4">
-        <div className="gravity-card p-4" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)' }}>
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <FaRegCheckCircle className="text-primary fs-3" />
+        <div className="gravity-card p-4 text-center" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)', maxWidth: 700, margin: '0 auto' }}>
+          <div className="d-flex flex-column align-items-center gap-2 mb-2">
+            <FaRegCheckCircle className="text-primary fs-3 mb-1" />
             <h3 className="mb-0 fs-5 text-primary">Getting Started: Step-by-Step</h3>
           </div>
-          <ol className="ps-3 mb-0">
+          <ol className="ps-3 mb-0 text-start" style={{ maxWidth: 600, margin: '0 auto' }}>
             <li><b>Sign In:</b> Log in with your operator or customer credentials. <span className="text-muted small">(Contact admin if you need access.)</span></li>
             <li><b>For Operators:</b> Go to <b>Operator Dashboard</b> → <b>New Delivery</b> to dispatch a load. Fill all required fields, double-check consignment and driver details, and submit.</li>
             <li><b>For Customers:</b> Use your <b>tracking code</b> to follow your delivery in real time via the <b>Track Delivery</b> page.</li>
             <li><b>Update Checkpoints:</b> Operators should log each checkpoint promptly for full visibility. <span className="text-muted small">(Accurate logs = fewer support issues!)</span></li>
             <li><b>Billing & Subscriptions:</b> Review your billing dashboard and manage your subscription plans as needed.</li>
           </ol>
-          <div className="mt-2 text-secondary small d-flex align-items-center">
+          <div className="mt-2 text-secondary small d-flex align-items-center justify-content-center">
             <FaRegLightbulb className="me-1 text-warning" />
             <span>Tip: Always keep your contact info up to date for SMS/email notifications.</span>
           </div>
@@ -92,9 +89,9 @@ export default function HelpCenter() {
 
       {/* FAQ as Gravity Cards */}
       <section className="mb-4">
-        <div className="gravity-card p-4" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)' }}>
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <FaQuestionCircle className="text-primary fs-3" />
+        <div className="gravity-card p-4" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)', maxWidth: 700, margin: '0 auto' }}>
+          <div className="d-flex flex-column align-items-center gap-2 mb-2 text-center">
+            <FaQuestionCircle className="text-primary fs-3 mb-1" />
             <h3 className="mb-0 fs-5 text-primary">Frequently Asked Questions</h3>
           </div>
           <div className="help-center-faq-list">
@@ -124,13 +121,13 @@ export default function HelpCenter() {
 
       {/* Feedback/Contact Form Card */}
       <section className="mb-4">
-        <div className="gravity-card p-4" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)' }}>
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <FaRegEnvelope className="text-primary fs-3" />
+        <div className="gravity-card p-4" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)', maxWidth: 500, margin: '0 auto' }}>
+          <div className="d-flex flex-column align-items-center gap-2 mb-2 text-center">
+            <FaRegEnvelope className="text-primary fs-3 mb-1" />
             <h3 className="mb-0 fs-5 text-primary">Still Need Help?</h3>
           </div>
-          <form onSubmit={handleFeedbackSubmit} className="d-flex flex-column gap-2" style={{ maxWidth: 420 }} aria-label="Help Center Feedback Form">
-            <label htmlFor="feedback" className="fw-medium">Describe your issue or question:</label>
+          <form onSubmit={handleFeedbackSubmit} className="d-flex flex-column gap-2 align-items-center" style={{ maxWidth: 420, margin: '0 auto' }} aria-label="Help Center Feedback Form">
+            <label htmlFor="feedback" className="fw-medium align-self-start">Describe your issue or question:</label>
             <textarea
               id="feedback"
               value={feedback}
@@ -140,6 +137,7 @@ export default function HelpCenter() {
               placeholder="Type your question or describe your issue..."
               required
               aria-required="true"
+              style={{ resize: 'vertical', minHeight: 80 }}
             />
             <button
               type="submit"
@@ -152,7 +150,7 @@ export default function HelpCenter() {
             </button>
             {submitted && <span className="text-primary fw-medium mt-1">Thank you! We'll get back to you soon.</span>}
           </form>
-          <div className="mt-3 text-secondary small">
+          <div className="mt-3 text-secondary small text-center">
             Or email us directly at <a href="mailto:jackfeng@morres.com">jackfeng@morres.com</a> or call <a href="tel:+263788888886">+263 78 888 8886</a>
           </div>
         </div>
