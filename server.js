@@ -1037,6 +1037,21 @@ app.post('/send-notification', authenticateJWT, async (req, res) => {
   }
 });
 
+// --- PUSH NOTIFY ENDPOINT ---
+app.post('/api/notify', async (req, res) => {
+  const { subscription, title, body } = req.body;
+  if (!subscription || !title || !body) {
+    return res.status(400).json({ error: 'Missing subscription, title, or body.' });
+  }
+  try {
+    await webPush.sendNotification(subscription, JSON.stringify({ title, body }));
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Failed to send push notification:', err);
+    res.status(500).json({ error: 'Failed to send push notification.' });
+  }
+});
+
 // Subscription Management
 app.get('/api/subscriptions/me', authenticateJWT, async (req, res) => {
   try {
@@ -1788,4 +1803,9 @@ app.post('/api/addons/purchase-sms', authenticateJWT, async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Local API running on port ${PORT}`);
+});
+
+// Health check endpoint for online/offline detection
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
 });

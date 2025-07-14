@@ -1,6 +1,6 @@
 import { useEffect, useState, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../App';
+import { AuthContext } from '../contexts/AuthContext';
 import { deliveryApi, notificationApi, invoiceApi } from '../services/api';
 import { useDeliveries } from '../services/useDeliveries';
 import { useParentBookings } from '../services/useParentBookings';

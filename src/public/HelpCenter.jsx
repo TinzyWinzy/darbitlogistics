@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { AuthContext } from '../App';
+import { AuthContext } from '../contexts/AuthContext';
 import {
   FaQuestionCircle, FaRegLightbulb, FaRegEnvelope, FaRegCheckCircle, FaRegUser,
   FaRegClock, FaRegPaperPlane, FaRegListAlt, FaRegArrowAltCircleRight, FaTachometerAlt, FaBoxOpen, FaCreditCard

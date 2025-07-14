@@ -1,15 +1,30 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { useContext, useState } from 'react';
-import { AuthContext } from '../App';
+import { useContext, useState, useEffect } from 'react';
+import { AuthContext } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaCog, FaUserShield, FaSignOutAlt } from 'react-icons/fa';
 import Dropdown from 'react-bootstrap/Dropdown';
+import db from '../services/db';
+import { isOnline } from '../services/api';
 
 export default function Navbar({ onHamburgerClick }) {
   const { user, setUser } = useContext(AuthContext);
   const navigate = useNavigate();
   const [isNavCollapsed, setIsNavCollapsed] = useState(true);
   const location = useLocation();
+
+  // Network status state
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    let mounted = true;
+    async function checkStatus() {
+      const status = await isOnline();
+      if (mounted) setOnline(status);
+    }
+    checkStatus();
+    const interval = setInterval(checkStatus, 10000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
 
   // Define public routes
   const publicRoutes = [
@@ -23,6 +38,10 @@ export default function Navbar({ onHamburgerClick }) {
     try {
       localStorage.removeItem('jwt_token');
       setUser(null);
+      // Clear IndexedDB tables to prevent data leaks between operators
+      await db.deliveries.clear();
+      await db.parentBookings.clear();
+      await db.outbox.clear();
       navigate('/login');
     } catch (error) {
       console.error('Logout failed:', error);
@@ -131,6 +150,25 @@ export default function Navbar({ onHamburgerClick }) {
             <NavLink to="/plans" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Plans</NavLink>
           </li>
         )}
+        {/* Network status indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', marginLeft: 18 }}>
+          <span
+            style={{
+              display: 'inline-block',
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              background: online ? '#27c93f' : '#e74c3c',
+              marginRight: 0,
+              border: '1.5px solid #fff',
+              boxShadow: online ? '0 0 4px #27c93f88' : '0 0 4px #e74c3c88',
+              transition: 'background 0.2s',
+              cursor: 'pointer',
+            }}
+            aria-label={online ? 'App Online' : 'App Offline'}
+            title={online ? 'App Online' : 'App Offline'}
+          />
+        </div>
       </div>
     </nav>
   );

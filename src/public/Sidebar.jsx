@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useContext, useState, useEffect, useRef } from 'react';
-import { AuthContext } from '../App';
+import { AuthContext } from '../contexts/AuthContext';
 import { FaTachometerAlt, FaBoxOpen, FaUsers, FaChartBar, FaCreditCard, FaQuestionCircle, FaCogs, FaChevronLeft, FaChevronRight, FaFileInvoiceDollar } from 'react-icons/fa';
 import './Sidebar.css';
 

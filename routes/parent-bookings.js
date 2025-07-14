@@ -21,8 +21,8 @@ router.get('/', async (req, res) => {
     let whereClauses = [];
     let values = [];
     let idx = 1;
-    // Per-user segmentation: only show own bookings for operators
-    if (req.user && req.user.role === 'operator') {
+    // Per-user segmentation: only show own bookings for non-admins
+    if (req.user && req.user.role !== 'admin') {
       whereClauses.push(`created_by_user_id = $${idx}`);
       values.push(req.user.id);
       idx++;

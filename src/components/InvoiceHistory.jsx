@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext } from 'react';
-import { AuthContext } from '../App';
+import { AuthContext } from '../contexts/AuthContext';
 import { invoiceApi } from '../services/api';
 import { FaFileDownload } from 'react-icons/fa';
 

@@ -2,8 +2,24 @@ import axios from 'axios';
 import { normalizeKeys } from './normalizeKeys';
 import db from './db';
 
-function isOnline() {
-  return typeof navigator !== 'undefined' ? navigator.onLine : true;
+// Replace the old isOnline function with a robust async version
+let lastPing = 0;
+let lastPingResult = true;
+
+export async function isOnline() {
+  const now = Date.now();
+  if (now - lastPing < 10000) return lastPingResult;
+  try {
+    // Use a lightweight endpoint (adjust if needed)
+    await fetch(`${import.meta.env.VITE_API_URL}/api/health`, { method: 'GET', cache: 'no-store' });
+    lastPing = now;
+    lastPingResult = true;
+    return true;
+  } catch {
+    lastPing = now;
+    lastPingResult = false;
+    return false;
+  }
 }
 
 // Create axios instance with default config
@@ -170,7 +186,7 @@ export const toSnake = d => ({
 export const deliveryApi = {
   // Get all deliveries (offline-first)
   getAll: async (limit = 20, offset = 0, search = '') => {
-    if (!isOnline()) {
+    if (!(await isOnline())) {
       // Offline: query IndexedDB
       let deliveries = await db.deliveries.toArray();
       if (search) {
@@ -210,7 +226,7 @@ export const deliveryApi = {
 
   // Get delivery by tracking ID (offline-first)
   getById: async (trackingId) => {
-    if (!isOnline()) {
+    if (!(await isOnline())) {
       // Offline: query IndexedDB
       return await db.deliveries.get(trackingId);
     }
@@ -229,7 +245,7 @@ export const deliveryApi = {
 
   // Create new delivery (offline-capable)
   create: async (deliveryData) => {
-    if (!isOnline()) {
+    if (!(await isOnline())) {
       // Queue in outbox and update local DB
       const now = new Date().toISOString();
       await db.outbox.add({
@@ -267,7 +283,7 @@ export const deliveryApi = {
 
   // Update a delivery's checkpoints and status (offline-capable)
   updateCheckpoint: async (trackingId, data) => {
-    if (!isOnline()) {
+    if (!(await isOnline())) {
       const now = new Date().toISOString();
       await db.outbox.add({
         type: 'updateCheckpoint',
@@ -576,9 +592,12 @@ export const scheduledReportApi = {
 };
 
 // Background sync worker for outbox
-export async function processOutbox() {
-  if (!isOnline()) return;
+export async function processOutbox(onSyncResult) {
+  if (!(await isOnline())) return;
   const outboxItems = await db.outbox.orderBy('createdAt').toArray();
+  let success = 0;
+  let failed = 0;
+  let total = outboxItems.length;
   for (const item of outboxItems) {
     try {
       if (item.type === 'createDelivery') {
@@ -601,10 +620,15 @@ export async function processOutbox() {
       }
       // Remove item from outbox if successful
       await db.outbox.delete(item.id);
+      success++;
     } catch (err) {
+      failed++;
       // Stop processing on first failure to avoid rapid retries
       break;
     }
+  }
+  if (typeof onSyncResult === 'function') {
+    onSyncResult({ success, failed, total });
   }
 }
 
@@ -619,5 +643,13 @@ api.interceptors.request.use(
   },
   error => Promise.reject(error)
 );
+
+export async function sendPushNotification(subscription, { title, body }) {
+  try {
+    await api.post('/api/notify', { subscription, title, body });
+  } catch (err) {
+    console.error('Failed to send push notification:', err);
+  }
+}
 
 export default api; 

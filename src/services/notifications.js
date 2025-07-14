@@ -1,4 +1,5 @@
 import { deliveryApi } from './api';
+import axios from 'axios';
 
 const MILESTONE_THRESHOLDS = {
   STARTED: 0,
@@ -104,6 +105,10 @@ class NotificationService {
       console.error('Failed to send notifications:', error);
     }
   }
+}
+
+export async function sendPushNotification(subscription, { title, body }) {
+  await axios.post('/api/notify', { subscription, title, body });
 }
 
 export const notificationService = new NotificationService(); 

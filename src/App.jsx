@@ -9,7 +9,8 @@ import Offerings from './public/Offerings';
 import Login from './public/Login';
 import Footer from './public/Footer';
 import './App.css'
-import { useState, createContext, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext } from 'react';
+import { AuthContext } from './contexts/AuthContext';
 import axios from 'axios';
 import ParentBookingDetails from './operator/ParentBookingDetails';
 import BillingDashboard from './public/BillingDashboard';
@@ -26,8 +27,7 @@ import { useParentBookings } from './services/useParentBookings';
 import Reports from './operator/Reports';
 import InvoiceHistory from './components/InvoiceHistory';
 import { processOutbox } from './services/api';
-
-export const AuthContext = createContext(null);
+import { sendPushNotification } from './services/api';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -131,10 +131,14 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false); // for mobile
-
   // Add these states to hold user-specific data at the top level
   const [deliveries, setDeliveries] = useState([]);
   const [parentBookings, setParentBookings] = useState([]);
+  // Sync notification state
+  const [syncMsg, setSyncMsg] = useState('');
+  const [showSyncToast, setShowSyncToast] = useState(false);
+  // Add push subscription state
+  const [pushSubscription, setPushSubscription] = useState(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -170,6 +174,17 @@ export default function App() {
     checkAuth();
   }, []);
 
+  useEffect(() => {
+    // Try to get the push subscription on mount
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          setPushSubscription(sub);
+        });
+      });
+    }
+  }, []);
+
   // Clear all user-specific state on logout or user change
   useEffect(() => {
     if (!user) {
@@ -182,20 +197,60 @@ export default function App() {
   const isAuthenticated = !!user;
 
   useEffect(() => {
+    // Helper to show sync notification and send push
+    function handleSyncResult({ success, failed, total }) {
+      if (total === 0) return;
+      let msg = '';
+      if (success && !failed) {
+        msg = `All ${success} offline deliveries synced successfully.`;
+      } else if (success && failed) {
+        msg = `${success} deliveries synced, ${failed} failed.`;
+      } else if (failed && !success) {
+        msg = `Failed to sync ${failed} offline deliveries.`;
+      }
+      setSyncMsg(msg);
+      setShowSyncToast(true);
+      setTimeout(() => setShowSyncToast(false), 3500);
+      // Send push notification if subscribed
+      if (pushSubscription && msg) {
+        sendPushNotification(pushSubscription, { title: 'Morres Logistics', body: msg });
+      }
+    }
     // On app start, try to process outbox
-    processOutbox();
-    // On network reconnect, process outbox
+    processOutbox(handleSyncResult);
+    // On network reconnect, process outbox and send push
     function handleOnline() {
-      processOutbox();
+      processOutbox(handleSyncResult);
+      if (pushSubscription) {
+        sendPushNotification(pushSubscription, { title: 'Morres Logistics', body: 'App is back online.' });
+      }
+    }
+    // On network offline, send push
+    function handleOffline() {
+      if (pushSubscription) {
+        sendPushNotification(pushSubscription, { title: 'Morres Logistics', body: 'App is offline.' });
+      }
     }
     window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     return () => {
       window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [pushSubscription]);
 
   return (
     <>
+      {/* Sync Toast Notification */}
+      {showSyncToast && (
+        <div className="toast show position-fixed top-0 end-0 m-4" style={{zIndex:9999, minWidth: '220px'}} role="alert" aria-live="assertive" aria-atomic="true">
+          <div className="toast-header bg-success text-white">
+            <strong className="me-auto">Sync</strong>
+            <button type="button" className="btn-close btn-close-white" onClick={() => setShowSyncToast(false)} aria-label="Close"></button>
+          </div>
+          <div className="toast-body">{syncMsg}</div>
+        </div>
+      )}
       <AuthContext.Provider value={{ user, setUser, isAuthenticated, loading }}>
         <Router>
           <WelcomeModal />

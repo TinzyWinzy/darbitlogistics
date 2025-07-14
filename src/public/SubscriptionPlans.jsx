@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { subscriptionTiers } from '../../config/subscriptions.js';
 import { deliveryApi } from '../services/api.js';
-import { AuthContext } from '../App';
+import { AuthContext } from '../contexts/AuthContext';
 import { FaRegStar, FaRegCheckCircle, FaRegEnvelope, FaRegChartBar, FaRegListAlt, FaRegBell, FaRegUser, FaRegBuilding, FaRegPaperPlane, FaCrown, FaRegQuestionCircle } from 'react-icons/fa';
 import { normalizeKeys } from '../services/normalizeKeys';
 
