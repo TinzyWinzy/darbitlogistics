@@ -1,14 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useContext, useState, useEffect, useRef } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
-import { FaTachometerAlt, FaBoxOpen, FaUsers, FaChartBar, FaCreditCard, FaQuestionCircle, FaCogs, FaChevronLeft, FaChevronRight, FaFileInvoiceDollar } from 'react-icons/fa';
+import { FaTachometerAlt, FaBoxOpen, FaUsers, FaChartBar, FaCreditCard, FaQuestionCircle, FaCogs, FaChevronLeft, FaChevronRight, FaFileInvoiceDollar, FaUserCircle, FaCog, FaSignOutAlt } from 'react-icons/fa';
 import './Sidebar.css';
+import { isOnline } from '../services/api';
 
 export default function Sidebar({ isOpen, onClose }) {
-  const { user } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const sidebarRef = useRef(null);
+  const [online, setOnline] = useState(true);
 
   // Focus trap and ESC close
   useEffect(() => {
@@ -40,6 +42,23 @@ export default function Sidebar({ isOpen, onClose }) {
     }, 100);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function checkStatus() {
+      const status = await isOnline();
+      if (mounted) setOnline(status);
+    }
+    checkStatus();
+    const interval = setInterval(checkStatus, 10000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('jwt_token');
+    setUser(null);
+    window.location.href = '/login';
+  };
 
   const navItems = [
     { to: '/dashboard', icon: <FaTachometerAlt />, label: 'Dashboard' },
@@ -81,6 +100,45 @@ export default function Sidebar({ isOpen, onClose }) {
               <span className="sidebar-icon me-2"><FaCogs /></span>
               {!collapsed && <span>Admin</span>}
             </Link>
+          </div>
+        )}
+        {/* User menu and network status for logged-in users */}
+        {user && (
+          <div className="sidebar-user-menu mt-auto px-3 pb-3">
+            <div className="dropdown mb-2">
+              <button className="btn btn-link dropdown-toggle text-light d-flex align-items-center" type="button" id="sidebarUserMenu" data-bs-toggle="dropdown" aria-expanded="false" style={{ color: '#EBD3AD', textDecoration: 'none', fontSize: '1.1rem', padding: '0.5em 0' }}>
+                <FaUserCircle className="me-2" size={24} />
+                {!collapsed && <span className="fw-semibold">{user.name || user.email || 'User'}</span>}
+              </button>
+              <ul className="dropdown-menu" aria-labelledby="sidebarUserMenu">
+                <li><Link className="dropdown-item" to="/profile"><FaUserCircle className="me-2" /> Profile</Link></li>
+                <li><Link className="dropdown-item" to="/settings"><FaCog className="me-2" /> Settings</Link></li>
+                {user.role === 'admin' && <>
+                  <li><hr className="dropdown-divider" /></li>
+                  <li><Link className="dropdown-item text-danger fw-bold" to="/admin/dashboard"><FaCogs className="me-2" /> Admin</Link></li>
+                </>}
+                <li><hr className="dropdown-divider" /></li>
+                <li><button className="dropdown-item d-flex align-items-center" onClick={handleLogout}><FaSignOutAlt className="me-2" /> Logout</button></li>
+              </ul>
+            </div>
+            <div className="d-flex align-items-center" style={{ gap: 10 }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  background: online ? '#27c93f' : '#e74c3c',
+                  border: '2px solid #fff',
+                  boxShadow: online ? '0 0 6px #27c93f88' : '0 0 6px #e74c3c88',
+                  transition: 'background 0.2s',
+                  marginRight: 6,
+                }}
+                aria-label={online ? 'App Online' : 'App Offline'}
+                title={online ? 'App Online' : 'App Offline'}
+              />
+              {!collapsed && <span style={{ fontWeight: 500 }}>{online ? 'Online' : 'Offline'}</span>}
+            </div>
           </div>
         )}
       </aside>

@@ -45,6 +45,19 @@ const TABS = [
   { key: 'actions', label: 'Admin Actions', icon: '📜' },
 ];
 
+const normalizeSubscription = (sub) => ({
+  subscription_id: sub.subscription_id || sub.id,
+  user_id: sub.user_id,
+  username: sub.username || sub.user_id,
+  tier: sub.tier,
+  status: sub.status,
+  deliveries_used: sub.deliveries_used ?? 0,
+  sms_used: sub.sms_used ?? 0,
+  start_date: sub.start_date,
+  end_date: sub.end_date,
+  tierDetails: sub.tierDetails || {},
+});
+
 const AdminDashboard = () => {
   const [tab, setTab] = useState('users');
   // Users
@@ -68,6 +81,8 @@ const AdminDashboard = () => {
   const [logsError, setLogsError] = useState('');
   // Toast
   const [toast, setToast] = useState(null);
+  // Add state to track original subscription when editing
+  const [editSubOriginal, setEditSubOriginal] = useState({ tier: '', status: '', end_date: '' });
 
   // Fetchers
   const fetchUsers = useCallback(async () => {
@@ -87,7 +102,7 @@ const AdminDashboard = () => {
     setIsLoadingSubs(true); setSubsError('');
     try {
       const subs = await deliveryApi.getAllSubscriptions();
-      setSubscriptions(subs);
+      setSubscriptions(subs.map(normalizeSubscription));
     } catch (err) {
       setSubsError(err.response?.data?.error || 'Failed to fetch subscriptions.');
       setSubscriptions([]);
@@ -154,16 +169,26 @@ const AdminDashboard = () => {
   };
   // Billing edit
   const handleEditSub = sub => {
-    setEditSubId(sub.id);
-    setEditSubData({ tier: sub.tier, status: sub.status });
+    setEditSubId(sub.subscription_id);
+    setEditSubData({ tier: sub.tier, status: sub.status, end_date: sub.end_date });
+    setEditSubOriginal({ tier: sub.tier, status: sub.status, end_date: sub.end_date });
   };
   const handleEditSubChange = e => {
     const { name, value } = e.target;
     setEditSubData(prev => ({ ...prev, [name]: value }));
   };
   const handleSaveSub = async subId => {
+    // Only send changed fields
+    const payload = {};
+    if (editSubData.tier !== editSubOriginal.tier) payload.newTier = editSubData.tier;
+    if (editSubData.status !== editSubOriginal.status) payload.newStatus = editSubData.status;
+    if (editSubData.end_date !== editSubOriginal.end_date) payload.newEndDate = editSubData.end_date;
+    if (Object.keys(payload).length === 0) {
+      setToast({ type: 'danger', msg: 'No changes to save.' });
+      return;
+    }
     try {
-      await deliveryApi.updateUserSubscription(subId, editSubData);
+      await deliveryApi.updateUserSubscription(subId, payload);
       setEditSubId(null);
       setToast({ type: 'success', msg: 'Subscription updated.' });
       fetchSubscriptions();
@@ -334,7 +359,7 @@ const AdminDashboard = () => {
                       <tr key={sub.subscription_id || sub.id || idx} className={idx % 2 === 0 ? 'table-light' : ''} style={{ transition: 'background 0.2s' }}>
                         <td>{sub.username || sub.user_id}</td>
                         <td>
-                          {editSubId === (sub.subscription_id || sub.id) ? (
+                          {editSubId === sub.subscription_id ? (
                             <select name="tier" value={editSubData.tier} onChange={handleEditSubChange} className="form-select form-select-sm">
                               <option value="starter">Starter</option>
                               <option value="basic">Basic</option>
@@ -346,7 +371,7 @@ const AdminDashboard = () => {
                           )}
                         </td>
                         <td>
-                          {editSubId === (sub.subscription_id || sub.id) ? (
+                          {editSubId === sub.subscription_id ? (
                             <select name="status" value={editSubData.status} onChange={handleEditSubChange} className="form-select form-select-sm">
                               <option value="active">Active</option>
                               <option value="trial">Trial</option>
@@ -362,13 +387,21 @@ const AdminDashboard = () => {
                         <td>{sub.start_date ? new Date(sub.start_date).toLocaleDateString() : '-'}</td>
                         <td>{sub.end_date ? new Date(sub.end_date).toLocaleDateString() : '-'}</td>
                         <td>
-                          {editSubId === (sub.subscription_id || sub.id) ? (
+                          {editSubId === sub.subscription_id ? (
                             <>
-                              <button className="btn btn-success btn-sm me-2" onClick={() => handleSaveSub(sub.subscription_id || sub.id)}>{/* <FaCheck /> */} Save</button>
-                              <button className="btn btn-secondary btn-sm" onClick={() => setEditSubId(null)}>{/* <FaTimes /> */} Cancel</button>
+                              <button
+                                className="btn btn-success btn-sm me-2"
+                                onClick={() => handleSaveSub(sub.subscription_id)}
+                                disabled={
+                                  editSubData.tier === editSubOriginal.tier &&
+                                  editSubData.status === editSubOriginal.status &&
+                                  editSubData.end_date === editSubOriginal.end_date
+                                }
+                              >Save</button>
+                              <button className="btn btn-secondary btn-sm" onClick={() => setEditSubId(null)}>Cancel</button>
                             </>
                           ) : (
-                            <button className="btn btn-primary btn-sm" onClick={() => handleEditSub(sub)}>{/* <FaEdit /> */} Edit</button>
+                            <button className="btn btn-primary btn-sm" onClick={() => handleEditSub(sub)}>Edit</button>
                           )}
                         </td>
                       </tr>
