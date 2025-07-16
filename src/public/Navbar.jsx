@@ -2,11 +2,13 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { FaUserCircle, FaCog, FaUserShield, FaSignOutAlt } from 'react-icons/fa';
+import { MENU_CONFIG, USER_ACTIONS } from '../menuConfig';
+import * as FaIcons from 'react-icons/fa';
 import Dropdown from 'react-bootstrap/Dropdown';
 import db from '../services/db';
 import { isOnline } from '../services/api';
 import { useMediaQuery } from 'react-responsive';
+import React from 'react'; // Added for React.createElement
 
 export default function Navbar({ onHamburgerClick }) {
   const { user, setUser } = useContext(AuthContext);
@@ -63,6 +65,18 @@ export default function Navbar({ onHamburgerClick }) {
     if (isMobile) setMobileMenuOpen(false);
   };
 
+  // Helper to get icon component by name
+  const getIcon = (name) => FaIcons[name] || null;
+
+  // Replace hardcoded menu arrays with:
+  const role = user?.role || 'guest';
+  const navMenu = MENU_CONFIG.filter(item => item.showIn.includes('navbar') && item.roles.includes(role));
+  const userMenu = USER_ACTIONS.filter(item => item.roles.includes(role));
+  // Dashboard-specific menu
+  const dashboardNavMenu = MENU_CONFIG.filter(item => item.showIn.includes('sidebar') && item.roles.includes(role));
+  // Public menu
+  const publicNavMenu = MENU_CONFIG.filter(item => item.showIn.includes('navbar') && item.roles.includes(role));
+
   return (
     <nav
       className="navbar navbar-expand-lg shadow-sm d-flex justify-content-between align-items-center"
@@ -80,7 +94,7 @@ export default function Navbar({ onHamburgerClick }) {
           <img src="/favicon-m.svg" alt="Morres Logistics Logo" width={36} height={36} style={{ marginRight: 10, display: 'inline-block', verticalAlign: 'middle' }} />
           Morres Logistics
         </Link>
-        {isMobile && !isDashboard && (
+        {isMobile && (
           <button
             className="navbar-toggler ms-3"
             type="button"
@@ -90,57 +104,109 @@ export default function Navbar({ onHamburgerClick }) {
             aria-controls="mobile-nav-menu"
             style={{
               border: '2px solid #EBD3AD',
-              borderRadius: '0.75rem',
-              boxShadow: '0 2px 8px rgba(235, 211, 173, 0.12)',
-              padding: '0.6em 1em',
-              background: 'transparent',
-              transition: 'background 0.2s, box-shadow 0.2s',
-              outline: 'none',
+              background: mobileMenuOpen ? '#EBD3AD' : 'transparent',
+              borderRadius: '0.5rem',
+              padding: '0.4em 0.7em',
+              boxShadow: '0 1px 4px rgba(31,33,32,0.10)',
+              transition: 'background 0.2s, border 0.2s',
             }}
           >
-            <span className="navbar-toggler-icon"></span>
+            <span
+              className="navbar-toggler-icon"
+              style={{
+                filter: 'invert(1) brightness(1.5)',
+                WebkitFilter: 'invert(1) brightness(1.5)',
+                backgroundImage: 'none',
+                width: 24,
+                height: 24,
+                display: 'inline-block',
+                background: 'none',
+                position: 'relative',
+              }}
+            >
+              {/* Custom hamburger icon for high contrast */}
+              <span style={{
+                display: 'block',
+                width: 22,
+                height: 3,
+                background: mobileMenuOpen ? '#1F2120' : '#EBD3AD',
+                borderRadius: 2,
+                margin: '4px 0',
+                transition: 'background 0.2s',
+              }} />
+              <span style={{
+                display: 'block',
+                width: 22,
+                height: 3,
+                background: mobileMenuOpen ? '#1F2120' : '#EBD3AD',
+                borderRadius: 2,
+                margin: '4px 0',
+                transition: 'background 0.2s',
+              }} />
+              <span style={{
+                display: 'block',
+                width: 22,
+                height: 3,
+                background: mobileMenuOpen ? '#1F2120' : '#EBD3AD',
+                borderRadius: 2,
+                margin: '4px 0',
+                transition: 'background 0.2s',
+              }} />
+            </span>
           </button>
         )}
       </div>
       {/* Desktop nav: only show if not dashboard */}
-      {!isMobile && !isDashboard && (
-        <div className="d-flex align-items-center">
+      {!isMobile && (
+        <div className="collapse navbar-collapse d-flex align-items-center justify-content-end">
           {isPublic ? (
             <>
               <ul className="navbar-nav flex-row gap-2 align-items-center mb-0">
-                <li className="nav-item">
-                  <NavLink to="/" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Home</NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink to="/track" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Track</NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink to="/offerings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Offerings</NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink to="/help" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Help</NavLink>
-                </li>
-                {!user && (
+                {navMenu.map((item, index) => (
+                  <li key={index} className="nav-item">
+                    <NavLink to={item.route} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                      {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
+                      {item.label}
+                    </NavLink>
+                  </li>
+                ))}
+                {user && (
                   <li className="nav-item">
-                    <NavLink to="/login" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Login</NavLink>
+                    <NavLink to="/profile" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                      <FaIcons.FaUserCircle className="me-2" /> Profile
+                    </NavLink>
+                  </li>
+                )}
+                {user && (
+                  <li className="nav-item">
+                    <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                      <FaIcons.FaCog className="me-2" /> Settings
+                    </NavLink>
+                  </li>
+                )}
+                {user && user.role === 'admin' && (
+                  <li className="nav-item">
+                    <NavLink to="/admin/dashboard" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                      <FaIcons.FaUserShield className="me-2" /> Admin
+                    </NavLink>
                   </li>
                 )}
               </ul>
               {user && (
                 <Dropdown align="end" className="ms-3">
                   <Dropdown.Toggle variant="link" className="text-light d-flex align-items-center" style={{ color: '#EBD3AD', textDecoration: 'none' }} id="userMenuButton">
-                    <FaUserCircle className="me-2" size={24} />
+                    <FaIcons.FaUserCircle className="me-2" size={24} />
                     <span className="fw-semibold">{user.name || user.email || 'User'}</span>
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
-                    <Dropdown.Item as={Link} to="/profile" className="d-flex align-items-center"><FaUserCircle className="me-2" /> Profile</Dropdown.Item>
-                    <Dropdown.Item as={Link} to="/settings" className="d-flex align-items-center"><FaCog className="me-2" /> Settings</Dropdown.Item>
-                    {user.role === 'admin' && <>
-                      <Dropdown.Divider />
-                      <Dropdown.Item as={Link} to="/admin/dashboard" className="d-flex align-items-center text-danger fw-bold"><FaUserShield className="me-2" /> Admin</Dropdown.Item>
-                    </>}
+                    {userMenu.filter(item => item.label.toLowerCase() !== 'logout').map((item, index) => (
+                      <Dropdown.Item key={index} as={Link} to={item.path} className="d-flex align-items-center">
+                        {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
+                        {item.label}
+                      </Dropdown.Item>
+                    ))}
                     <Dropdown.Divider />
-                    <Dropdown.Item as="button" className="d-flex align-items-center" onClick={handleLogout}><FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
+                    <Dropdown.Item as="button" className="d-flex align-items-center" onClick={handleLogout}><FaIcons.FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
                   </Dropdown.Menu>
                 </Dropdown>
               )}
@@ -149,18 +215,18 @@ export default function Navbar({ onHamburgerClick }) {
             user && (
               <Dropdown align="end">
                 <Dropdown.Toggle variant="link" className="text-light d-flex align-items-center" style={{ color: '#EBD3AD', textDecoration: 'none' }} id="userMenuButton">
-                  <FaUserCircle className="me-2" size={24} />
+                  <FaIcons.FaUserCircle className="me-2" size={24} />
                   <span className="fw-semibold">{user.name || user.email || 'User'}</span>
                 </Dropdown.Toggle>
                 <Dropdown.Menu>
-                  <Dropdown.Item as={Link} to="#" className="d-flex align-items-center"><FaUserCircle className="me-2" /> Profile</Dropdown.Item>
-                  <Dropdown.Item as={Link} to="#" className="d-flex align-items-center"><FaCog className="me-2" /> Settings</Dropdown.Item>
-                  {user.role === 'admin' && <>
-                    <Dropdown.Divider />
-                    <Dropdown.Item as={Link} to="/admin/dashboard" className="d-flex align-items-center text-danger fw-bold"><FaUserShield className="me-2" /> Admin</Dropdown.Item>
-                  </>}
+                  {userMenu.map((item, index) => (
+                    <Dropdown.Item key={index} as={Link} to={item.path} className="d-flex align-items-center">
+                      {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
+                      {item.label}
+                    </Dropdown.Item>
+                  ))}
                   <Dropdown.Divider />
-                  <Dropdown.Item as="button" className="d-flex align-items-center" onClick={handleLogout}><FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
+                  <Dropdown.Item as="button" className="d-flex align-items-center" onClick={handleLogout}><FaIcons.FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
                 </Dropdown.Menu>
               </Dropdown>
             )
@@ -192,79 +258,62 @@ export default function Navbar({ onHamburgerClick }) {
           </div>
         </div>
       )}
-      {/* Mobile nav menu: only show if not dashboard */}
-      {isMobile && mobileMenuOpen && !isDashboard && (
+      {/* Mobile nav menu: always show on mobile, overlays content */}
+      {isMobile && mobileMenuOpen && (
         <div
           id="mobile-nav-menu"
-          className="position-absolute top-100 start-0 w-100 bg-dark text-light p-3 shadow-lg rounded-bottom"
-          style={{ zIndex: 1050 }}
+          className="position-fixed top-0 start-0 w-100 bg-dark text-light p-3 shadow-lg rounded-bottom"
+          style={{ zIndex: 2000, minHeight: '100vh' }}
           role="menu"
         >
           <ul className="navbar-nav flex-column gap-2 align-items-stretch mb-2" style={{ fontSize: '1.15rem' }}>
-            <li className="nav-item">
-              <NavLink to="/" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={handleNavLinkClick}>Home</NavLink>
-            </li>
-            <li className="nav-item">
-              <NavLink to="/track" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={handleNavLinkClick}>Track</NavLink>
-            </li>
-            <li className="nav-item">
-              <NavLink to="/offerings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={handleNavLinkClick}>Offerings</NavLink>
-            </li>
-            <li className="nav-item">
-              <NavLink to="/help" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={handleNavLinkClick}>Help</NavLink>
-            </li>
-            {!user && (
-              <li className="nav-item">
-                <NavLink to="/login" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={handleNavLinkClick}>Login</NavLink>
+            {(isDashboard ? dashboardNavMenu : publicNavMenu).map((item, index) => (
+              <li key={index} className="nav-item">
+                <NavLink to={item.route} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={handleNavLinkClick}>
+                  {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
+                  {item.label}
+                </NavLink>
               </li>
-            )}
-            {/* Plans link for logged-in users */}
-            {user && !isDashboard && (
-              <li className="nav-item">
-                <NavLink to="/plans" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={handleNavLinkClick}>Plans</NavLink>
-              </li>
-            )}
+            ))}
           </ul>
           {/* User dropdown for mobile: only show if not dashboard */}
-          {user && !isDashboard && (
+          {user && (
             <Dropdown align="end" className="w-100 mb-2">
               <Dropdown.Toggle variant="link" className="text-light d-flex align-items-center w-100 justify-content-start" style={{ color: '#EBD3AD', textDecoration: 'none', fontSize: '1.1rem', padding: '0.5em 0' }} id="userMenuButtonMobile">
-                <FaUserCircle className="me-2" size={28} />
+                <FaIcons.FaUserCircle className="me-2" size={28} />
                 <span className="fw-semibold">{user.name || user.email || 'User'}</span>
               </Dropdown.Toggle>
               <Dropdown.Menu className="w-100">
-                <Dropdown.Item as={Link} to="/profile" className="d-flex align-items-center" onClick={handleNavLinkClick}><FaUserCircle className="me-2" /> Profile</Dropdown.Item>
-                <Dropdown.Item as={Link} to="/settings" className="d-flex align-items-center" onClick={handleNavLinkClick}><FaCog className="me-2" /> Settings</Dropdown.Item>
-                {user.role === 'admin' && <>
-                  <Dropdown.Divider />
-                  <Dropdown.Item as={Link} to="/admin/dashboard" className="d-flex align-items-center text-danger fw-bold" onClick={handleNavLinkClick}><FaUserShield className="me-2" /> Admin</Dropdown.Item>
-                </>}
+                {userMenu.map((item, index) => (
+                  <Dropdown.Item key={index} as={Link} to={item.path} className="d-flex align-items-center" onClick={handleNavLinkClick}>
+                    {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
+                    {item.label}
+                  </Dropdown.Item>
+                ))}
                 <Dropdown.Divider />
-                <Dropdown.Item as="button" className="d-flex align-items-center" onClick={() => { handleLogout(); handleNavLinkClick(); }}><FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
+                <Dropdown.Item as="button" className="d-flex align-items-center" onClick={() => { handleLogout(); handleNavLinkClick(); }}><FaIcons.FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
           )}
-          {/* Network status indicator for mobile: only show if not dashboard */}
-          {!isDashboard && (
-            <div className="d-flex align-items-center mt-2" style={{ gap: 10 }}>
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: 18,
-                  height: 18,
-                  borderRadius: '50%',
-                  background: online ? '#27c93f' : '#e74c3c',
-                  border: '2px solid #fff',
-                  boxShadow: online ? '0 0 6px #27c93f88' : '0 0 6px #e74c3c88',
-                  transition: 'background 0.2s',
-                  marginRight: 6,
-                }}
-                aria-label={online ? 'App Online' : 'App Offline'}
-                title={online ? 'App Online' : 'App Offline'}
-              />
-              <span style={{ fontWeight: 500 }}>{online ? 'Online' : 'Offline'}</span>
-            </div>
-          )}
+          {/* Network status indicator for mobile */}
+          <div className="d-flex align-items-center mt-2" style={{ gap: 10 }}>
+            <span
+              style={{
+                display: 'inline-block',
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                background: online ? '#27c93f' : '#e74c3c',
+                border: '2px solid #fff',
+                boxShadow: online ? '0 0 6px #27c93f88' : '0 0 6px #e74c3c88',
+                transition: 'background 0.2s',
+                marginRight: 6,
+              }}
+              aria-label={online ? 'App Online' : 'App Offline'}
+              title={online ? 'App Online' : 'App Offline'}
+            />
+            <span style={{ fontWeight: 500 }}>{online ? 'Online' : 'Offline'}</span>
+          </div>
         </div>
       )}
     </nav>

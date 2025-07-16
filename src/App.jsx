@@ -76,11 +76,11 @@ function AppLayout({ sidebarOpen, setSidebarOpen }) {
   const parentBookingsData = useParentBookings();
 
   return (
-    <div className="app-flex-layout d-flex">
+    <div className="d-flex flex-nowrap min-vh-100 w-100">
       {showSidebar && (
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       )}
-      <main className="flex-grow-1">
+      <main className="flex-grow-1 container-fluid p-0">
         <Routes>
                 <Route path="/dashboard" element={
                   <ProtectedRoute>

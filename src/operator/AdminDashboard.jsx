@@ -205,6 +205,17 @@ const AdminDashboard = () => {
     }
   }, [toast]);
 
+  useEffect(() => {
+    if (tab === 'billing') {
+      const ids = subscriptions.map(s => s.subscription_id);
+      const unique = new Set(ids);
+      if (ids.length !== unique.size) {
+        // eslint-disable-next-line no-console
+        console.warn('Duplicate subscription_id detected in subscriptions:', ids);
+      }
+    }
+  }, [subscriptions, tab]);
+
   return (
     <div className="container mt-4" style={{ maxWidth: 1100 }}>
       <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
@@ -355,8 +366,8 @@ const AdminDashboard = () => {
                   ) : subscriptions.length === 0 ? (
                     <tr><td colSpan={8}><EmptyState message="No subscriptions found." /></td></tr>
                   ) : (
-                    subscriptions.map((sub, idx) => (
-                      <tr key={sub.subscription_id || sub.id || idx} className={idx % 2 === 0 ? 'table-light' : ''} style={{ transition: 'background 0.2s' }}>
+                    subscriptions.map((sub) => (
+                      <tr key={sub.subscription_id} className={sub.subscription_id % 2 === 0 ? 'table-light' : ''} style={{ transition: 'background 0.2s' }}>
                         <td>{sub.username || sub.user_id}</td>
                         <td>
                           {editSubId === sub.subscription_id ? (

@@ -19,6 +19,7 @@ import { useRef } from 'react';
 import SummaryWidgets from './SummaryWidgets';
 import DashboardNotifications from './DashboardNotifications';
 import DashboardAnalytics from './DashboardAnalytics';
+import './Dashboard.mobile.css';
 
 const mineralTypes = [
   'Agate', 'Adamite', 'Andalusite', 'Anhydrite', 'Angelisite', 'Anthophyllite', 'Antimony', 'Aragonite', 'Arucite', 'Arsenic',
@@ -171,6 +172,21 @@ export default function OperatorDashboard() {
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [invoices, setInvoices] = useState([]);
   const [activeChartTab, setActiveChartTab] = useState('bar');
+
+  // Responsive container class
+  const [containerClass, setContainerClass] = useState('container py-5 px-2 px-md-4');
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth <= 600) {
+        setContainerClass('container-fluid py-5 px-0');
+      } else {
+        setContainerClass('container py-5 px-2 px-md-4');
+      }
+    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Fetch notifications on mount
   useEffect(() => {
@@ -456,7 +472,7 @@ export default function OperatorDashboard() {
   };
 
   return (
-    <div className="container py-5 px-2 px-md-4">
+    <div className={containerClass}>
       {hasPendingSync && (
         <div className="alert alert-warning d-flex align-items-center" role="alert">
           <FaExclamationTriangle className="me-2" />
@@ -492,12 +508,17 @@ export default function OperatorDashboard() {
         toastMsg={toastMsg}
         setShowToast={setShowToast}
       />
-      <DashboardAnalytics
-        analytics={analytics}
-        loadingAnalytics={loadingAnalytics}
-        activeChartTab={activeChartTab}
-        setActiveChartTab={setActiveChartTab}
-      />
+      {/* Dashboard Analytics Section */}
+      <div className="row">
+        <div className="col-12 mb-4">
+          <DashboardAnalytics
+            analytics={analytics}
+            loadingAnalytics={loadingAnalytics}
+            activeChartTab={activeChartTab}
+            setActiveChartTab={setActiveChartTab}
+          />
+        </div>
+      </div>
       {/* Strategic Operations Console Banner */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
         STRATEGIC OPERATIONS CONSOLE
@@ -577,7 +598,7 @@ export default function OperatorDashboard() {
       </div>
       {/* Replace the row/col for ConsignmentMonitor with full-width */}
       <div className="row g-4">
-        <div className="col-12 px-0">
+        <div className="col-12">
           <ConsignmentMonitor
             parentBookings={parentBookings}
             loading={parentBookingsLoading}
@@ -597,7 +618,7 @@ export default function OperatorDashboard() {
           />
           {/* Highlight selected consignment visually (handled in ConsignmentMonitor if possible) */}
           {/* Pagination Controls for Deliveries */}
-          <div className="d-flex justify-content-between align-items-center mt-3">
+          <div className="d-flex justify-content-between align-items-center mt-3 dashboard-pagination-controls">
             <div className="small text-muted">
               {parentBookings.length > 0 && (
                 <span>

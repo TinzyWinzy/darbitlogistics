@@ -160,11 +160,6 @@ button:focus-visible {
     width: 100% !important;
     font-size: 1em !important;
   }
-  .row, [class*='col-'] {
-    flex-direction: column !important;
-    width: 100% !important;
-    max-width: 100% !important;
-  }
   .table-responsive {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;

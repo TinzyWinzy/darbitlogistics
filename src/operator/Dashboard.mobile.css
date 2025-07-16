@@ -1,0 +1,37 @@
+@media (max-width: 600px) {
+  .container {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  .col-12 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .card {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  .card {
+    padding: 0.7em !important;
+    margin-bottom: 1rem !important;
+  }
+  h1, .display-6, .h5, h2 {
+    font-size: 1.2em !important;
+  }
+  .dashboard-pagination-controls {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    align-items: stretch !important;
+  }
+  .dashboard-pagination-controls .btn-group,
+  .dashboard-pagination-controls .ms-3 {
+    width: 100% !important;
+  }
+  .dashboard-pagination-controls .btn-group {
+    justify-content: stretch !important;
+  }
+} 

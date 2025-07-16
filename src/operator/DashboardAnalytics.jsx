@@ -33,48 +33,54 @@ export default function DashboardAnalytics({ analytics, loadingAnalytics, active
           {loadingAnalytics ? <Spinner /> : analytics ? (
             <>
               {activeChartTab === 'bar' && (
-                <Bar
-                  data={{
-                    labels: ['Total', 'Completed', 'Pending'],
-                    datasets: [{
-                      label: 'Deliveries',
-                      data: [analytics.totalDeliveries, analytics.completedDeliveries, analytics.pendingDeliveries],
-                      backgroundColor: ['#1e40af', '#16a34a', '#d2691e']
-                    }]
-                  }}
-                  options={{ responsive: true, plugins: { legend: { display: false } } }}
-                  height={80}
-                />
+                <div style={{overflowX: 'auto', minWidth: 0}}>
+                  <Bar
+                    data={{
+                      labels: ['Total', 'Completed', 'Pending'],
+                      datasets: [{
+                        label: 'Deliveries',
+                        data: [analytics.totalDeliveries, analytics.completedDeliveries, analytics.pendingDeliveries],
+                        backgroundColor: ['#1e40af', '#16a34a', '#d2691e']
+                      }]
+                    }}
+                    options={{ responsive: true, plugins: { legend: { display: false } } }}
+                    height={80}
+                  />
+                </div>
               )}
               {activeChartTab === 'pie' && (
-                <Pie
-                  data={{
-                    labels: ['Completed', 'Pending', 'Other'],
-                    datasets: [{
-                      label: 'Deliveries by Status',
-                      data: [analytics.completedDeliveries, analytics.pendingDeliveries, Math.max(0, (analytics.totalDeliveries - analytics.completedDeliveries - analytics.pendingDeliveries))],
-                      backgroundColor: ['#16a34a', '#d2691e', '#1e40af']
-                    }]
-                  }}
-                  options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
-                />
+                <div style={{overflowX: 'auto', minWidth: 0}}>
+                  <Pie
+                    data={{
+                      labels: ['Completed', 'Pending', 'Other'],
+                      datasets: [{
+                        label: 'Deliveries by Status',
+                        data: [analytics.completedDeliveries, analytics.pendingDeliveries, Math.max(0, (analytics.totalDeliveries - analytics.completedDeliveries - analytics.pendingDeliveries))],
+                        backgroundColor: ['#16a34a', '#d2691e', '#1e40af']
+                      }]
+                    }}
+                    options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+                  />
+                </div>
               )}
               {activeChartTab === 'line' && (
-                <Line
-                  data={{
-                    labels: analytics.monthlyLabels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-                    datasets: [{
-                      label: 'Deliveries per Month',
-                      data: analytics.monthlyData || Array(12).fill(0),
-                      fill: false,
-                      borderColor: '#1e40af',
-                      backgroundColor: '#1e40af',
-                      tension: 0.3
-                    }]
-                  }}
-                  options={{ responsive: true, plugins: { legend: { position: 'top' } } }}
-                  height={80}
-                />
+                <div style={{overflowX: 'auto', minWidth: 0}}>
+                  <Line
+                    data={{
+                      labels: analytics.monthlyLabels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                      datasets: [{
+                        label: 'Deliveries per Month',
+                        data: analytics.monthlyData || Array(12).fill(0),
+                        fill: false,
+                        borderColor: '#1e40af',
+                        backgroundColor: '#1e40af',
+                        tension: 0.3
+                      }]
+                    }}
+                    options={{ responsive: true, plugins: { legend: { position: 'top' } } }}
+                    height={80}
+                  />
+                </div>
               )}
             </>
           ) : <div className="text-muted">No analytics data.</div>}

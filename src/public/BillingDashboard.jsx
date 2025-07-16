@@ -17,11 +17,11 @@ export default function BillingDashboard() {
       const res = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ tier: planId }), // PATCH: use 'tier' not 'planId'
       });
       const data = await res.json();
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
+      if (data.paymentUrl || data.paynowUrl) {
+        window.location.href = data.paymentUrl || data.paynowUrl;
       } else {
         setError('Payment initiation failed.');
       }

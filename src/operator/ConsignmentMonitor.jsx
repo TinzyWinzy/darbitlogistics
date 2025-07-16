@@ -143,12 +143,12 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, 
   useEffect(() => { setPage(1); }, [search, progressFilter, customStatusFilter, progressSort, progressSortOrder]);
 
   return (
-    <div className="card shadow-sm border-0 mb-4 w-100" style={{ width: '100%' }} role="region" aria-labelledby="consignment-monitor-heading">
+    <div className="card shadow-sm border-0 mb-4" role="region" aria-labelledby="consignment-monitor-heading">
       {/* Strategic Operations Console Banner */}
       <div className="bg-warning text-dark text-center py-1 small fw-bold" style={{ letterSpacing: '1px', borderTopLeftRadius: '0.5rem', borderTopRightRadius: '0.5rem' }}>
         STRATEGIC OPERATIONS CONSOLE
       </div>
-      <div className="card-body px-2 px-md-3" style={{ width: '100%' }}>
+      <div className="card-body px-2 px-md-3">
         <h2 id="consignment-monitor-heading" className="h5 fw-bold mb-3" style={{ color: '#1F2120' }}>
           <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>list_alt</span>
           Consignment & Load Monitoring
