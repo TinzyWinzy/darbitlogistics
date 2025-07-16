@@ -281,6 +281,17 @@ export default function App() {
     };
   }, [pushSubscription]);
 
+  useEffect(() => {
+    if (sidebarOpen && window.innerWidth <= 991) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [sidebarOpen]);
+
   return (
     <>
       {/* Sync Toast Notification */}

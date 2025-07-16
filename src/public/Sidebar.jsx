@@ -74,7 +74,7 @@ export default function Sidebar({ isOpen, onClose }) {
       <nav
         ref={sidebarRef}
         className={`sidebar navbar navbar-dark bg-dark flex-column p-0${collapsed ? ' sidebar-collapsed' : ''}${isOpen ? ' open' : ''}`}
-        style={{ zIndex: 1050, minHeight: '100vh', width: collapsed ? 64 : 240, transition: 'width 0.2s' }}
+        style={{ zIndex: 1050, minHeight: '100vh', width: window.innerWidth > 991 ? (collapsed ? 64 : 240) : 220, transition: 'width 0.2s', overflowY: window.innerWidth <= 991 ? 'auto' : undefined }}
         aria-label="Main sidebar navigation"
       >
         <div className="sidebar-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">

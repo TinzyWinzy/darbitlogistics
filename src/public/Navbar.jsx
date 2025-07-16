@@ -98,7 +98,7 @@ export default function Navbar({ onHamburgerClick }) {
           <button
             className="navbar-toggler ms-3"
             type="button"
-            onClick={handleMobileMenuToggle}
+            onClick={onHamburgerClick}
             aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-nav-menu"

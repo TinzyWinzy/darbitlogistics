@@ -41,8 +41,12 @@
     position: fixed;
     left: -220px;
     top: 0;
+    width: 220px !important;
+    min-width: 0 !important;
     height: 100vh;
     z-index: 2000;
+    border-radius: 0 !important;
+    overflow-y: auto;
     transition: left 0.2s;
   }
   .sidebar.open {

@@ -174,16 +174,11 @@ export default function OperatorDashboard() {
   const [activeChartTab, setActiveChartTab] = useState('bar');
 
   // Responsive container class
-  const [containerClass, setContainerClass] = useState('container py-5 px-2 px-md-4');
+  const [containerClass, setContainerClass] = useState(window.innerWidth <= 600 ? 'container-fluid py-5 px-0' : 'container py-5 px-2 px-md-4');
   useEffect(() => {
     function handleResize() {
-      if (window.innerWidth <= 600) {
-        setContainerClass('container-fluid py-5 px-0');
-      } else {
-        setContainerClass('container py-5 px-2 px-md-4');
-      }
+      setContainerClass(window.innerWidth <= 600 ? 'container-fluid py-5 px-0' : 'container py-5 px-2 px-md-4');
     }
-    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
