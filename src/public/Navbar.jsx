@@ -155,7 +155,13 @@ export default function Navbar({ onHamburgerClick }) {
                 }} />
               </span>
             </button>
-            <MobileDashboardDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} userRole={role} />
+            <MobileDashboardDrawer
+              open={drawerOpen}
+              onClose={() => setDrawerOpen(false)}
+              userRole={role}
+              onLogout={handleLogout}
+              userName={user?.name || user?.email || 'User'}
+            />
           </>
         )}
       </div>

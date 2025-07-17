@@ -1,12 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import * as FaIcons from 'react-icons/fa';
-import { MENU_CONFIG } from '../menuConfig';
+import { MENU_CONFIG, USER_ACTIONS } from '../menuConfig';
 
-export default function MobileDashboardDrawer({ open, onClose, userRole }) {
+export default function MobileDashboardDrawer({ open, onClose, userRole, onLogout, userName }) {
   if (!open) return null;
   // Dashboard routes only
   const dashboardLinks = MENU_CONFIG.filter(item => item.showIn.includes('sidebar') && item.roles.includes(userRole));
+  // User actions: profile, settings, logout
+  const userActions = USER_ACTIONS.filter(item => ['Profile', 'Settings'].includes(item.label) && item.roles.includes(userRole));
   return (
     <>
       {/* Overlay */}
@@ -65,6 +67,37 @@ export default function MobileDashboardDrawer({ open, onClose, userRole }) {
               </NavLink>
             </li>
           ))}
+        </ul>
+        {/* Divider */}
+        <hr style={{ borderColor: '#444', margin: '1.2rem 0' }} />
+        {/* User section */}
+        <div className="d-flex align-items-center gap-2 mb-3 px-3">
+          <FaIcons.FaUserCircle size={28} className="me-2" />
+          <span className="fw-semibold" style={{ fontSize: '1.1rem' }}>{userName || 'User'}</span>
+        </div>
+        <ul className="list-unstyled mb-0">
+          {userActions.map(item => (
+            <li key={item.path} className="mb-2">
+              <NavLink
+                to={item.path}
+                className={({ isActive }) => `d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold${isActive ? ' bg-light text-dark' : ''}`}
+                style={{ textDecoration: 'none', fontSize: '1.1rem' }}
+                onClick={onClose}
+              >
+                {FaIcons[item.icon] && React.createElement(FaIcons[item.icon], { className: 'me-2', size: 20 })}
+                {item.label}
+              </NavLink>
+            </li>
+          ))}
+          <li>
+            <button
+              className="d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold btn btn-link text-danger w-100"
+              style={{ textDecoration: 'none', fontSize: '1.1rem' }}
+              onClick={() => { onLogout(); onClose(); }}
+            >
+              <FaIcons.FaSignOutAlt className="me-2" size={20} /> Logout
+            </button>
+          </li>
         </ul>
       </div>
       {/* Drawer animation */}
