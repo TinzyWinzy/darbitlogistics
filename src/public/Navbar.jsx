@@ -9,6 +9,7 @@ import db from '../services/db';
 import { isOnline } from '../services/api';
 import { useMediaQuery } from 'react-responsive';
 import React from 'react'; // Added for React.createElement
+import MobileDashboardDrawer from './MobileDashboardDrawer';
 
 export default function Navbar({ onHamburgerClick }) {
   const { user, setUser } = useContext(AuthContext);
@@ -58,12 +59,11 @@ export default function Navbar({ onHamburgerClick }) {
   }
 
   const isMobile = useMediaQuery({ maxWidth: 991 });
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const handleMobileMenuToggle = () => setMobileMenuOpen(open => !open);
-  const handleNavLinkClick = () => {
-    if (isMobile) setMobileMenuOpen(false);
-  };
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Remove mobileMenuOpen state and handlers
+  // const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // const handleMobileMenuToggle = () => setMobileMenuOpen(open => !open);
+  // const handleNavLinkClick = () => { if (isMobile) setMobileMenuOpen(false); };
 
   // Helper to get icon component by name
   const getIcon = (name) => FaIcons[name] || null;
@@ -95,65 +95,68 @@ export default function Navbar({ onHamburgerClick }) {
           Morres Logistics
         </Link>
         {isMobile && (
-          <button
-            className="navbar-toggler ms-3"
-            type="button"
-            onClick={onHamburgerClick}
-            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-nav-menu"
-            style={{
-              border: '2px solid #EBD3AD',
-              background: mobileMenuOpen ? '#EBD3AD' : 'transparent',
-              borderRadius: '0.5rem',
-              padding: '0.4em 0.7em',
-              boxShadow: '0 1px 4px rgba(31,33,32,0.10)',
-              transition: 'background 0.2s, border 0.2s',
-            }}
-          >
-            <span
-              className="navbar-toggler-icon"
+          <>
+            <button
+              className="navbar-toggler ms-3"
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open menu"
+              aria-expanded={drawerOpen}
+              aria-controls="mobile-dashboard-drawer"
               style={{
-                filter: 'invert(1) brightness(1.5)',
-                WebkitFilter: 'invert(1) brightness(1.5)',
-                backgroundImage: 'none',
-                width: 24,
-                height: 24,
-                display: 'inline-block',
-                background: 'none',
-                position: 'relative',
+                border: '2px solid #EBD3AD',
+                background: 'transparent',
+                borderRadius: '0.5rem',
+                padding: '0.4em 0.7em',
+                boxShadow: '0 1px 4px rgba(31,33,32,0.10)',
+                transition: 'background 0.2s, border 0.2s',
               }}
             >
-              {/* Custom hamburger icon for high contrast */}
-              <span style={{
-                display: 'block',
-                width: 22,
-                height: 3,
-                background: mobileMenuOpen ? '#1F2120' : '#EBD3AD',
-                borderRadius: 2,
-                margin: '4px 0',
-                transition: 'background 0.2s',
-              }} />
-              <span style={{
-                display: 'block',
-                width: 22,
-                height: 3,
-                background: mobileMenuOpen ? '#1F2120' : '#EBD3AD',
-                borderRadius: 2,
-                margin: '4px 0',
-                transition: 'background 0.2s',
-              }} />
-              <span style={{
-                display: 'block',
-                width: 22,
-                height: 3,
-                background: mobileMenuOpen ? '#1F2120' : '#EBD3AD',
-                borderRadius: 2,
-                margin: '4px 0',
-                transition: 'background 0.2s',
-              }} />
-            </span>
-          </button>
+              <span
+                className="navbar-toggler-icon"
+                style={{
+                  filter: 'invert(1) brightness(1.5)',
+                  WebkitFilter: 'invert(1) brightness(1.5)',
+                  backgroundImage: 'none',
+                  width: 24,
+                  height: 24,
+                  display: 'inline-block',
+                  background: 'none',
+                  position: 'relative',
+                }}
+              >
+                {/* Custom hamburger icon for high contrast */}
+                <span style={{
+                  display: 'block',
+                  width: 22,
+                  height: 3,
+                  background: '#EBD3AD',
+                  borderRadius: 2,
+                  margin: '4px 0',
+                  transition: 'background 0.2s',
+                }} />
+                <span style={{
+                  display: 'block',
+                  width: 22,
+                  height: 3,
+                  background: '#EBD3AD',
+                  borderRadius: 2,
+                  margin: '4px 0',
+                  transition: 'background 0.2s',
+                }} />
+                <span style={{
+                  display: 'block',
+                  width: 22,
+                  height: 3,
+                  background: '#EBD3AD',
+                  borderRadius: 2,
+                  margin: '4px 0',
+                  transition: 'background 0.2s',
+                }} />
+              </span>
+            </button>
+            <MobileDashboardDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} userRole={role} />
+          </>
         )}
       </div>
       {/* Desktop nav: only show if not dashboard */}
@@ -258,64 +261,7 @@ export default function Navbar({ onHamburgerClick }) {
           </div>
         </div>
       )}
-      {/* Mobile nav menu: always show on mobile, overlays content */}
-      {isMobile && mobileMenuOpen && (
-        <div
-          id="mobile-nav-menu"
-          className="position-fixed top-0 start-0 w-100 bg-dark text-light p-3 shadow-lg rounded-bottom"
-          style={{ zIndex: 2000, minHeight: '100vh' }}
-          role="menu"
-        >
-          <ul className="navbar-nav flex-column gap-2 align-items-stretch mb-2" style={{ fontSize: '1.15rem' }}>
-            {(isDashboard ? dashboardNavMenu : publicNavMenu).map((item, index) => (
-              <li key={index} className="nav-item">
-                <NavLink to={item.route} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} onClick={handleNavLinkClick}>
-                  {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-          {/* User dropdown for mobile: only show if not dashboard */}
-          {user && (
-            <Dropdown align="end" className="w-100 mb-2">
-              <Dropdown.Toggle variant="link" className="text-light d-flex align-items-center w-100 justify-content-start" style={{ color: '#EBD3AD', textDecoration: 'none', fontSize: '1.1rem', padding: '0.5em 0' }} id="userMenuButtonMobile">
-                <FaIcons.FaUserCircle className="me-2" size={28} />
-                <span className="fw-semibold">{user.name || user.email || 'User'}</span>
-              </Dropdown.Toggle>
-              <Dropdown.Menu className="w-100">
-                {userMenu.map((item, index) => (
-                  <Dropdown.Item key={index} as={Link} to={item.path} className="d-flex align-items-center" onClick={handleNavLinkClick}>
-                    {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
-                    {item.label}
-                  </Dropdown.Item>
-                ))}
-                <Dropdown.Divider />
-                <Dropdown.Item as="button" className="d-flex align-items-center" onClick={() => { handleLogout(); handleNavLinkClick(); }}><FaIcons.FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          )}
-          {/* Network status indicator for mobile */}
-          <div className="d-flex align-items-center mt-2" style={{ gap: 10 }}>
-            <span
-              style={{
-                display: 'inline-block',
-                width: 18,
-                height: 18,
-                borderRadius: '50%',
-                background: online ? '#27c93f' : '#e74c3c',
-                border: '2px solid #fff',
-                boxShadow: online ? '0 0 6px #27c93f88' : '0 0 6px #e74c3c88',
-                transition: 'background 0.2s',
-                marginRight: 6,
-              }}
-              aria-label={online ? 'App Online' : 'App Offline'}
-              title={online ? 'App Online' : 'App Offline'}
-            />
-            <span style={{ fontWeight: 500 }}>{online ? 'Online' : 'Offline'}</span>
-          </div>
-        </div>
-      )}
+      {/* Remove mobile nav menu overlay logic entirely */}
     </nav>
   );
 } 

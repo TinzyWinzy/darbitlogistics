@@ -143,7 +143,7 @@ function AppLayout({ sidebarOpen, setSidebarOpen }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // for mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false); // for mobile sidebar nav only
   // Add these states to hold user-specific data at the top level
   const [deliveries, setDeliveries] = useState([]);
   const [parentBookings, setParentBookings] = useState([]);
