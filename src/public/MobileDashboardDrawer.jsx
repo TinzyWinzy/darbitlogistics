@@ -77,23 +77,25 @@ export default function MobileDashboardDrawer({ open, onClose, userRole, onLogou
         </div>
         <ul className="list-unstyled mb-0">
           {userActions.map(item => (
-            <li key={item.path} className="mb-2">
+            <li key={item.label} className="mb-2">
               <NavLink
                 to={item.path}
                 className={({ isActive }) => `d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold${isActive ? ' bg-light text-dark' : ''}`}
                 style={{ textDecoration: 'none', fontSize: '1.1rem' }}
                 onClick={onClose}
+                aria-label={item.label}
               >
                 {FaIcons[item.icon] && React.createElement(FaIcons[item.icon], { className: 'me-2', size: 20 })}
                 {item.label}
               </NavLink>
             </li>
           ))}
-          <li>
+          <li key="logout">
             <button
               className="d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold btn btn-link text-danger w-100"
               style={{ textDecoration: 'none', fontSize: '1.1rem' }}
               onClick={() => { onLogout(); onClose(); }}
+              aria-label="Logout"
             >
               <FaIcons.FaSignOutAlt className="me-2" size={20} /> Logout
             </button>
