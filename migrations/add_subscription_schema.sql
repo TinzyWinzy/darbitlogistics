@@ -197,11 +197,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_create_trial_subscription ON users;
-CREATE TRIGGER trigger_create_trial_subscription
-AFTER INSERT ON users
-FOR EACH ROW
-EXECUTE FUNCTION create_trial_subscription();
+-- Robustly drop and create trigger only if users table exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') THEN
+    BEGIN
+      EXECUTE 'DROP TRIGGER IF EXISTS trigger_create_trial_subscription ON users';
+    EXCEPTION WHEN undefined_table THEN
+      NULL;
+    END;
+    BEGIN
+      EXECUTE 'CREATE TRIGGER trigger_create_trial_subscription
+        AFTER INSERT ON users
+        FOR EACH ROW
+        EXECUTE FUNCTION create_trial_subscription();';
+    EXCEPTION WHEN undefined_table THEN
+      NULL;
+    END;
+  END IF;
+END $$;
 
 -- Create admin_logs table for real admin action logging
 DO $$ BEGIN

@@ -1,3 +1,12 @@
+-- DEV ONLY: Drop tables if they exist (for clean resets)
+DROP TABLE IF EXISTS sampling_records CASCADE;
+DROP TABLE IF EXISTS environmental_incidents CASCADE;
+DROP TABLE IF EXISTS checkpoint_logs CASCADE;
+DROP TABLE IF EXISTS deliveries CASCADE;
+DROP TABLE IF EXISTS parent_bookings CASCADE;
+DROP TABLE IF EXISTS sessions CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 -- Create UUID extension for better IDs
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -102,6 +111,47 @@ BEGIN
     END IF;
 END$$;
 
+-- 1. Create all core tables first
+
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role TEXT NOT NULL DEFAULT 'operator' CHECK (role IN ('operator', 'admin', 'viewer')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Sessions table
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id TEXT PRIMARY KEY,
+    username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Robustly drop and create update_sessions_updated_at trigger only if table exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sessions') THEN
+    BEGIN
+      EXECUTE 'DROP TRIGGER IF EXISTS update_sessions_updated_at ON sessions';
+    EXCEPTION WHEN undefined_table THEN
+      -- Table does not exist, skip
+      NULL;
+    END;
+    BEGIN
+      EXECUTE 'CREATE TRIGGER update_sessions_updated_at
+        BEFORE UPDATE ON sessions
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();';
+    EXCEPTION WHEN undefined_table THEN
+      -- Table does not exist, skip
+      NULL;
+    END;
+  END IF;
+END $$;
+
 -- Parent Bookings table
 CREATE TABLE IF NOT EXISTS parent_bookings (
     id TEXT PRIMARY KEY DEFAULT 'PB-' || substr(md5(random()::text), 1, 8),
@@ -131,6 +181,106 @@ CREATE TABLE IF NOT EXISTS parent_bookings (
     CONSTRAINT valid_tonnage CHECK (completed_tonnage <= total_tonnage),
     CONSTRAINT valid_remaining CHECK (remaining_tonnage >= 0)
 );
+
+-- Deliveries table
+CREATE TABLE IF NOT EXISTS deliveries (
+    tracking_id TEXT PRIMARY KEY,
+    parent_booking_id TEXT REFERENCES parent_bookings(id) ON DELETE RESTRICT,
+    customer_name TEXT NOT NULL,
+    phone_number TEXT NOT NULL,
+    current_status delivery_status NOT NULL DEFAULT 'Pending',
+    vehicle_type TEXT NOT NULL DEFAULT 'Standard Truck',
+    vehicle_capacity DECIMAL(10,2) NOT NULL CHECK (vehicle_capacity > 0),
+    tonnage DECIMAL(10,2) NOT NULL CHECK (tonnage > 0),
+    container_count INTEGER NOT NULL CHECK (container_count > 0),
+    has_weighbridge_cert BOOLEAN DEFAULT false,
+    weighbridge_ref TEXT,
+    tare_weight DECIMAL(10,2),
+    net_weight DECIMAL(10,2),
+    sampling_required BOOLEAN DEFAULT false,
+    sampling_status TEXT,
+    environmental_incident BOOLEAN DEFAULT false,
+    incident_details JSONB DEFAULT '{}',
+    checkpoints JSONB DEFAULT '[]'::jsonb,
+    driver_details JSONB NOT NULL DEFAULT '{}'::jsonb,
+    booking_reference TEXT UNIQUE NOT NULL,
+    loading_point TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    is_completed BOOLEAN DEFAULT FALSE,
+    completion_date TIMESTAMP WITH TIME ZONE,
+    created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT valid_weights CHECK (net_weight IS NULL OR (tare_weight IS NOT NULL AND net_weight >= 0)),
+    -- Only check that checkpoints is an array; detailed structure is enforced by trigger or app code
+    CONSTRAINT valid_checkpoint_format CHECK (jsonb_typeof(checkpoints) = 'array'),
+    CONSTRAINT valid_driver_details CHECK (
+        jsonb_typeof(driver_details) = 'object' AND
+        driver_details ? 'name' AND
+        driver_details ? 'vehicleReg'
+    )
+);
+-- NOTE: Detailed checkpoint JSON structure validation should be enforced by a trigger or in application code, not in a CHECK constraint.
+
+-- Checkpoint logs table
+CREATE TABLE IF NOT EXISTS checkpoint_logs (
+    id SERIAL PRIMARY KEY,
+    delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
+    checkpoint_type checkpoint_type NOT NULL,
+    location TEXT NOT NULL,
+    operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT,
+    status delivery_status NOT NULL,
+    coordinates TEXT,
+    comment TEXT,
+    has_issue BOOLEAN DEFAULT false,
+    issue_details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+-- Environmental incidents table
+CREATE TABLE IF NOT EXISTS environmental_incidents (
+    id SERIAL PRIMARY KEY,
+    delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
+    incident_type TEXT NOT NULL,
+    description TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
+    reported_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    location TEXT NOT NULL,
+    coordinates TEXT,
+    reported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    resolution_notes TEXT,
+    status TEXT NOT NULL DEFAULT 'Open' CHECK (status IN ('Open', 'In Progress', 'Resolved', 'Closed')),
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+-- Sampling records table
+CREATE TABLE IF NOT EXISTS sampling_records (
+    id SERIAL PRIMARY KEY,
+    delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
+    sample_code TEXT UNIQUE NOT NULL,
+    collected_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    collection_location TEXT NOT NULL,
+    collection_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    sample_type TEXT NOT NULL,
+    quantity DECIMAL(10,2),
+    unit TEXT,
+    lab_reference TEXT,
+    analysis_status TEXT DEFAULT 'Pending' CHECK (analysis_status IN ('Pending', 'In Progress', 'Completed', 'Rejected')),
+    results JSONB DEFAULT '{}'::jsonb,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Clean up legacy columns that may exist in older database versions
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parent_bookings' AND column_name = 'commodity') THEN
+        ALTER TABLE parent_bookings DROP COLUMN commodity;
+    END IF;
+END $$;
 
 -- Add missing columns to parent_bookings if they don't exist
 DO $$
@@ -175,63 +325,6 @@ BEGIN
         ALTER TABLE parent_bookings ADD COLUMN created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     END IF;
 END $$;
-
--- Clean up legacy columns that may exist in older database versions
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'parent_bookings' AND column_name = 'commodity') THEN
-        ALTER TABLE parent_bookings DROP COLUMN commodity;
-    END IF;
-END $$;
-
--- Deliveries table
-CREATE TABLE IF NOT EXISTS deliveries (
-    tracking_id TEXT PRIMARY KEY,
-    parent_booking_id TEXT REFERENCES parent_bookings(id) ON DELETE RESTRICT,
-    customer_name TEXT NOT NULL,
-    phone_number TEXT NOT NULL,
-    current_status delivery_status NOT NULL DEFAULT 'Pending',
-    vehicle_type TEXT NOT NULL DEFAULT 'Standard Truck',
-    vehicle_capacity DECIMAL(10,2) NOT NULL CHECK (vehicle_capacity > 0),
-    tonnage DECIMAL(10,2) NOT NULL CHECK (tonnage > 0),
-    container_count INTEGER NOT NULL CHECK (container_count > 0),
-    has_weighbridge_cert BOOLEAN DEFAULT false,
-    weighbridge_ref TEXT,
-    tare_weight DECIMAL(10,2),
-    net_weight DECIMAL(10,2),
-    sampling_required BOOLEAN DEFAULT false,
-    sampling_status TEXT,
-    environmental_incident BOOLEAN DEFAULT false,
-    incident_details JSONB DEFAULT '{}',
-    checkpoints JSONB DEFAULT '[]'::jsonb,
-    driver_details JSONB NOT NULL DEFAULT '{}'::jsonb,
-    booking_reference TEXT UNIQUE NOT NULL,
-    loading_point TEXT NOT NULL,
-    destination TEXT NOT NULL,
-    is_completed BOOLEAN DEFAULT FALSE,
-    completion_date TIMESTAMP WITH TIME ZONE,
-    created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT valid_weights CHECK (net_weight IS NULL OR (tare_weight IS NOT NULL AND net_weight >= 0)),
-    CONSTRAINT valid_checkpoint_format CHECK (
-        jsonb_typeof(checkpoints) = 'array' AND
-        (
-            SELECT bool_and(
-                jsonb_typeof(checkpoint->'location') = 'string' AND
-                jsonb_typeof(checkpoint->'operator_id') = 'number' AND
-                jsonb_typeof(checkpoint->'status') = 'string' AND
-                jsonb_typeof(checkpoint->'timestamp') = 'string'
-            )
-            FROM jsonb_array_elements(checkpoints) checkpoint
-        )
-    ),
-    CONSTRAINT valid_driver_details CHECK (
-        jsonb_typeof(driver_details) = 'object' AND
-        driver_details ? 'name' AND
-        driver_details ? 'vehicleReg'
-    )
-);
 
 -- Add missing columns to deliveries if they don't exist
 DO $$
@@ -307,6 +400,30 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'created_by_user_id') THEN
         ALTER TABLE deliveries ADD COLUMN created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
     END IF;
+END $$;
+
+-- Add missing value column to deliveries if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'value') THEN
+    ALTER TABLE deliveries ADD COLUMN value DECIMAL(12,2) DEFAULT 0;
+  END IF;
+END $$;
+
+-- Add missing cost column to deliveries if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'cost') THEN
+    ALTER TABLE deliveries ADD COLUMN cost DECIMAL(12,2) DEFAULT 0;
+  END IF;
+END $$;
+
+-- Add missing custom_status column to deliveries if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deliveries' AND column_name = 'custom_status') THEN
+    ALTER TABLE deliveries ADD COLUMN custom_status TEXT;
+  END IF;
 END $$;
 
 -- Add parent_booking_id to deliveries if it doesn't exist
@@ -400,25 +517,9 @@ FOR EACH ROW
 EXECUTE FUNCTION validate_tonnage();
 
 -- Drop and recreate users table to ensure correct structure
-DROP TABLE IF EXISTS sessions CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-
--- Users table
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(255) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    role TEXT NOT NULL DEFAULT 'operator' CHECK (role IN ('operator', 'admin', 'viewer')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Sessions table
-CREATE TABLE IF NOT EXISTS sessions (
-    session_id TEXT PRIMARY KEY,
-    username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- REMOVE the following lines from the end of the file:
+-- DROP TABLE IF EXISTS sessions CASCADE;
+-- DROP TABLE IF EXISTS users CASCADE;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_deliveries_customer ON deliveries(customer_name);
@@ -426,8 +527,23 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_parent ON deliveries(parent_booking_id
 CREATE INDEX IF NOT EXISTS idx_deliveries_status ON deliveries(current_status);
 CREATE INDEX IF NOT EXISTS idx_parent_bookings_status ON parent_bookings(status);
 CREATE INDEX IF NOT EXISTS idx_parent_bookings_deadline ON parent_bookings(deadline);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
-CREATE INDEX IF NOT EXISTS idx_sessions_username ON sessions(username);
+
+-- Robustly create indexes for sessions only if table exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sessions') THEN
+    BEGIN
+      EXECUTE 'CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)';
+    EXCEPTION WHEN undefined_table THEN
+      NULL;
+    END;
+    BEGIN
+      EXECUTE 'CREATE INDEX IF NOT EXISTS idx_sessions_username ON sessions(username)';
+    EXCEPTION WHEN undefined_table THEN
+      NULL;
+    END;
+  END IF;
+END $$;
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -496,74 +612,6 @@ LEFT JOIN deliveries d ON pb.id = d.parent_booking_id
 GROUP BY pb.id, pb.customer_name, pb.phone_number, pb.total_tonnage, pb.deadline, pb.mineral_type, 
          pb.mineral_grade, pb.loading_point, pb.destination, pb.booking_code, 
          pb.notes, pb.status, pb.remaining_tonnage, pb.created_at, pb.updated_at;
-
--- Create checkpoint_logs table for better audit trail
-CREATE TABLE IF NOT EXISTS checkpoint_logs (
-    id SERIAL PRIMARY KEY,
-    delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
-    checkpoint_type checkpoint_type NOT NULL,
-    location TEXT NOT NULL,
-    operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT,
-    status delivery_status NOT NULL,
-    coordinates TEXT,
-    comment TEXT,
-    has_issue BOOLEAN DEFAULT false,
-    issue_details TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    metadata JSONB DEFAULT '{}'::jsonb
-);
-
--- Drop the legacy 'operator' text column if it exists.
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'checkpoint_logs' AND column_name = 'operator') THEN
-        ALTER TABLE checkpoint_logs DROP COLUMN operator;
-    END IF;
-END $$;
-
--- Add missing columns to checkpoint_logs if they don't exist
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'checkpoint_logs' AND column_name = 'operator_id') THEN
-        ALTER TABLE checkpoint_logs ADD COLUMN operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
-    END IF;
-END $$;
-
--- Create environmental_incidents table
-CREATE TABLE IF NOT EXISTS environmental_incidents (
-    id SERIAL PRIMARY KEY,
-    delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
-    incident_type TEXT NOT NULL,
-    description TEXT NOT NULL,
-    severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
-    reported_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    location TEXT NOT NULL,
-    coordinates TEXT,
-    reported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    resolved_at TIMESTAMP WITH TIME ZONE,
-    resolution_notes TEXT,
-    status TEXT NOT NULL DEFAULT 'Open' CHECK (status IN ('Open', 'In Progress', 'Resolved', 'Closed')),
-    metadata JSONB DEFAULT '{}'::jsonb
-);
-
--- Create sampling_records table
-CREATE TABLE IF NOT EXISTS sampling_records (
-    id SERIAL PRIMARY KEY,
-    delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
-    sample_code TEXT UNIQUE NOT NULL,
-    collected_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    collection_location TEXT NOT NULL,
-    collection_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    sample_type TEXT NOT NULL,
-    quantity DECIMAL(10,2),
-    unit TEXT,
-    lab_reference TEXT,
-    analysis_status TEXT DEFAULT 'Pending' CHECK (analysis_status IN ('Pending', 'In Progress', 'Completed', 'Rejected')),
-    results JSONB DEFAULT '{}'::jsonb,
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
 
 -- Function to validate checkpoint data
 CREATE OR REPLACE FUNCTION validate_checkpoint_data()

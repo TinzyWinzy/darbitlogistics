@@ -1813,7 +1813,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/operators', authenticateJWT, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, username FROM users WHERE role = $1 ORDER BY username',
+      'SELECT id, username FROM users WHERE role = $1 ORDER BY id',
       ['operator']
     );
     res.json({ operators: result.rows });
