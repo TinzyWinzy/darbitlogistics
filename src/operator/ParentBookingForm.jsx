@@ -262,21 +262,21 @@ export default function ParentBookingForm({
       </div>
       <div className="col-md-6">
         <label className="form-label">Loading Point <span className="required-asterisk">*</span></label>
-        <input
-          type="text"
-          className="form-control"
+        <select
+          className="form-select"
           name="loadingPoint"
-          placeholder="e.g., Zimplats Mine"
           value={parentForm.loadingPoint}
           onChange={handleParentFormChange}
           required
-          list="loading-point-suggestions"
-        />
-        <datalist id="loading-point-suggestions">
-          {suggestedLocations.map(loc => (
-            <option key={loc} value={loc} />
-          ))}
-        </datalist>
+        >
+          {suggestedLocations.length === 0 ? (
+            <option value="" disabled>No locations available</option>
+          ) : (
+            suggestedLocations.map(loc => (
+              <option key={loc} value={loc}>{loc}</option>
+            ))
+          )}
+        </select>
       </div>
       <div className="col-md-6">
         <label className="form-label">Destination <span className="required-asterisk">*</span></label>

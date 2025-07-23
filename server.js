@@ -1809,3 +1809,16 @@ app.listen(PORT, () => {
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
+
+app.get('/api/operators', authenticateJWT, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, username FROM users WHERE role = $1 ORDER BY username',
+      ['operator']
+    );
+    res.json({ operators: result.rows });
+  } catch (err) {
+    console.error('Get operators error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});

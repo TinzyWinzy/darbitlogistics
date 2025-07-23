@@ -23,7 +23,7 @@ export default function CheckpointLoggerForm({
 }) {
   const [form, setForm] = useState({
     location: '',
-    operator: user?.username || '',
+    operatorId: user?.id || '',
     comment: '',
     status: '',
     coordinates: '',
@@ -31,14 +31,27 @@ export default function CheckpointLoggerForm({
     hasIssue: false,
     issueDetails: ''
   });
+  const [operators, setOperators] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Set default timestamp on mount and reset
   useEffect(() => {
     setForm(f => ({ ...f, timestamp: new Date().toISOString().slice(0, 16) }));
   }, [selectedId]);
+
+  useEffect(() => {
+    async function fetchOperators() {
+      try {
+        const res = await fetch('/api/operators', { credentials: 'include' });
+        const data = await res.json();
+        setOperators(data.operators || []);
+      } catch (err) {
+        setOperators([]);
+      }
+    }
+    fetchOperators();
+  }, []);
 
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
@@ -66,6 +79,9 @@ export default function CheckpointLoggerForm({
     if (!form.status) {
       errors.status = 'Status is required.';
     }
+    if (!form.operatorId) {
+      errors.operatorId = 'Operator is required.';
+    }
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       setFeedback('Please fill in all required fields.');
@@ -75,8 +91,7 @@ export default function CheckpointLoggerForm({
     const checkpoint = {
       location: form.location.trim(),
       status: form.status,
-      operator_id: user.id,
-      operator_username: user.username,
+      operator_id: form.operatorId,
       comment: form.comment.trim(),
       timestamp: new Date(form.timestamp).toISOString(),
       coordinates: form.coordinates.trim(),
@@ -88,7 +103,7 @@ export default function CheckpointLoggerForm({
       setFeedback('Checkpoint logged successfully!');
       setForm({
         location: '',
-        operator: user?.username || '',
+        operatorId: user?.id || '',
         comment: '',
         status: '',
         coordinates: '',
@@ -160,6 +175,24 @@ export default function CheckpointLoggerForm({
             ))}
           </select>
           {fieldErrors.status && <div className="invalid-feedback">{fieldErrors.status}</div>}
+        </div>
+        <div className="col-md-6">
+          <label htmlFor="operatorSelect" className="form-label fw-semibold">Operator <span className="text-danger">*</span></label>
+          <select
+            className={`form-select${fieldErrors.operatorId ? ' is-invalid' : ''}`}
+            id="operatorSelect"
+            name="operatorId"
+            value={form.operatorId}
+            onChange={handleChange}
+            required
+            aria-required="true"
+          >
+            <option value="">Select operator...</option>
+            {operators.map(op => (
+              <option key={op.id} value={op.id}>{op.username}</option>
+            ))}
+          </select>
+          {fieldErrors.operatorId && <div className="invalid-feedback">{fieldErrors.operatorId}</div>}
         </div>
         <div className="col-12">
           <label htmlFor="commentInput" className="form-label">Comment</label>
