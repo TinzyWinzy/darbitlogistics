@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
             },
             {
               // Cache API calls to your backend
-              urlPattern: ({ url }) => url.origin === env.VITE_API_URL,
+              urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'api-cache',

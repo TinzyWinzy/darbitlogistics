@@ -2,29 +2,19 @@ import axios from 'axios';
 import { normalizeKeys } from './normalizeKeys';
 import db from './db';
 
-// Replace the old isOnline function with a robust async version
-let lastPing = 0;
-let lastPingResult = true;
-
+// Simple online check
 export async function isOnline() {
-  const now = Date.now();
-  if (now - lastPing < 10000) return lastPingResult;
   try {
-    // Use a lightweight endpoint (adjust if needed)
-    await fetch(`${import.meta.env.VITE_API_URL}/api/health`, { method: 'GET', cache: 'no-store' });
-    lastPing = now;
-    lastPingResult = true;
+    await fetch('/api/health', { method: 'GET', cache: 'no-store' });
     return true;
   } catch {
-    lastPing = now;
-    lastPingResult = false;
     return false;
   }
 }
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: '/api',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
@@ -60,7 +50,7 @@ api.interceptors.response.use(
       if (!isRefreshing) {
         isRefreshing = true;
         try {
-          const res = await api.post('/api/auth/refresh');
+          const res = await api.post('/auth/refresh');
           const newToken = res.data.token;
           localStorage.setItem('jwt_token', newToken);
           onRefreshed(newToken);

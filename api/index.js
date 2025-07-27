@@ -1,53 +1,34 @@
-// Vercel Serverless Function - Main API entry point
+// Fresh Vercel Serverless Function for DarLogistics
 import express from 'express';
-import bodyParser from 'body-parser';
 import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
 
 // Import your existing routes
 import authRouter from '../routes/auth.js';
 import parentBookingsRouter from '../routes/parent-bookings.js';
 import adminRouter from '../routes/admin.js';
 
+// Load environment variables
+dotenv.config();
+
 const app = express();
 
 // Middleware
-app.use(bodyParser.json());
-app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// CORS configuration for Vercel
-const allowedOrigins = [
-  'https://darlog-logistics.vercel.app',
-  'https://darbitlogistics.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000'
-];
+// CORS for Vercel
+app.use(cors({
+  origin: [
+    'https://darlog-logistics.vercel.app',
+    'https://darbitlogistics.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.warn(`[WARN][CORS] Blocked origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-};
-
-app.use(cors(corsOptions));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
-
-// Health check endpoint
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 

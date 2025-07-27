@@ -237,7 +237,7 @@ export default function App() {
       if (!token) {
         // Try to refresh
         try {
-          const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/refresh`, {}, { withCredentials: true });
+          const res = await axios.post(`/api/auth/refresh`, {}, { withCredentials: true });
           token = res.data.token;
           localStorage.setItem('jwt_token', token);
         } catch (err) {
@@ -248,7 +248,7 @@ export default function App() {
       }
       // Now check /me with the (possibly new) token
       try {
-        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+        const { data } = await axios.get(`/api/auth/me`, {
           withCredentials: true,
           headers: {
             'Content-Type': 'application/json',

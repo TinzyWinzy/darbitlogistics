@@ -24,11 +24,13 @@ export default function Login() {
     setError('');
     try {
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/login`,
-        { username, password, rememberMe },
+        `/api/login`,
+        {
+          email,
+          password,
+        },
         {
           withCredentials: true,
-          headers: { 'Content-Type': 'application/json' }
         }
       );
       if (response.data && response.data.user && response.data.token) {

@@ -54,7 +54,7 @@ export default function InvoiceHistory() {
                     <td>{inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString() : ''}</td>
                     <td>
                       <a
-                        href={`$${process.env.VITE_API_URL || ''}/api/invoices/${inv.invoiceId || inv.invoice_id}/download`}
+                        href={`/api/invoices/${inv.invoiceId || inv.invoice_id}/download`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn btn-sm btn-outline-primary"
