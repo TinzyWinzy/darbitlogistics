@@ -8,7 +8,9 @@ import Landing from './public/Landing';
 import Offerings from './public/Offerings';
 import Login from './public/Login';
 import Footer from './public/Footer';
+import SendOneDelivery from './public/SendOneDelivery';
 import './App.css'
+import './styles/modern-design.css'
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from './contexts/AuthContext';
 import axios from 'axios';
@@ -32,12 +34,23 @@ import { jwtDecode as jwt_decode } from 'jwt-decode';
 import Profile from './public/Profile';
 import Settings from './public/Settings';
 
+// Import new redesigned components
+import PaymentScreen from './components/PaymentScreen';
+import BookingScreen from './components/BookingScreen';
+import TrackingScreen from './components/TrackingScreen';
+
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useContext(AuthContext);
   
   if (loading) {
-    return <div className="d-flex justify-content-center p-5">Loading...</div>;
+    return (
+      <div className="loading-container">
+        <div className="modern-loading" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
   }
   
   if (!isAuthenticated) {
@@ -52,7 +65,13 @@ const AdminRoute = ({ children }) => {
   const { user, isAuthenticated, loading } = useContext(AuthContext);
 
   if (loading) {
-    return <div className="d-flex justify-content-center p-5">Loading...</div>;
+    return (
+      <div className="loading-container">
+        <div className="modern-loading" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated || user?.role !== 'admin') {
@@ -76,66 +95,99 @@ function AppLayout({ sidebarOpen, setSidebarOpen }) {
   const parentBookingsData = useParentBookings();
 
   return (
-    <div className="d-flex flex-nowrap min-vh-100 w-100">
-      {showSidebar && (
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <div className="app-container">
+      {/* Animated Background for authenticated pages */}
+      {isAuthenticated && (
+        <div className="background-animation">
+          <div className="floating-sphere sphere-1"></div>
+          <div className="floating-sphere sphere-2"></div>
+          <div className="floating-sphere sphere-3"></div>
+          <div className="floating-sphere sphere-4"></div>
+        </div>
       )}
-      <main className="flex-grow-1 container-fluid p-0">
-        <Routes>
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/loads" element={
-                  <ProtectedRoute>
-                    <Loads />
-                  </ProtectedRoute>
-                } />
-                <Route path="/customers" element={
-                  <ProtectedRoute>
-                    <CustomerList parentBookings={parentBookingsData.parentBookings} deliveries={deliveriesData.deliveries} />
-                  </ProtectedRoute>
-                } />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/admin/dashboard" element={
-                  <AdminRoute>
-                    <AdminDashboard />
-                  </AdminRoute>
-                } />
-                <Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
-                <Route path="/track" element={<TrackDelivery />} />
-                <Route path="/offerings" element={<Offerings />} />
-                <Route path="/login" element={
-                  isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
-                } />
-                <Route path="/" element={<Landing />} />
-                <Route path="/track-delivery" element={<TrackDelivery />} />
-                <Route path="/track-booking" element={<TrackParentBooking />} />
-                <Route path="/operator/dashboard" element={<Dashboard />} />
-                <Route path="/parent-booking-details/:id" element={<ParentBookingDetails />} />
-                <Route path="/billing" element={<BillingDashboard />} />
-                <Route path="/plans" element={<SubscriptionPlans />} />
-                <Route path="/help" element={<HelpCenter />} />
-                <Route path="/payment-success" element={<PaymentSuccess />} />
-                <Route path="/invoices" element={
-                  <ProtectedRoute>
-                    <InvoiceHistory />
-                  </ProtectedRoute>
-                } />
-                <Route path="/profile" element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                } />
-                <Route path="/settings" element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                } />
-        </Routes>
-        <Footer />
-      </main>
+      
+      {/* Navbar - positioned outside sidebar but inside app container */}
+      <Navbar onHamburgerClick={() => setSidebarOpen(o => !o)} />
+      
+      <div className="d-flex flex-nowrap min-vh-100 w-100">
+        {showSidebar && (
+          <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        )}
+        <main className="flex-grow-1 w-100 p-0" style={{ maxWidth: '100vw', overflowX: 'hidden' }}>
+          <Routes>
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/loads" element={
+                    <ProtectedRoute>
+                      <Loads />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/customers" element={
+                    <ProtectedRoute>
+                      <CustomerList parentBookings={parentBookingsData.parentBookings} deliveries={deliveriesData.deliveries} />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/admin/dashboard" element={
+                    <AdminRoute>
+                      <AdminDashboard />
+                    </AdminRoute>
+                  } />
+                  <Route path="/admin" element={<Navigate to="/admin/dashboard" />} />
+                  <Route path="/track" element={<TrackDelivery />} />
+                  <Route path="/offerings" element={<Offerings />} />
+                  <Route path="/login" element={
+                    isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
+                  } />
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/track-delivery" element={<TrackDelivery />} />
+                  <Route path="/track-booking" element={<TrackParentBooking />} />
+                  <Route path="/send-one-delivery" element={<SendOneDelivery />} />
+                  <Route path="/operator/dashboard" element={<Dashboard />} />
+                  <Route path="/parent-booking-details/:id" element={<ParentBookingDetails />} />
+                  <Route path="/billing" element={<BillingDashboard />} />
+                  <Route path="/plans" element={<SubscriptionPlans />} />
+                  <Route path="/help" element={<HelpCenter />} />
+                  <Route path="/payment-success" element={<PaymentSuccess />} />
+                  <Route path="/invoices" element={
+                    <ProtectedRoute>
+                      <InvoiceHistory />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile" element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/settings" element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  } />
+                  
+                  {/* New Redesigned Component Routes */}
+                  <Route path="/payment" element={
+                    <ProtectedRoute>
+                      <PaymentScreen />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/booking" element={
+                    <ProtectedRoute>
+                      <BookingScreen />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/tracking" element={
+                    <ProtectedRoute>
+                      <TrackingScreen />
+                    </ProtectedRoute>
+                  } />
+          </Routes>
+          <Footer />
+        </main>
+      </div>
     </div>
   );
 }
@@ -255,7 +307,7 @@ export default function App() {
       setTimeout(() => setShowSyncToast(false), 3500);
       // Send push notification if subscribed
       if (pushSubscription && msg) {
-        sendPushNotification(pushSubscription, { title: 'Morres Logistics', body: msg });
+        sendPushNotification(pushSubscription, { title: 'Dar Logistics', body: msg });
       }
     }
     // On app start, try to process outbox
@@ -264,13 +316,13 @@ export default function App() {
     function handleOnline() {
       processOutbox(handleSyncResult);
       if (pushSubscription) {
-        sendPushNotification(pushSubscription, { title: 'Morres Logistics', body: 'App is back online.' });
+        sendPushNotification(pushSubscription, { title: 'Dar Logistics', body: 'App is back online.' });
       }
     }
     // On network offline, send push
     function handleOffline() {
       if (pushSubscription) {
-        sendPushNotification(pushSubscription, { title: 'Morres Logistics', body: 'App is offline.' });
+        sendPushNotification(pushSubscription, { title: 'Dar Logistics', body: 'App is offline.' });
       }
     }
     window.addEventListener('online', handleOnline);
@@ -296,7 +348,7 @@ export default function App() {
     <>
       {/* Sync Toast Notification */}
       {showSyncToast && (
-        <div className="toast show position-fixed top-0 end-0 m-4" style={{zIndex:9999, minWidth: '220px'}} role="alert" aria-live="assertive" aria-atomic="true">
+        <div className="toast show position-fixed top-0 end-0 m-4 glassmorphism-toast" style={{zIndex:9999, minWidth: '280px'}} role="alert" aria-live="assertive" aria-atomic="true">
           <div className="toast-header bg-success text-white">
             <strong className="me-auto">Sync</strong>
             <button type="button" className="btn-close btn-close-white" onClick={() => setShowSyncToast(false)} aria-label="Close"></button>
@@ -307,10 +359,209 @@ export default function App() {
       <AuthContext.Provider value={{ user, setUser, isAuthenticated, loading }}>
         <Router>
           <WelcomeModal />
-          <Navbar onHamburgerClick={() => setSidebarOpen(o => !o)} />
           <AppLayout sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         </Router>
       </AuthContext.Provider>
+
+      <style>{`
+        html, body {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          max-width: 100vw;
+          overflow-x: hidden;
+        }
+        
+        .app-container {
+          min-height: 100vh;
+          width: 100vw;
+          max-width: 100vw;
+          background: linear-gradient(135deg, var(--primary-blue) 0%, var(--accent-blue) 100%);
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          overflow-x: hidden;
+        }
+
+        /* Loading Container */
+        .loading-container {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, var(--primary-blue) 0%, var(--accent-blue) 100%);
+        }
+
+        .modern-loading {
+          width: 50px;
+          height: 50px;
+          border: 3px solid rgba(255, 255, 255, 0.3);
+          border-top: 3px solid var(--primary-orange);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        /* Animated Background for authenticated pages */
+        .background-animation {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 1;
+        }
+
+        /* Navbar positioning for landing page */
+        .navbar {
+          position: relative;
+          z-index: 1000;
+        }
+
+        .floating-sphere {
+          position: absolute;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          animation: float 8s ease-in-out infinite;
+        }
+
+        .sphere-1 {
+          width: 200px;
+          height: 200px;
+          top: 10%;
+          left: 5%;
+          animation-delay: 0s;
+        }
+
+        .sphere-2 {
+          width: 150px;
+          height: 150px;
+          top: 60%;
+          right: 10%;
+          animation-delay: 2s;
+        }
+
+        .sphere-3 {
+          width: 100px;
+          height: 100px;
+          bottom: 20%;
+          left: 15%;
+          animation-delay: 4s;
+        }
+
+        .sphere-4 {
+          width: 120px;
+          height: 120px;
+          bottom: 40%;
+          right: 5%;
+          animation-delay: 6s;
+        }
+
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-20px) rotate(180deg); }
+        }
+
+        /* Glassmorphism Toast */
+        .glassmorphism-toast {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+        }
+
+        /* Color Variables */
+        :root {
+          --primary-blue: #003366;
+          --accent-blue: #0066CC;
+          --primary-orange: #FF6600;
+          --accent-orange: #FF8533;
+          --success-green: #28a745;
+          --warning-yellow: #ffc107;
+          --danger-red: #dc3545;
+          --info-cyan: #17a2b8;
+          --light-gray: #f8f9fa;
+          --dark-gray: #343a40;
+          --white: #ffffff;
+          --black: #000000;
+          --transition-slow: 0.3s ease;
+          --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Global Button Styles */
+        .btn-primary {
+          background: linear-gradient(135deg, var(--primary-orange), var(--accent-orange));
+          border: none;
+          color: var(--white);
+          transition: var(--transition-slow);
+        }
+
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-lg);
+        }
+
+        .btn-outline-primary {
+          color: var(--primary-orange);
+          border-color: var(--primary-orange);
+        }
+
+        .btn-outline-primary:hover {
+          background: var(--primary-orange);
+          border-color: var(--primary-orange);
+        }
+
+        /* Card Styles */
+        .card {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 16px;
+        }
+
+        /* Form Controls */
+        .form-control:focus {
+          border-color: var(--primary-orange);
+          box-shadow: 0 0 0 0.2rem rgba(255, 102, 0, 0.25);
+        }
+
+        /* Alert Styles */
+        .alert-success {
+          background: rgba(40, 167, 69, 0.1);
+          border-color: var(--success-green);
+          color: var(--success-green);
+        }
+
+        .alert-warning {
+          background: rgba(255, 193, 7, 0.1);
+          border-color: var(--warning-yellow);
+          color: var(--warning-yellow);
+        }
+
+        .alert-danger {
+          background: rgba(220, 53, 69, 0.1);
+          border-color: var(--danger-red);
+          color: var(--danger-red);
+        }
+
+        .alert-info {
+          background: rgba(23, 162, 184, 0.1);
+          border-color: var(--info-cyan);
+          color: var(--info-cyan);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+          .app-container {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--accent-blue) 100%);
+          }
+        }
+      `}</style>
     </>
   );
 }

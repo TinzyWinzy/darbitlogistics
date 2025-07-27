@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { FaDownload, FaSort, FaSortUp, FaSortDown, FaEye, FaEyeSlash, FaFilter, FaSearch, FaTimes } from 'react-icons/fa';
 
 function exportToCSV(rows, columns) {
   const header = columns.map(col => col.label).join(',');
@@ -52,6 +53,7 @@ export default function LoadsTable({
   const [sortDir, setSortDir] = useState('desc');
   const [expanded, setExpanded] = useState({});
   const [isMobile, setIsMobile] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 700px)');
@@ -111,6 +113,13 @@ export default function LoadsTable({
   // Row expansion
   const toggleExpand = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
 
+  // Clear all filters
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setDateRange({ from: '', to: '' });
+  };
+
   // Card view for mobile
   const renderMobileCards = () => (
     <div className="d-flex flex-column gap-3 mt-3">
@@ -121,13 +130,13 @@ export default function LoadsTable({
         </div>
       ) : (
         sorted.map(delivery => (
-          <div key={delivery.trackingId} className="loads-card p-3 shadow-sm border position-relative">
+          <div key={delivery.trackingId} className="loads-card p-3 shadow-sm border position-relative glassmorphism-card">
             <div className="d-flex justify-content-between align-items-center mb-2">
               <div>
-                <span className="fw-bold">{delivery.trackingId}</span>
-                <span className={`badge bg-${statusMap[delivery.currentStatus] || 'secondary'} ms-2`} style={{fontSize:'0.95em'}}>{delivery.currentStatus}</span>
+                <span className="fw-bold" style={{ color: 'var(--primary-orange)' }}>{delivery.trackingId}</span>
+                <span className={`modern-badge modern-badge-${statusMap[delivery.currentStatus] || 'secondary'} glassmorphism-badge ms-2`} style={{fontSize:'0.95em'}}>{delivery.currentStatus}</span>
               </div>
-              <button className="btn btn-sm btn-outline-primary" onClick={() => toggleExpand(delivery.trackingId)} aria-label="Expand row">{expanded[delivery.trackingId] ? 'Hide' : 'Details'}</button>
+              <button className="btn btn-sm btn-outline-custom" onClick={() => toggleExpand(delivery.trackingId)} aria-label="Expand row">{expanded[delivery.trackingId] ? 'Hide' : 'Details'}</button>
             </div>
             <div><b>Customer:</b> {delivery.customerName}</div>
             <div><b>Consignment:</b> {delivery.parentBookingId}</div>
@@ -136,7 +145,7 @@ export default function LoadsTable({
             <div><b>Driver:</b> {delivery.driverDetails?.name}</div>
             <div><b>Created:</b> {delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : ''}</div>
             {expanded[delivery.trackingId] && (
-              <div className="mt-2 bg-light p-2 rounded">
+              <div className="mt-2 glassmorphism-item p-2 rounded">
                 <div><b>Last Updated:</b> {delivery.updatedAt ? new Date(delivery.updatedAt).toLocaleString() : ''}</div>
                 {/* Add more details as needed */}
               </div>
@@ -148,98 +157,509 @@ export default function LoadsTable({
   );
 
   return (
-    <div className="card shadow-sm border-0 mt-4">
-      <div className="card-body p-0">
-        <div className="d-flex flex-wrap align-items-center gap-3 p-3 pb-0">
-          <form className="d-flex gap-2 flex-wrap" onSubmit={e => { e.preventDefault(); }}>
-            <input
-              type="text"
-              className="form-control form-control-sm"
-              placeholder="Search by customer, tracking ID, status..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ width: 200 }}
-            />
-            <select className="form-select form-select-sm" style={{ width: 120 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option value="">All Statuses</option>
-              {Object.keys(statusMap).map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <input type="date" className="form-control form-control-sm" style={{ width: 120 }} value={dateRange.from} onChange={e => setDateRange(r => ({ ...r, from: e.target.value }))} />
-            <input type="date" className="form-control form-control-sm" style={{ width: 120 }} value={dateRange.to} onChange={e => setDateRange(r => ({ ...r, to: e.target.value }))} />
-          </form>
-          <button className="btn btn-sm btn-outline-success ms-auto" onClick={handleExport}>Export CSV</button>
+    <div className="loads-table-container">
+      <style>{`
+        .loads-table-container {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          overflow: hidden;
+        }
+        
+        .table-header {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          padding: 1.5rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .table-controls {
+          display: flex;
+          justify-content: between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 1rem;
+        }
+        
+        .table-filters {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(10px);
+          padding: 1.5rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .filter-row {
+          display: flex;
+          gap: 1rem;
+          align-items: end;
+          flex-wrap: wrap;
+        }
+        
+        .filter-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        
+        .filter-label {
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.9);
+          font-size: 0.9rem;
+        }
+        
+        .table-content {
+          overflow-x: auto;
+          max-height: 600px;
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(10px);
+        }
+        
+        .table-custom {
+          margin: 0;
+          border-collapse: separate;
+          border-spacing: 0;
+        }
+        
+        .table-custom th {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+          padding: 1rem 0.75rem;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.9);
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+        }
+        
+        .table-custom th:hover {
+          background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .table-custom td {
+          padding: 1rem 0.75rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          vertical-align: middle;
+          color: var(--dark-gray);
+        }
+        
+        .table-custom tbody tr:hover {
+          background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .table-custom tbody tr.expanded-row {
+          background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .sort-icon {
+          margin-left: 0.5rem;
+          opacity: 0.5;
+          color: var(--dark-gray);
+        }
+        
+        .sort-icon.active {
+          opacity: 1;
+          color: var(--primary-orange);
+        }
+        
+        .status-badge {
+          padding: 0.5rem 0.75rem;
+          border-radius: 6px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        
+        .btn-table {
+          padding: 0.5rem 1rem;
+          border-radius: 6px;
+          font-weight: 600;
+          transition: all 0.2s ease;
+        }
+        
+        .btn-table:hover {
+          transform: translateY(-1px);
+        }
+        
+        .empty-state {
+          text-align: center;
+          padding: 3rem 1rem;
+          color: var(--dark-gray);
+        }
+        
+        .empty-state-icon {
+          font-size: 3rem;
+          margin-bottom: 1rem;
+          opacity: 0.5;
+        }
+        
+        .btn-outline-custom {
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          color: var(--dark-gray);
+          background: transparent;
+          font-weight: 600;
+          padding: 0.5rem 1rem;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+        }
+        
+        .btn-outline-custom:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--primary-orange);
+          border-color: var(--primary-orange);
+        }
+        
+        .btn-primary-custom {
+          background: linear-gradient(135deg, var(--primary-orange), var(--accent-orange));
+          border: none;
+          color: white;
+          font-weight: 600;
+          padding: 0.5rem 1rem;
+          border-radius: 6px;
+          transition: all 0.2s ease;
+        }
+        
+        .btn-primary-custom:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(255, 102, 0, 0.3);
+        }
+        
+        .form-control-custom {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 6px;
+          padding: 0.5rem 0.75rem;
+          color: var(--dark-gray);
+          transition: all 0.2s ease;
+        }
+        
+        .form-control-custom:focus {
+          border-color: var(--primary-orange);
+          box-shadow: 0 0 0 0.2rem rgba(255, 102, 0, 0.25);
+          background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .glassmorphism-card {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .glassmorphism-badge {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 20px;
+        }
+        
+        .glassmorphism-item {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 8px;
+        }
+        
+        /* Text color fixes for better contrast */
+        .table-custom td strong,
+        .table-custom td b {
+          color: var(--dark-gray);
+        }
+        
+        .table-custom td .text-muted {
+          color: var(--dark-gray) !important;
+        }
+        
+        .expanded-row {
+          color: var(--dark-gray);
+        }
+        
+        .expanded-row strong,
+        .expanded-row b {
+          color: var(--dark-gray);
+        }
+        
+        .loads-card {
+          color: var(--dark-gray);
+        }
+        
+        .loads-card strong,
+        .loads-card b {
+          color: var(--dark-gray);
+        }
+        
+        .loads-card .text-muted {
+          color: var(--dark-gray) !important;
+        }
+        
+        @media (max-width: 700px) {
+          .table-header { padding: 1rem; }
+          .table-filters { padding: 1rem; }
+          .filter-row { flex-direction: column; gap: 0.75rem; }
+          .filter-group { width: 100%; }
+          .table-controls { flex-direction: column; align-items: stretch; }
+          .table-controls .btn { width: 100%; }
+          .loads-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+          }
+        }
+      `}</style>
+
+      <div className="table-header">
+        <div className="table-controls">
+          <div className="d-flex align-items-center gap-3">
+            <h5 className="mb-0 fw-bold" style={{ color: 'var(--primary-orange)' }}>
+              Loads Table
+            </h5>
+            <span className="modern-badge modern-badge-secondary glassmorphism-badge">
+              {sorted.length} of {filtered.length}
+            </span>
+          </div>
+          
+          <div className="d-flex gap-2">
+            <button 
+              className="btn btn-outline-custom btn-sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            >
+              <FaFilter className="me-1" />
+              {showAdvancedFilters ? 'Hide' : 'Advanced'} Filters
+            </button>
+            
+            <button 
+              className="btn btn-primary-custom btn-sm"
+              onClick={handleExport}
+            >
+              <FaDownload className="me-1" />
+              Export CSV
+            </button>
+          </div>
         </div>
+      </div>
+
+      {showAdvancedFilters && (
+        <div className="table-filters">
+          <div className="filter-row">
+            <div className="filter-group">
+              <label className="filter-label">Search</label>
+              <div className="input-group">
+                <span className="input-group-text" style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)', color: 'var(--primary-orange)' }}>
+                  <FaSearch />
+                </span>
+                <input
+                  type="text"
+                  className="form-control form-control-custom"
+                  placeholder="Search by customer, tracking ID, status..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+                {search && (
+                  <button 
+                    className="btn btn-outline-custom" 
+                    onClick={() => setSearch('')}
+                  >
+                    <FaTimes />
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            <div className="filter-group">
+              <label className="filter-label">Status</label>
+              <select 
+                className="form-select form-control-custom"
+                value={statusFilter} 
+                onChange={e => setStatusFilter(e.target.value)}
+              >
+                <option value="">All Statuses</option>
+                {Object.keys(statusMap).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            
+            <div className="filter-group">
+              <label className="filter-label">From Date</label>
+              <input 
+                type="date" 
+                className="form-control form-control-custom"
+                value={dateRange.from} 
+                onChange={e => setDateRange(r => ({ ...r, from: e.target.value }))} 
+              />
+            </div>
+            
+            <div className="filter-group">
+              <label className="filter-label">To Date</label>
+              <input 
+                type="date" 
+                className="form-control form-control-custom"
+                value={dateRange.to} 
+                onChange={e => setDateRange(r => ({ ...r, to: e.target.value }))} 
+              />
+            </div>
+            
+            <div className="filter-group d-flex align-items-end">
+              <button 
+                className="btn btn-outline-custom btn-sm"
+                onClick={clearFilters}
+              >
+                <FaTimes className="me-1" />
+                Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="table-content">
         {isMobile ? (
           renderMobileCards()
         ) : (
-          <div className="table-responsive" style={{ maxHeight: 480, overflowY: 'auto' }}>
-            <table className="table table-hover align-middle mb-0 loads-table" style={{ minWidth: 900 }}>
-              <thead className="table-light sticky-top" style={{ top: 0, zIndex: 2 }}>
-                <tr>
-                  {columns.map(col => (
-                    <th
-                      key={col.key}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                      onClick={() => {
-                        if (sortKey === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                        else { setSortKey(col.key); setSortDir('asc'); }
-                      }}
-                    >
+          <table className="table table-custom">
+            <thead>
+              <tr>
+                {columns.map(col => (
+                  <th
+                    key={col.key}
+                    onClick={() => {
+                      if (sortKey === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                      else { setSortKey(col.key); setSortDir('asc'); }
+                    }}
+                  >
+                    <div className="d-flex align-items-center">
                       {col.label}
-                      {sortKey === col.key && (sortDir === 'asc' ? ' ▲' : ' ▼')}
-                    </th>
-                  ))}
-                  <th></th>
+                      <span className={`sort-icon ${sortKey === col.key ? 'active' : ''}`}>
+                        {sortKey === col.key ? (
+                          sortDir === 'asc' ? <FaSortUp /> : <FaSortDown />
+                        ) : (
+                          <FaSort />
+                        )}
+                      </span>
+                    </div>
+                  </th>
+                ))}
+                <th style={{ width: '100px' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 1} className="empty-state">
+                    <div className="empty-state-icon">📦</div>
+                    <div className="fw-bold mb-2">No loads found</div>
+                    <div className="text-muted">Try adjusting your search or filters</div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {sorted.length === 0 ? (
-                  <tr>
-                    <td colSpan={columns.length + 1} className="text-center text-muted py-5">
-                      <div className="mb-2" style={{ fontSize: '2rem' }}>&#128230;</div>
-                      <div>No loads found. Try adjusting your search or filters.</div>
-                    </td>
-                  </tr>
-                ) : (
-                  sorted.map(delivery => (
-                    <React.Fragment key={delivery.trackingId}>
-                      <tr>
-                        <td>{delivery.trackingId}</td>
-                        <td>{delivery.customerName}</td>
-                        <td>{delivery.parentBookingId}</td>
-                        <td><span className={`badge bg-${statusMap[delivery.currentStatus] || 'secondary'}`}>{delivery.currentStatus}</span></td>
-                        <td>{delivery.tonnage}</td>
-                        <td>{delivery.containerCount}</td>
-                        <td>{delivery.driverDetails?.name}</td>
-                        <td>{delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : ''}</td>
-                        <td>
-                          <button className="btn btn-sm btn-outline-primary me-2" onClick={() => toggleExpand(delivery.trackingId)} aria-label="Expand row">{expanded[delivery.trackingId] ? 'Hide' : 'Details'}</button>
+              ) : (
+                sorted.map(delivery => (
+                  <React.Fragment key={delivery.trackingId}>
+                    <tr>
+                      <td>
+                        <span className="fw-bold" style={{ color: 'var(--primary-orange)' }}>{delivery.trackingId}</span>
+                      </td>
+                      <td>{delivery.customerName}</td>
+                      <td>
+                        <span className="text-muted">{delivery.parentBookingId}</span>
+                      </td>
+                      <td>
+                        <span className={`modern-badge modern-badge-${statusMap[delivery.currentStatus] || 'secondary'} glassmorphism-badge status-badge`}>
+                          {delivery.currentStatus}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="fw-bold">{delivery.tonnage} tons</span>
+                      </td>
+                      <td>
+                        <span className="modern-badge modern-badge-info glassmorphism-badge">{delivery.containerCount}</span>
+                      </td>
+                      <td>
+                        <span className="text-muted">{delivery.driverDetails?.name || 'N/A'}</span>
+                      </td>
+                      <td>
+                        {delivery.createdAt ? new Date(delivery.createdAt).toLocaleDateString() : ''}
+                      </td>
+                      <td>
+                        <button 
+                          className="btn btn-outline-custom btn-table btn-sm"
+                          onClick={() => toggleExpand(delivery.trackingId)}
+                        >
+                          {expanded[delivery.trackingId] ? <FaEyeSlash /> : <FaEye />}
+                        </button>
+                      </td>
+                    </tr>
+                    {expanded[delivery.trackingId] && (
+                      <tr className="expanded-row">
+                        <td colSpan={columns.length + 1}>
+                          <div className="p-3">
+                            <div className="row">
+                              <div className="col-md-6">
+                                <h6 className="fw-bold mb-3" style={{ color: 'var(--primary-orange)' }}>Load Details</h6>
+                                <div className="row g-2">
+                                  <div className="col-6"><strong>Tracking ID:</strong></div>
+                                  <div className="col-6">{delivery.trackingId}</div>
+                                  <div className="col-6"><strong>Customer:</strong></div>
+                                  <div className="col-6">{delivery.customerName}</div>
+                                  <div className="col-6"><strong>Consignment:</strong></div>
+                                  <div className="col-6">{delivery.parentBookingId}</div>
+                                  <div className="col-6"><strong>Status:</strong></div>
+                                  <div className="col-6">
+                                    <span className={`modern-badge modern-badge-${statusMap[delivery.currentStatus] || 'secondary'} glassmorphism-badge`}>
+                                      {delivery.currentStatus}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="col-md-6">
+                                <h6 className="fw-bold mb-3" style={{ color: 'var(--primary-orange)' }}>Transport Details</h6>
+                                <div className="row g-2">
+                                  <div className="col-6"><strong>Tonnage:</strong></div>
+                                  <div className="col-6">{delivery.tonnage} tons</div>
+                                  <div className="col-6"><strong>Containers:</strong></div>
+                                  <div className="col-6">{delivery.containerCount}</div>
+                                  <div className="col-6"><strong>Driver:</strong></div>
+                                  <div className="col-6">{delivery.driverDetails?.name || 'N/A'}</div>
+                                  <div className="col-6"><strong>Vehicle:</strong></div>
+                                  <div className="col-6">{delivery.driverDetails?.vehicleReg || 'N/A'}</div>
+                                </div>
+                              </div>
+                            </div>
+                            <hr style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+                            <div className="row">
+                              <div className="col-md-6">
+                                <div className="row g-2">
+                                  <div className="col-6"><strong>Created:</strong></div>
+                                  <div className="col-6">{delivery.createdAt ? new Date(delivery.createdAt).toLocaleString() : ''}</div>
+                                  <div className="col-6"><strong>Updated:</strong></div>
+                                  <div className="col-6">{delivery.updatedAt ? new Date(delivery.updatedAt).toLocaleString() : ''}</div>
+                                </div>
+                              </div>
+                              <div className="col-md-6">
+                                <div className="row g-2">
+                                  <div className="col-6"><strong>Value:</strong></div>
+                                  <div className="col-6">{delivery.value ? `$${Number(delivery.value).toLocaleString()}` : 'N/A'}</div>
+                                  <div className="col-6"><strong>Cost:</strong></div>
+                                  <div className="col-6">{delivery.cost ? `$${Number(delivery.cost).toLocaleString()}` : 'N/A'}</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </td>
                       </tr>
-                      {expanded[delivery.trackingId] && (
-                        <tr className="bg-light">
-                          <td colSpan={columns.length + 1}>
-                            <div className="p-3">
-                              <strong>Tracking ID:</strong> {delivery.trackingId}<br />
-                              <strong>Customer:</strong> {delivery.customerName}<br />
-                              <strong>Consignment:</strong> {delivery.parentBookingId}<br />
-                              <strong>Status:</strong> {delivery.currentStatus}<br />
-                              <strong>Tonnage:</strong> {delivery.tonnage}<br />
-                              <strong>Containers:</strong> {delivery.containerCount}<br />
-                              <strong>Driver:</strong> {delivery.driverDetails?.name}<br />
-                              <strong>Created At:</strong> {delivery.createdAt ? new Date(delivery.createdAt).toLocaleString() : ''}<br />
-                              <strong>Last Updated:</strong> {delivery.updatedAt ? new Date(delivery.updatedAt).toLocaleString() : ''}<br />
-                              {/* Add more details as needed */}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                    )}
+                  </React.Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
         )}
       </div>
     </div>

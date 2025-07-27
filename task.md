@@ -88,7 +88,7 @@ Add a feature flag `isTrialUser` to limit or enable premium features during onbo
 ## Status: To Be Implemented
 
 ### Overview
-Morres Logistics requires a system-wide garbage collector to maintain data hygiene, optimize performance, and reduce storage bloat across both backend and frontend systems.
+Dar Logistics requires a system-wide garbage collector to maintain data hygiene, optimize performance, and reduce storage bloat across both backend and frontend systems.
 
 ### Purpose
 - Automatically remove expired, obsolete, or orphaned data (e.g., refresh tokens, sessions, logs, temp files)

@@ -14,7 +14,7 @@ import CheckpointLoggerForm from './CheckpointLoggerForm';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Title } from 'chart.js';
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Title);
-import { FaUsers, FaTruck, FaCheckCircle, FaHourglassHalf, FaBell, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaFileDownload } from 'react-icons/fa';
+import { FaUsers, FaTruck, FaCheckCircle, FaHourglassHalf, FaBell, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaFileDownload, FaChartBar, FaEye, FaPlus, FaClipboardList } from 'react-icons/fa';
 import { useRef } from 'react';
 import SummaryWidgets from './SummaryWidgets';
 import DashboardNotifications from './DashboardNotifications';
@@ -94,11 +94,11 @@ const mineralLocations = {
   'Wolfram': ['Hurungwe'],
 };
 
-// Spinner component
-function Spinner() {
+// Modern Spinner component
+function ModernSpinner() {
   return (
-    <div className="d-flex justify-content-center align-items-center py-4">
-      <div className="spinner-border" style={{ color: '#1F2120' }} role="status">
+    <div className="d-flex justify-content-center align-items-center py-5">
+      <div className="modern-loading" role="status">
         <span className="visually-hidden">Loading...</span>
       </div>
     </div>
@@ -131,6 +131,7 @@ export default function OperatorDashboard() {
   } = useParentBookings();
 
   const [selectedId, setSelectedId] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [customers, setCustomers] = useState([]);
   const [selectedCustomerBookings, setSelectedCustomerBookings] = useState([]);
   const [createForm, setCreateForm] = useState({
@@ -172,6 +173,9 @@ export default function OperatorDashboard() {
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [invoices, setInvoices] = useState([]);
   const [activeChartTab, setActiveChartTab] = useState('bar');
+
+  // Add tab state
+  const [activeTab, setActiveTab] = useState('overview');
 
   // Responsive container class
   const [containerClass, setContainerClass] = useState(window.innerWidth <= 600 ? 'container-fluid py-5 px-0' : 'container py-5 px-2 px-md-4');
@@ -263,21 +267,19 @@ export default function OperatorDashboard() {
       setShowSmsPreview(false);
       setSmsPreview('');
       setActiveChartTab('bar');
-      // ...add any other user-specific state resets here
+      setActiveTab('overview'); // Reset tab
     }
   }, [user]);
 
   const error = deliveriesError || parentBookingsError;
 
   function generateTrackingId() {
-    // Simple unique code: 3 letters + 4 digits
     const letters = Math.random().toString(36).substring(2, 5).toUpperCase();
     const digits = Math.floor(1000 + Math.random() * 9000);
     return letters + digits;
   }
 
   function validateZimPhone(phone) {
-    // Accepts +2637..., 07..., 7... (Zimbabwe mobile)
     const cleaned = phone.replace(/\D/g, '');
     return (
       cleaned.length === 9 && cleaned.startsWith('7') ||
@@ -421,13 +423,13 @@ export default function OperatorDashboard() {
 
     return (
       <div className="checkpoint-history mt-3">
-        <h6 className="mb-3 fw-bold" style={{ color: '#1F2120' }}>Audit Log</h6>
+        <h6 className="mb-3 fw-bold" style={{ color: 'var(--primary-orange)' }}>Audit Log</h6>
         <ul className="list-unstyled">
           {checkpoints.slice().reverse().map((cp, index) => (
-            <li key={index} className="checkpoint-item mb-3 border-start border-3 ps-3" style={{ borderColor: '#1F2120' }}>
+            <li key={index} className="checkpoint-item mb-3 border-start border-3 ps-3 glassmorphism-card" style={{ borderColor: 'var(--primary-orange)' }}>
               <div className="d-flex justify-content-between align-items-center">
                 <strong className="text-dark">{cp.location}</strong>
-                <span className={`badge ${cp.hasIssue ? 'bg-danger' : 'bg-secondary'}`}>{cp.status}</span>
+                <span className={`modern-badge ${cp.hasIssue ? 'modern-badge-danger' : 'modern-badge-info'}`}>{cp.status}</span>
               </div>
               <small className="text-muted d-block">
                 {new Date(cp.timestamp).toLocaleString()} by <strong>{cp.operator || cp.operator_username || 'System'}</strong>
@@ -467,18 +469,20 @@ export default function OperatorDashboard() {
   };
 
   return (
-    <div className={containerClass}>
+    <div className={`dashboard-container ${containerClass} fade-in`}>
+      {/* Offline Sync Alert */}
       {hasPendingSync && (
-        <div className="alert alert-warning d-flex align-items-center" role="alert">
+        <div className="alert alert-warning d-flex align-items-center glassmorphism-card" role="alert">
           <FaExclamationTriangle className="me-2" />
           <span>
             You have offline deliveries pending sync. They will be sent automatically when you reconnect.
           </span>
         </div>
       )}
-      {/* Toast/Snackbar Feedback */}
+
+      {/* Modern Toast/Snackbar Feedback */}
       {showToast && (
-        <div className="toast show position-fixed bottom-0 end-0 m-4" style={{zIndex:9999, minWidth: '220px'}} role="alert" aria-live="assertive" aria-atomic="true">
+        <div className="toast show position-fixed bottom-0 end-0 m-4 slide-up glassmorphism-toast" style={{zIndex:9999, minWidth: '280px'}} role="alert" aria-live="assertive" aria-atomic="true">
           <div className="toast-header bg-primary text-white">
             <strong className="me-auto">Info</strong>
             <button type="button" className="btn-close btn-close-white" onClick={() => setShowToast(false)} aria-label="Close"></button>
@@ -486,67 +490,328 @@ export default function OperatorDashboard() {
           <div className="toast-body">{toastMsg}</div>
         </div>
       )}
-      {/* Summary Widgets Row */}
-      <SummaryWidgets
-        activeLoads={activeLoads}
-        completedLoads={completedLoads}
-        pendingLoads={pendingLoads}
-        totalCustomers={totalCustomers}
-        analyticsTrends={analyticsTrends}
-      />
-      {/* Notifications/Alerts Area */}
-      <DashboardNotifications
-        notifications={notifications}
-        onDismiss={dismissNotification}
-        onMarkAllRead={markAllNotificationsRead}
-        showToast={showToast}
-        toastMsg={toastMsg}
-        setShowToast={setShowToast}
-      />
-      {/* Dashboard Analytics Section */}
-      <div className="row">
-        <div className="col-12 mb-4">
-          <DashboardAnalytics
-            analytics={analytics}
-            loadingAnalytics={loadingAnalytics}
-            activeChartTab={activeChartTab}
-            setActiveChartTab={setActiveChartTab}
-          />
+
+      {/* Dashboard Header */}
+      <div className="glassmorphism-card mb-4">
+        <div className="card-header-glass">
+          <div className="d-flex flex-column flex-md-row justify-content-between align-items-center">
+            <div className="d-flex align-items-center mb-3 mb-md-0">
+              <div className="widget-icon bg-primary text-white me-3">
+                <FaTruck />
+              </div>
+              <div>
+                <h1 className="h3 fw-bold mb-1 gradient-text">
+                  Dar Logistics - Operations Hub
+                </h1>
+                <p className="text-muted mb-0">Manage deliveries, track consignments, and monitor operations</p>
+              </div>
+            </div>
+            <button
+              className="btn-modern btn-modern-primary"
+              onClick={() => setShowCreateParentBookingModal(true)}
+              aria-label="Log new consignment"
+            >
+              <FaFileDownload />
+              Log New Consignment
+            </button>
+          </div>
         </div>
       </div>
+
       {/* Strategic Operations Console Banner */}
-      <div className="bg-warning text-dark text-center py-1 small fw-bold mb-3" style={{ letterSpacing: '1px', borderRadius: '0.5rem' }}>
+      <div className="glassmorphism-banner bg-warning text-dark text-center py-2 small fw-bold mb-4">
+        <FaTruck className="me-2" />
         STRATEGIC OPERATIONS CONSOLE
       </div>
-      <h1 className="display-6 fw-bold mb-4" style={{ color: '#1F2120' }}>Morres Logistics - Operations Hub</h1>
-      
-      {/* Trigger button for Parent Booking Modal */}
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-2 gap-md-0">
-        <h2 className="h5 fw-bold mb-0" style={{ color: '#1F2120' }}>
-          <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>apps</span>
-          Dashboard
-        </h2>
-        <button
-          className="btn fw-bold w-100 w-md-auto"
-          style={{ background: '#1F2120', border: 'none', color: '#EBD3AD', borderRadius: '0.5rem', padding: '0.75rem 1.25rem', fontSize: '1.1em' }}
-          onClick={() => setShowCreateParentBookingModal(true)}
-          aria-label="Log new consignment"
-        >
-          <span className="material-icons-outlined align-middle me-1">add_box</span>
-          Log New Consignment
-        </button>
+
+      {/* Modern Tab Navigation */}
+      <div className="glassmorphism-card mb-4">
+        <div className="card-header-glass">
+          <ul className="nav nav-tabs nav-fill border-0" id="dashboardTabs" role="tablist">
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeTab === 'overview' ? 'active' : ''} d-flex align-items-center gap-2`}
+                onClick={() => setActiveTab('overview')}
+                type="button"
+                role="tab"
+                aria-controls="overview-tab"
+                aria-selected={activeTab === 'overview'}
+              >
+                <FaChartBar />
+                <span className="d-none d-sm-inline">Overview</span>
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeTab === 'dispatch' ? 'active' : ''} d-flex align-items-center gap-2`}
+                onClick={() => setActiveTab('dispatch')}
+                type="button"
+                role="tab"
+                aria-controls="dispatch-tab"
+                aria-selected={activeTab === 'dispatch'}
+              >
+                <FaPlus />
+                <span className="d-none d-sm-inline">Dispatch</span>
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeTab === 'monitor' ? 'active' : ''} d-flex align-items-center gap-2`}
+                onClick={() => setActiveTab('monitor')}
+                type="button"
+                role="tab"
+                aria-controls="monitor-tab"
+                aria-selected={activeTab === 'monitor'}
+              >
+                <FaEye />
+                <span className="d-none d-sm-inline">Monitor</span>
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeTab === 'reports' ? 'active' : ''} d-flex align-items-center gap-2`}
+                onClick={() => setActiveTab('reports')}
+                type="button"
+                role="tab"
+                aria-controls="reports-tab"
+                aria-selected={activeTab === 'reports'}
+              >
+                <FaClipboardList />
+                <span className="d-none d-sm-inline">Reports</span>
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
-      
+
+      {/* Tab Content */}
+      <div className="tab-content" id="dashboardTabContent">
+        
+        {/* Overview Tab */}
+        <div className={`tab-pane fade ${activeTab === 'overview' ? 'show active' : ''}`} id="overview-tab" role="tabpanel" aria-labelledby="overview-tab">
+          {/* Summary Widgets Row */}
+          <SummaryWidgets
+            activeLoads={activeLoads}
+            completedLoads={completedLoads}
+            pendingLoads={pendingLoads}
+            totalCustomers={totalCustomers}
+            analyticsTrends={analyticsTrends}
+          />
+
+          {/* Notifications/Alerts Area */}
+          <DashboardNotifications
+            notifications={notifications}
+            onDismiss={dismissNotification}
+            onMarkAllRead={markAllNotificationsRead}
+            showToast={showToast}
+            toastMsg={toastMsg}
+            setShowToast={setShowToast}
+          />
+
+          {/* Dashboard Analytics Section */}
+          <div className="row">
+            <div className="col-12 mb-4">
+              <DashboardAnalytics
+                analytics={analytics}
+                loadingAnalytics={loadingAnalytics}
+                activeChartTab={activeChartTab}
+                setActiveChartTab={setActiveChartTab}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Dispatch Tab */}
+        <div className={`tab-pane fade ${activeTab === 'dispatch' ? 'show active' : ''}`} id="dispatch-tab" role="tabpanel" aria-labelledby="dispatch-tab">
+          {/* Modern Create Delivery Form */}
+          <div className="glassmorphism-card mb-4">
+            <div className="card-header-glass">
+              <h2 className="h5 fw-bold mb-0 gradient-text">
+                <FaTruck className="me-2" />
+                Dispatch New Load
+              </h2>
+            </div>
+            <div className="card-body-glass">
+              <DeliveryDispatchForm
+                customers={customers}
+                parentBookings={parentBookings}
+                createDelivery={createDelivery}
+                fetchParentBookings={fetchParentBookings}
+                onSuccess={async () => {
+                  await fetchParentBookings();
+                  await fetchDeliveries();
+                }}
+                onFeedback={setFeedback}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Monitor Tab */}
+        <div className={`tab-pane fade ${activeTab === 'monitor' ? 'show active' : ''}`} id="monitor-tab" role="tabpanel" aria-labelledby="monitor-tab">
+          {/* Consignment Monitor */}
+          <div className="row g-4">
+            <div className="col-12">
+              <ConsignmentMonitor
+                parentBookings={parentBookings}
+                loading={parentBookingsLoading}
+                error={parentBookingsError}
+                onSelectDelivery={setSelectedId}
+                user={user}
+                onSubmitCheckpoint={handleUpdateCheckpoint}
+                onSuccess={async () => {
+                  await fetchParentBookings();
+                  await fetchDeliveries();
+                  setToastMsg('Checkpoint logged successfully!');
+                  setShowToast(true);
+                  clearTimeout(toastTimeout.current);
+                  toastTimeout.current = setTimeout(() => setShowToast(false), 2500);
+                }}
+                onFeedback={setFeedback}
+              />
+
+              {/* Pagination Controls for Deliveries */}
+              <div className="d-flex justify-content-between align-items-center mt-4 dashboard-pagination-controls">
+                <div className="small text-muted">
+                  {parentBookings.length > 0 && (
+                    <span>
+                      Showing {Math.min((page - 1) * pageSize + 1, total)}-
+                      {Math.min(page * pageSize, total)} of {total} deliveries
+                    </span>
+                  )}
+                </div>
+                <div className="btn-group" role="group" aria-label="Pagination controls">
+                  <button
+                    className="btn-modern btn-modern-secondary"
+                    onClick={() => setPage(page - 1)}
+                    disabled={page === 1}
+                    aria-label="Previous page"
+                  >
+                    &laquo; Prev
+                  </button>
+                  <span className="mx-3 align-self-center small">
+                    Page {page} of {Math.max(1, Math.ceil(total / pageSize))}
+                  </span>
+                  <button
+                    className="btn-modern btn-modern-secondary"
+                    onClick={() => setPage(page + 1)}
+                    disabled={page * pageSize >= total}
+                    aria-label="Next page"
+                  >
+                    Next &raquo;
+                  </button>
+                </div>
+                <div className="ms-3">
+                  <select
+                    className="form-control-modern"
+                    style={{ width: 'auto', display: 'inline-block' }}
+                    value={pageSize}
+                    onChange={e => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    aria-label="Select page size"
+                  >
+                    {[10, 20, 50, 100].map(size => (
+                      <option key={size} value={size}>{size} / page</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Reports Tab */}
+        <div className={`tab-pane fade ${activeTab === 'reports' ? 'show active' : ''}`} id="reports-tab" role="tabpanel" aria-labelledby="reports-tab">
+          <div className="glassmorphism-card">
+            <div className="card-header-glass">
+              <h3 className="h5 fw-bold mb-0 gradient-text">
+                <FaClipboardList className="me-2" />
+                Detailed Reports & Analytics
+              </h3>
+            </div>
+            <div className="card-body-glass">
+              <div className="row g-4">
+                <div className="col-md-6">
+                  <div className="glassmorphism-card">
+                    <div className="card-header-glass">
+                      <h6 className="mb-0">Delivery Performance</h6>
+                    </div>
+                    <div className="card-body-glass">
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <span>Active Deliveries</span>
+                        <span className="fw-bold text-primary">{activeLoads}</span>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <span>Completed Deliveries</span>
+                        <span className="fw-bold text-success">{completedLoads}</span>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span>Pending Deliveries</span>
+                        <span className="fw-bold text-warning">{pendingLoads}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="glassmorphism-card">
+                    <div className="card-header-glass">
+                      <h6 className="mb-0">Customer Overview</h6>
+                    </div>
+                    <div className="card-body-glass">
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <span>Total Customers</span>
+                        <span className="fw-bold text-info">{totalCustomers}</span>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <span>Active Consignments</span>
+                        <span className="fw-bold text-primary">{parentBookings.filter(b => b.status === 'Active').length}</span>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span>Total Bookings</span>
+                        <span className="fw-bold text-secondary">{parentBookings.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Additional Analytics Charts */}
+              {analytics && (
+                <div className="row mt-4">
+                  <div className="col-12">
+                    <div className="glassmorphism-card">
+                      <div className="card-header-glass">
+                        <h6 className="mb-0">Advanced Analytics</h6>
+                      </div>
+                      <div className="card-body-glass">
+                        <DashboardAnalytics
+                          analytics={analytics}
+                          loadingAnalytics={loadingAnalytics}
+                          activeChartTab={activeChartTab}
+                          setActiveChartTab={setActiveChartTab}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Parent Booking Form Modal */}
       {showCreateParentBookingModal && (
-        <div className="modal fade show d-block" tabIndex="-1" role="dialog" aria-modal="true" aria-labelledby="parentBookingModalLabel" style={{ background: 'rgba(0,0,0,0.3)', zIndex: 1050 }}>
+        <div className="modal fade show d-block" tabIndex="-1" role="dialog" aria-modal="true" aria-labelledby="parentBookingModalLabel" style={{ background: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
           <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down" role="document">
-            <div className="modal-content rounded-3 shadow-lg">
-              <div className="modal-header">
+            <div className="modal-content glassmorphism-card">
+              <div className="card-header-glass">
                 <h5 className="modal-title" id="parentBookingModalLabel">Log New Consignment</h5>
                 <button type="button" className="btn-close" aria-label="Close" onClick={() => setShowCreateParentBookingModal(false)}></button>
               </div>
-              <div className="modal-body p-3 p-md-4" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
+              <div className="card-body-glass" style={{ maxHeight: '100vh', overflowY: 'auto' }}>
                 <ParentBookingForm
                   onClose={() => setShowCreateParentBookingModal(false)}
                   onSuccess={fetchParentBookings}
@@ -571,103 +836,400 @@ export default function OperatorDashboard() {
         </div>
       )}
 
-      {/* Modified Create Delivery Form */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-body">
-          <h2 className="h5 fw-bold mb-3" style={{ color: '#1F2120' }}>
-            <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>add_box</span>
-            Dispatch New Load
-          </h2>
-          <DeliveryDispatchForm
-            customers={customers}
-            parentBookings={parentBookings}
-            createDelivery={createDelivery}
-            fetchParentBookings={fetchParentBookings}
-            onSuccess={async () => {
-              await fetchParentBookings();
-              await fetchDeliveries();
-            }}
-            onFeedback={setFeedback}
-          />
-        </div>
-      </div>
-      {/* Replace the row/col for ConsignmentMonitor with full-width */}
-      <div className="row g-4">
-        <div className="col-12">
-          <ConsignmentMonitor
-            parentBookings={parentBookings}
-            loading={parentBookingsLoading}
-            error={parentBookingsError}
-            onSelectDelivery={setSelectedId}
-            user={user}
-            onSubmitCheckpoint={handleUpdateCheckpoint}
-            onSuccess={async () => {
-              await fetchParentBookings();
-              await fetchDeliveries();
-              setToastMsg('Checkpoint logged successfully!');
-              setShowToast(true);
-              clearTimeout(toastTimeout.current);
-              toastTimeout.current = setTimeout(() => setShowToast(false), 2500);
-            }}
-            onFeedback={setFeedback}
-          />
-          {/* Highlight selected consignment visually (handled in ConsignmentMonitor if possible) */}
-          {/* Pagination Controls for Deliveries */}
-          <div className="d-flex justify-content-between align-items-center mt-3 dashboard-pagination-controls">
-            <div className="small text-muted">
-              {parentBookings.length > 0 && (
-                <span>
-                  Showing {Math.min((page - 1) * pageSize + 1, total)}-
-                  {Math.min(page * pageSize, total)} of {total} deliveries
-                </span>
-              )}
-            </div>
-            <div className="btn-group" role="group" aria-label="Pagination controls">
-              <button
-                className="btn fw-bold"
-                style={{ background: '#fff', border: '1px solid #1F2120', color: '#1F2120', borderRadius: '0.5rem', padding: '0.5rem 1.25rem' }}
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-                aria-label="Previous page"
-              >
-                &laquo; Prev
-              </button>
-              <span className="mx-2 align-self-center small">
-                Page {page} of {Math.max(1, Math.ceil(total / pageSize))}
-              </span>
-              <button
-                className="btn fw-bold"
-                style={{ background: '#fff', border: '1px solid #1F2120', color: '#1F2120', borderRadius: '0.5rem', padding: '0.5rem 1.25rem' }}
-                onClick={() => setPage(page + 1)}
-                disabled={page * pageSize >= total}
-                aria-label="Next page"
-              >
-                Next &raquo;
-              </button>
-            </div>
-            <div className="ms-3">
-              <select
-                className="form-select form-select-sm"
-                style={{ width: 'auto', display: 'inline-block' }}
-                value={pageSize}
-                onChange={e => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                aria-label="Select page size"
-              >
-                {[10, 20, 50, 100].map(size => (
-                  <option key={size} value={size}>{size} / page</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
       {/* Internal Support Contact */}
-      <div className="text-center text-muted small mt-5">
-        For support: <a href="mailto:jackfeng@morres.com" style={{ color: '#1F2120' }}>jackfeng@morres.com</a> | <a href="tel:+263788888886" style={{ color: '#1F2120' }}>+263 78 888 8886</a>
+      <div className="text-center text-muted small mt-5 glassmorphism-card p-3">
+        <p className="mb-1">Need help? Contact our support team</p>
+        <div className="d-flex justify-content-center gap-3">
+          <a href="mailto:support@darlogistics.co.zw" className="text-decoration-none" style={{ color: 'var(--primary-orange)' }}>
+            <FaBell className="me-1" />
+            support@darlogistics.co.zw
+          </a>
+          <a href="tel:+263781334474" className="text-decoration-none" style={{ color: 'var(--primary-orange)' }}>
+            <FaTruck className="me-1" />
+            +263 781 334474
+          </a>
+        </div>
       </div>
+
+      <style>{`
+        /* CSS Custom Properties for Dashboard */
+        :root {
+          --primary-blue: #003366;
+          --primary-orange: #FF6600;
+          --accent-orange: #FF8533;
+          --accent-blue: #0066CC;
+          --danger-red: #dc3545;
+          --info-cyan: #17a2b8;
+          --success-green: #28a745;
+          --warning-yellow: #ffc107;
+          --font-size-xs: 0.75rem;
+          --font-size-sm: 0.875rem;
+          --font-size-base: 1rem;
+          --font-size-lg: 1.125rem;
+          --font-size-xl: 1.25rem;
+          --font-size-2xl: 1.5rem;
+          --font-size-3xl: 1.875rem;
+          --font-size-4xl: 2.25rem;
+          --space-1: 0.25rem;
+          --space-2: 0.5rem;
+          --space-3: 0.75rem;
+          --space-4: 1rem;
+          --space-5: 1.25rem;
+          --space-6: 1.5rem;
+          --space-8: 2rem;
+          --space-10: 2.5rem;
+          --radius-sm: 0.375rem;
+          --radius-md: 0.5rem;
+          --radius-lg: 0.75rem;
+          --radius-xl: 1rem;
+          --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          --transition-slow: 0.3s ease;
+        }
+
+        .dashboard-container {
+          position: relative;
+          z-index: 2;
+          min-height: 100vh;
+          background: linear-gradient(135deg, var(--primary-blue) 0%, var(--accent-blue) 100%);
+          color: white;
+        }
+
+        /* Enhanced Glassmorphism Cards */
+        .glassmorphism-card {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          transition: all 0.3s ease;
+        }
+
+        .glassmorphism-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header-glass {
+          background: rgba(255, 255, 255, 0.1);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+          padding: 1.5rem;
+          border-radius: 16px 16px 0 0;
+          backdrop-filter: blur(10px);
+        }
+
+        .card-body-glass {
+          padding: 1.5rem;
+        }
+
+        /* Enhanced Glassmorphism Banner */
+        .glassmorphism-banner {
+          background: rgba(255, 193, 7, 0.15);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 193, 7, 0.3);
+          border-radius: 12px;
+          letter-spacing: 1px;
+          font-weight: 600;
+        }
+
+        /* Enhanced Glassmorphism Toast */
+        .glassmorphism-toast {
+          background: rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Enhanced Gradient Text */
+        .gradient-text {
+          background: linear-gradient(135deg, var(--primary-orange), var(--accent-orange));
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          font-weight: 700;
+        }
+
+        /* Enhanced Widget Icon */
+        .widget-icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          background: linear-gradient(135deg, var(--primary-orange), var(--accent-orange));
+          box-shadow: 0 4px 16px rgba(255, 102, 0, 0.3);
+        }
+
+        /* Enhanced Modern Buttons */
+        .btn-modern {
+          padding: 12px 24px;
+          border-radius: 12px;
+          font-weight: 600;
+          transition: all 0.3s ease;
+          border: none;
+          cursor: pointer;
+          font-size: var(--font-size-base);
+        }
+
+        .btn-modern-primary {
+          background: linear-gradient(135deg, var(--primary-orange), var(--accent-orange));
+          color: white;
+          box-shadow: 0 4px 16px rgba(255, 102, 0, 0.3);
+        }
+
+        .btn-modern-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(255, 102, 0, 0.4);
+        }
+
+        .btn-modern-secondary {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          backdrop-filter: blur(10px);
+        }
+
+        .btn-modern-secondary:hover {
+          background: rgba(255, 255, 255, 0.2);
+          transform: translateY(-1px);
+        }
+
+        /* Enhanced Form Controls */
+        .form-control-modern {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 8px;
+          color: white;
+          padding: 12px 16px;
+          font-size: var(--font-size-base);
+          transition: all 0.3s ease;
+          backdrop-filter: blur(10px);
+        }
+
+        .form-control-modern:focus {
+          border-color: var(--primary-orange);
+          box-shadow: 0 0 0 0.2rem rgba(255, 102, 0, 0.25);
+          background: rgba(255, 255, 255, 0.15);
+          outline: none;
+        }
+
+        .form-control-modern::placeholder {
+          color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* Enhanced Navigation Tabs */
+        .nav-tabs {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-tabs .nav-link {
+          background: transparent;
+          border: none;
+          color: rgba(255, 255, 255, 0.7);
+          border-radius: 8px;
+          margin: 0 4px;
+          transition: all 0.3s ease;
+          padding: 12px 20px;
+          font-weight: 500;
+          font-size: var(--font-size-base);
+        }
+
+        .nav-tabs .nav-link:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          transform: translateY(-1px);
+        }
+
+        .nav-tabs .nav-link.active {
+          background: linear-gradient(135deg, var(--primary-orange), var(--accent-orange));
+          color: white;
+          box-shadow: 0 4px 16px rgba(255, 102, 0, 0.3);
+        }
+
+        /* Enhanced Checkpoint History */
+        .checkpoint-item {
+          background: rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(10px);
+          border-radius: 8px;
+          padding: 16px;
+          margin-bottom: 12px;
+          border-left: 4px solid var(--primary-orange);
+          transition: all 0.3s ease;
+        }
+
+        .checkpoint-item:hover {
+          background: rgba(255, 255, 255, 0.12);
+          transform: translateX(4px);
+        }
+
+        /* Enhanced Modern Badges */
+        .modern-badge {
+          padding: 6px 16px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .modern-badge-danger {
+          background: rgba(220, 53, 69, 0.2);
+          color: #ff6b6b;
+          border: 1px solid rgba(220, 53, 69, 0.3);
+        }
+
+        .modern-badge-info {
+          background: rgba(23, 162, 184, 0.2);
+          color: #4ecdc4;
+          border: 1px solid rgba(23, 162, 184, 0.3);
+        }
+
+        .modern-badge-success {
+          background: rgba(40, 167, 69, 0.2);
+          color: #51cf66;
+          border: 1px solid rgba(40, 167, 69, 0.3);
+        }
+
+        .modern-badge-warning {
+          background: rgba(255, 193, 7, 0.2);
+          color: #ffd43b;
+          border: 1px solid rgba(255, 193, 7, 0.3);
+        }
+
+        /* Enhanced Animations */
+        .slide-up {
+          animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideUp {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        .fade-in {
+          animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        /* Enhanced Responsive Design */
+        @media (max-width: 768px) {
+          .dashboard-container {
+            padding: 1rem;
+          }
+          
+          .glassmorphism-card {
+            margin-bottom: 1rem;
+          }
+          
+          .card-header-glass,
+          .card-body-glass {
+            padding: 1rem;
+          }
+
+          .btn-modern {
+            padding: 14px 20px;
+            font-size: var(--font-size-base);
+            width: 100%;
+            margin-bottom: 0.5rem;
+          }
+
+          .nav-tabs .nav-link {
+            padding: 10px 16px;
+            font-size: var(--font-size-sm);
+          }
+
+          .widget-icon {
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .dashboard-container {
+            padding: 0.5rem;
+          }
+
+          .card-header-glass,
+          .card-body-glass {
+            padding: 0.75rem;
+          }
+
+          .btn-modern {
+            padding: 12px 16px;
+            font-size: var(--font-size-sm);
+          }
+        }
+
+        /* Enhanced Typography */
+        .dashboard-container h1,
+        .dashboard-container h2,
+        .dashboard-container h3,
+        .dashboard-container h4,
+        .dashboard-container h5,
+        .dashboard-container h6 {
+          color: white;
+          font-weight: 600;
+        }
+
+        .dashboard-container p {
+          color: rgba(255, 255, 255, 0.8);
+          line-height: 1.6;
+        }
+
+        .dashboard-container .text-muted {
+          color: rgba(255, 255, 255, 0.6) !important;
+        }
+
+        /* Enhanced Modal Styling */
+        .modal-content.glassmorphism-card {
+          background: rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(25px);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Enhanced Pagination Controls */
+        .dashboard-pagination-controls {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border-radius: 12px;
+          padding: 1rem;
+          margin-top: 1rem;
+        }
+
+        /* Enhanced Loading Spinner */
+        .modern-loading {
+          width: 40px;
+          height: 40px;
+          border: 3px solid rgba(255, 255, 255, 0.3);
+          border-top: 3px solid var(--primary-orange);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -678,9 +1240,9 @@ function getDeadlineBadgeClass(deadline) {
   const deadlineDate = new Date(deadline);
   const daysUntilDeadline = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
 
-  if (daysUntilDeadline < 0) return 'bg-danger';
-  if (daysUntilDeadline <= 3) return 'bg-warning text-dark';
-  return 'bg-success';
+  if (daysUntilDeadline < 0) return 'modern-badge-danger';
+  if (daysUntilDeadline <= 3) return 'modern-badge-warning';
+  return 'modern-badge-success';
 }
 
 function getTimeLeft(deadline) {

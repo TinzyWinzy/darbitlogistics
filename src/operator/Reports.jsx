@@ -11,6 +11,7 @@ import html2canvas from 'html2canvas';
 import DeliveriesOverTimeChart from './DeliveriesOverTimeChart';
 import TonnageByMineralChart from './TonnageByMineralChart';
 import TopCustomersChart from './TopCustomersChart';
+import { FaRegChartBar, FaRegListAlt, FaRegCalendarAlt, FaRegEnvelope, FaDownload, FaFileAlt, FaExclamationTriangle, FaFilter, FaSearch, FaUser, FaTruck, FaCalendar, FaEye, FaTrashAlt, FaPlay, FaPause, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 
 function exportToCSV(deliveries, columns) {
   if (!deliveries.length) return;
@@ -39,7 +40,7 @@ function sumBy(array, key) {
   return array.reduce((sum, item) => sum + (parseFloat(item[key]) || 0), 0);
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28CFF', '#FF6F91', '#6FCF97', '#F2994A'];
+const COLORS = ['#FF6600', '#FF8533', '#FFBB28', '#FF8042', '#A28CFF', '#FF6F91', '#6FCF97', '#F2994A'];
 
 // Responsive helper
 function useIsMobile() {
@@ -71,6 +72,7 @@ async function chartToImage(chartRef, scale = 3) {
 
 export default function Reports() {
   const { deliveries, loading } = useDeliveries();
+  const [activeTab, setActiveTab] = useState('analytics');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [customer, setCustomer] = useState([]); // multi-select
@@ -262,11 +264,11 @@ export default function Reports() {
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     // Branding: Add logo and title
     const logo = new window.Image();
-    logo.src = '/logo.jpg';
+            logo.src = '/logo.svg';
     await new Promise(res => { logo.onload = res; });
     pdf.addImage(logo, 'JPEG', 40, 20, 80, 40);
     pdf.setFontSize(22);
-    pdf.text('Morres Logistics Report', 140, 50);
+    pdf.text('Dar Logistics Report', 140, 50);
     pdf.setFontSize(12);
     pdf.text(`Generated: ${new Date().toLocaleString()}`, 140, 70);
 
@@ -302,7 +304,7 @@ export default function Reports() {
       tableWidth: 'auto',
       theme: 'grid',
     });
-    pdf.save('morres_report.pdf');
+    pdf.save('darlog_report.pdf');
   };
 
   const isMobile = useIsMobile();
@@ -324,52 +326,372 @@ export default function Reports() {
     topCustomers: useRef(),
   };
 
+  const tabs = [
+    { id: 'analytics', label: 'Analytics', icon: <FaRegChartBar /> },
+    { id: 'data', label: 'Data', icon: <FaRegListAlt /> },
+    { id: 'scheduled', label: 'Scheduled Reports', icon: <FaRegCalendarAlt /> },
+  ];
+
   return (
-    <div className="container py-5">
+    <div className="reports-container">
       {/* Notification Toast */}
       {notification.show && (
-        <div className={`toast show position-fixed top-0 end-0 m-4`} style={{ zIndex: 9999, minWidth: 220 }} role="alert" aria-live="assertive" aria-atomic="true">
-          <div className={`toast-header bg-${notification.type} text-white`}>
-            <strong className="me-auto">{notification.type === 'success' ? 'Success' : notification.type === 'danger' ? 'Error' : 'Info'}</strong>
-            <button type="button" className="btn-close btn-close-white" onClick={() => setNotification({ show: false, type: '', message: '' })} aria-label="Close"></button>
+        <div className={`notification-toast ${notification.type}`}>
+          <div className="notification-content">
+            <div className="notification-icon">
+              {notification.type === 'success' && <FaCheckCircle />}
+              {notification.type === 'danger' && <FaTimesCircle />}
+              {notification.type === 'info' && <FaExclamationTriangle />}
+            </div>
+            <div className="notification-message">
+              <strong>{notification.type === 'success' ? 'Success' : notification.type === 'danger' ? 'Error' : 'Info'}</strong>
+              <span>{notification.message}</span>
+            </div>
+            <button 
+              className="notification-close" 
+              onClick={() => setNotification({ show: false, type: '', message: '' })}
+              aria-label="Close"
+            >
+              ×
+            </button>
           </div>
-          <div className="toast-body">{notification.message}</div>
         </div>
       )}
-      <h2 className="fw-bold mb-4">Reports</h2>
-      {/* Filters: stack vertically on mobile */}
-      <div className={`mb-3 d-flex ${isMobile ? 'flex-column gap-2 align-items-stretch' : 'flex-wrap gap-2 align-items-end'}`}>        
-        <input type="text" className="form-control" style={isMobile ? { width: '100%' } : { maxWidth: 200 }} placeholder="Search by tracking ID or customer" value={search} onChange={e => setSearch(e.target.value)} />
-        <select className="form-select" style={isMobile ? { width: '100%' } : { maxWidth: 160 }} value={status} onChange={e => setStatus(e.target.value)}>
-          <option value="">All Statuses</option>
-          {uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <div style={isMobile ? { width: '100%' } : { minWidth: 200 }}>
-          <Select
-            isMulti
-            options={uniqueCustomers.map(c => ({ value: c, label: c }))}
-            value={customer.map(c => ({ value: c, label: c }))}
-            onChange={opts => setCustomer(opts.map(o => o.value))}
-            placeholder="Select customers"
-            styles={isMobile ? { container: base => ({ ...base, width: '100%' }) } : {}}
-          />
-        </div>
-        <div style={isMobile ? { width: '100%' } : { minWidth: 200 }}>
-          <Select
-            isMulti
-            options={uniqueMinerals.map(m => ({ value: m, label: m }))}
-            value={mineral.map(m => ({ value: m, label: m }))}
-            onChange={opts => setMineral(opts.map(o => o.value))}
-            placeholder="Select minerals"
-            styles={isMobile ? { container: base => ({ ...base, width: '100%' }) } : {}}
-          />
-        </div>
-        <input type="date" className="form-control" style={isMobile ? { width: '100%' } : { maxWidth: 160 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-        <input type="date" className="form-control" style={isMobile ? { width: '100%' } : { maxWidth: 160 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
-        <button className="btn btn-primary" style={isMobile ? { width: '100%', fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setShowCsvModal(true)}>Export CSV</button>
-        <button className="btn btn-outline-secondary" style={isMobile ? { width: '100%', fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setShowPdfModal(true)}>Export PDF</button>
-        <button className="btn btn-outline-success" style={isMobile ? { width: '100%', fontSize: '1.1em', padding: '0.7em' } : {}} onClick={() => setShowScheduleModal(true)}>Schedule Email Report</button>
+
+      <div className="reports-header">
+        <h1 className="reports-title">Reports & Analytics</h1>
+        <p className="reports-subtitle">
+          Comprehensive insights into your delivery operations with real-time analytics and export capabilities.
+        </p>
       </div>
+
+      {/* Tab Navigation */}
+      <div className="tabs-container">
+        <div className="tabs-nav">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="tab-icon">{tab.icon}</span>
+              <span className="tab-label">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div className="tab-content">
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && (
+          <div className="analytics-section">
+            <div className="charts-grid">
+              <div className="chart-card">
+                <div className="chart-header">
+                  <h3 className="chart-title">Deliveries Over Time</h3>
+                  <p className="chart-subtitle">Monthly delivery trends and patterns</p>
+                </div>
+                <div className="chart-container" ref={chartRefs.deliveriesOverTime}>
+                  <DeliveriesOverTimeChart data={deliveriesOverTime} onDrilldown={handleDrilldown} />
+                </div>
+              </div>
+              <div className="chart-card">
+                <div className="chart-header">
+                  <h3 className="chart-title">Tonnage by Mineral</h3>
+                  <p className="chart-subtitle">Distribution of cargo by mineral type</p>
+                </div>
+                <div className="chart-container" ref={chartRefs.tonnageByMineral}>
+                  <TonnageByMineralChart data={tonnageByMineral} onDrilldown={handleDrilldown} />
+                </div>
+              </div>
+              <div className="chart-card full-width">
+                <div className="chart-header">
+                  <h3 className="chart-title">Top Customers</h3>
+                  <p className="chart-subtitle">Highest volume customers by tonnage</p>
+                </div>
+                <div className="chart-container" ref={chartRefs.topCustomers}>
+                  <TopCustomersChart data={topCustomers} onDrilldown={handleDrilldown} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Data Tab */}
+        {activeTab === 'data' && (
+          <div className="data-section">
+            {/* Filters */}
+            <div className="filters-section">
+              <div className="filters-grid">
+                <div className="filter-item">
+                  <FaSearch className="filter-icon" />
+                  <input 
+                    type="text" 
+                    className="filter-input" 
+                    placeholder="Search by tracking ID or customer" 
+                    value={search} 
+                    onChange={e => setSearch(e.target.value)} 
+                  />
+                </div>
+                                <div className="filter-item">
+                  <FaFilter className="filter-icon" />
+                  <select 
+                    className="filter-select" 
+                    value={status} 
+                    onChange={e => setStatus(e.target.value)}
+                  >
+                <option value="">All Statuses</option>
+                {uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+                </div>
+                                <div className="filter-item">
+                  <FaUser className="filter-icon" />
+                <Select
+                  isMulti
+                  options={uniqueCustomers.map(c => ({ value: c, label: c }))}
+                  value={customer.map(c => ({ value: c, label: c }))}
+                  onChange={opts => setCustomer(opts.map(o => o.value))}
+                  placeholder="Select customers"
+                    className="react-select-container"
+                    classNamePrefix="react-select"
+                />
+              </div>
+                                <div className="filter-item">
+                  <FaTruck className="filter-icon" />
+                <Select
+                  isMulti
+                  options={uniqueMinerals.map(m => ({ value: m, label: m }))}
+                  value={mineral.map(m => ({ value: m, label: m }))}
+                  onChange={opts => setMineral(opts.map(o => o.value))}
+                  placeholder="Select minerals"
+                    className="react-select-container"
+                    classNamePrefix="react-select"
+                />
+              </div>
+                <div className="filter-item">
+                  <FaCalendar className="filter-icon" />
+                  <input 
+                    type="date" 
+                    className="filter-input" 
+                    value={dateFrom} 
+                    onChange={e => setDateFrom(e.target.value)} 
+                  />
+                </div>
+                <div className="filter-item">
+                  <FaCalendar className="filter-icon" />
+                  <input 
+                    type="date" 
+                    className="filter-input" 
+                    value={dateTo} 
+                    onChange={e => setDateTo(e.target.value)} 
+                  />
+                </div>
+              </div>
+              
+              <div className="export-actions">
+                <button className="export-btn csv" onClick={() => setShowCsvModal(true)}>
+                  <FaDownload className="btn-icon" />
+                  Export CSV
+                </button>
+                <button className="export-btn pdf" onClick={() => setShowPdfModal(true)}>
+                  <FaFileAlt className="btn-icon" />
+                  Export PDF
+                </button>
+                <button className="export-btn schedule" onClick={() => setShowScheduleModal(true)}>
+                  <FaRegEnvelope className="btn-icon" />
+                  Schedule Report
+                </button>
+              </div>
+            </div>
+
+            {/* Data Table */}
+            <div className="data-table-container">
+              {loading ? (
+                <div className="loading-container">
+                  <div className="loading-spinner"></div>
+                  <p>Loading delivery data...</p>
+                </div>
+              ) : (
+                <>
+                  {filtered.length === 0 ? (
+                    <div className="no-data">
+                      <FaRegListAlt className="no-data-icon" />
+                      <h3>No deliveries found</h3>
+                      <p>Try adjusting your filters or search criteria.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {isMobile ? (
+                        <div className="mobile-cards">
+                          {mobilePaged.map(d => (
+                            <DeliveryCard 
+                              key={d.trackingId} 
+                              delivery={d} 
+                              onShowDetails={() => setDrilldown({ type: 'row', value: d.trackingId, details: [d] })} 
+                            />
+                          ))}
+                          {mobileTotalPages > 1 && (
+                            <div className="mobile-pagination">
+                              <button 
+                                className="pagination-btn" 
+                                disabled={mobilePage === 1}
+                                onClick={() => setMobilePage(mobilePage - 1)}
+                              >
+                                Previous
+                              </button>
+                              <span className="pagination-info">
+                                Page {mobilePage} of {mobileTotalPages}
+                              </span>
+                              <button 
+                                className="pagination-btn" 
+                                disabled={mobilePage === mobileTotalPages}
+                                onClick={() => setMobilePage(mobilePage + 1)}
+                              >
+                                Next
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="table-wrapper">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Tracking ID</th>
+                                <th>Customer</th>
+                                <th>Status</th>
+                                <th>Mineral</th>
+                                <th>Tonnage</th>
+                                <th>Containers</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filtered.map(d => (
+                                <tr key={d.trackingId} className="table-row">
+                                  <td>{d.trackingId}</td>
+                                  <td>{d.customerName}</td>
+                                  <td>
+                                    <span className={`status-badge ${d.currentStatus?.toLowerCase()}`}>
+                                      {d.currentStatus}
+                                    </span>
+                                  </td>
+                                  <td>{d.mineralType}</td>
+                                  <td>{d.tonnage}</td>
+                                  <td>{d.containerCount}</td>
+                                  <td>{d.createdAt ? new Date(d.createdAt).toLocaleString() : ''}</td>
+                                  <td>
+                                    <button 
+                                      className="action-btn view"
+                                      onClick={() => setDrilldown({ type: 'row', value: d.trackingId, details: [d] })}
+                                    >
+                                      <FaEye />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Scheduled Reports Tab */}
+        {activeTab === 'scheduled' && (
+          <div className="scheduled-section">
+            {loadingScheduled ? (
+              <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>Loading scheduled reports...</p>
+              </div>
+            ) : (
+              <>
+                {scheduledReports.length === 0 ? (
+                  <div className="no-data">
+                    <FaRegCalendarAlt className="no-data-icon" />
+                    <h3>No scheduled reports</h3>
+                    <p>Create your first scheduled report to get started.</p>
+                  </div>
+                ) : (
+                  <div className="scheduled-reports-grid">
+                    {schedPaged.map(r => (
+                      <div key={r.id} className="scheduled-report-card">
+                        <div className="report-header">
+                          <div className="report-info">
+                            <h4 className="report-title">
+                              {Array.isArray(r.recipients) ? r.recipients.join(', ') : r.recipients}
+                            </h4>
+                            <span className={`status-badge ${r.status}`}>{r.status}</span>
+                          </div>
+                          <div className="report-schedule">
+                            <span className="schedule-info">{r.schedule_type} • {r.day_of_week} • {r.time}</span>
+                          </div>
+                        </div>
+                        <div className="report-details">
+                          <div className="detail-item">
+                            <strong>Type:</strong> {r.report_type}
+                          </div>
+                          <div className="detail-item">
+                            <strong>Last Run:</strong> {r.last_run ? new Date(r.last_run).toLocaleString() : '-'}
+                          </div>
+                          <div className="detail-item">
+                            <strong>Next Run:</strong> {r.next_run ? new Date(r.next_run).toLocaleString() : '-'}
+                          </div>
+                        </div>
+                        <div className="report-actions">
+                                                      <button className="action-btn edit" onClick={() => setEditReport(r)}>
+                              <FaFileAlt />
+                            </button>
+                          <button className="action-btn delete" onClick={() => setDeleteReport(r)}>
+                            <FaTrashAlt />
+                          </button>
+                          <button 
+                            className={`action-btn ${r.status === 'active' ? 'pause' : 'play'}`}
+                            onClick={() => handlePauseResume(r)}
+                          >
+                            {r.status === 'active' ? <FaPause /> : <FaPlay />}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {schedTotalPages > 1 && (
+                      <div className="pagination">
+                        <button 
+                          className="pagination-btn" 
+                          disabled={schedPage === 1}
+                          onClick={() => setSchedPage(schedPage - 1)}
+                        >
+                          Previous
+                        </button>
+                        <span className="pagination-info">
+                          Page {schedPage} of {schedTotalPages}
+                        </span>
+                        <button 
+                          className="pagination-btn" 
+                          disabled={schedPage === schedTotalPages}
+                          onClick={() => setSchedPage(schedPage + 1)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Modals - Outside tab content so they remain accessible */}
       {/* CSV Export Modal: full-screen on mobile */}
       {showCsvModal && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
@@ -420,6 +742,7 @@ export default function Reports() {
           </div>
         </div>
       )}
+
       {/* PDF Export Modal: full-screen on mobile */}
       {showPdfModal && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
@@ -440,6 +763,7 @@ export default function Reports() {
           </div>
         </div>
       )}
+
       {/* Schedule Email Report Modal: full-screen on mobile */}
       {showScheduleModal && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
@@ -516,126 +840,7 @@ export default function Reports() {
           </div>
         </div>
       )}
-      {/* Report Content for PDF Export */}
-      <div ref={reportRef}>
-        {/* Charts Section: single column on mobile */}
-        <div className={isMobile ? 'mb-4' : 'row mb-4 g-3'}>
-          {isMobile ? (
-            <>
-              <div className="mb-3">
-                <div className="card h-100 shadow-sm">
-                  <div className="card-body">
-                    <DeliveriesOverTimeChart data={deliveriesOverTime} onDrilldown={handleDrilldown} />
-                  </div>
-                </div>
-              </div>
-              <div className="mb-3">
-                <div className="card h-100 shadow-sm">
-                  <div className="card-body">
-                    <TonnageByMineralChart data={tonnageByMineral} onDrilldown={handleDrilldown} />
-                  </div>
-                </div>
-              </div>
-              <div className="mb-3">
-                <div className="card h-100 shadow-sm">
-                  <div className="card-body">
-                    <TopCustomersChart data={topCustomers} onDrilldown={handleDrilldown} />
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="col-md-6">
-                <div className="card h-100 shadow-sm">
-                  <div className="card-body">
-                    <DeliveriesOverTimeChart data={deliveriesOverTime} onDrilldown={handleDrilldown} />
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="card h-100 shadow-sm">
-                  <div className="card-body">
-                    <TonnageByMineralChart data={tonnageByMineral} onDrilldown={handleDrilldown} />
-                  </div>
-                </div>
-              </div>
-              <div className="col-12">
-                <div className="card h-100 shadow-sm">
-                  <div className="card-body">
-                    <TopCustomersChart data={topCustomers} onDrilldown={handleDrilldown} />
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        {/* Data Section: Card/List on mobile, table on desktop */}
-        <div className="card shadow-sm border-0">
-          <div className="card-body p-0">
-            {loading ? <div className="p-4 text-center">Loading...</div> : (
-              isMobile ? (
-                filtered.length === 0 ? (
-                  <div className="text-center text-muted py-4">No deliveries found.</div>
-                ) : (
-                  <>
-                    <div>
-                      {mobilePaged.map(d => (
-                        <DeliveryCard key={d.trackingId} delivery={d} onShowDetails={() => setDrilldown({ type: 'row', value: d.trackingId, details: [d] })} />
-                      ))}
-                    </div>
-                    {/* Mobile Pagination */}
-                    {mobileTotalPages > 1 && (
-                      <nav className="mt-2 position-sticky bottom-0 bg-white py-2" style={{ zIndex: 10 }}>
-                        <ul className="pagination justify-content-center mb-0" style={{ fontSize: '1.2em' }}>
-                          <li className={`page-item${mobilePage === 1 ? ' disabled' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setMobilePage(mobilePage - 1)}>&laquo;</button></li>
-                          {Array.from({ length: mobileTotalPages }, (_, i) => (
-                            <li key={i + 1} className={`page-item${mobilePage === i + 1 ? ' active' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setMobilePage(i + 1)}>{i + 1}</button></li>
-                          ))}
-                          <li className={`page-item${mobilePage === mobileTotalPages ? ' disabled' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setMobilePage(mobilePage + 1)}>&raquo;</button></li>
-                        </ul>
-                      </nav>
-                    )}
-                  </>
-                )
-              ) : (
-                <div className="table-responsive" style={isMobile ? { overflowX: 'auto' } : {}}>
-                  <table className="table table-hover align-middle mb-0" style={isMobile ? { minWidth: 600, fontSize: '1em' } : {}}>
-                    <thead className="table-light" style={isMobile ? { position: 'sticky', top: 0, zIndex: 2 } : {}}>
-                    <tr>
-                      <th>Tracking ID</th>
-                      <th>Customer</th>
-                      <th>Status</th>
-                      <th>Mineral</th>
-                      <th>Tonnage</th>
-                      <th>Containers</th>
-                      <th>Created At</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.length === 0 ? (
-                      <tr><td colSpan={7} className="text-center text-muted">No deliveries found.</td></tr>
-                    ) : (
-                      filtered.map(d => (
-                          <tr key={d.trackingId} style={{ cursor: 'pointer', height: isMobile ? 56 : undefined }} onClick={() => setDrilldown({ type: 'row', value: d.trackingId, details: [d] })}>
-                          <td>{d.trackingId}</td>
-                          <td>{d.customerName}</td>
-                          <td>{d.currentStatus}</td>
-                          <td>{d.mineralType}</td>
-                          <td>{d.tonnage}</td>
-                          <td>{d.containerCount}</td>
-                          <td>{d.createdAt ? new Date(d.createdAt).toLocaleString() : ''}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              )
-            )}
-          </div>
-        </div>
-      </div>
+
       {/* Drilldown Modal: full-screen on mobile */}
       {drilldown && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
@@ -684,88 +889,7 @@ export default function Reports() {
           </div>
         </div>
       )}
-      <hr className="my-5" />
-      <h4 className="fw-bold mb-3">Scheduled Reports</h4>
-      {loadingScheduled ? <div>Loading scheduled reports...</div> : (
-        isMobile ? (
-          schedPaged.length === 0 ? (
-            <div className="text-center text-muted py-4">No scheduled reports.</div>
-          ) : (
-            <>
-              <div>
-                {schedPaged.map(r => (
-                  <div key={r.id} className="delivery-card mb-3">
-                    <div className="delivery-card-header">
-                      <span className="delivery-card-key">{Array.isArray(r.recipients) ? r.recipients.join(', ') : r.recipients}</span>
-                      <span className="delivery-card-status">{r.status}</span>
-                    </div>
-                    <div className="mb-1 text-muted small">{r.schedule_type} &bull; {r.day_of_week} &bull; {r.time}</div>
-                    <div className="mb-1"><strong>Type:</strong> {r.report_type}</div>
-                    <div className="mb-1"><strong>Last Run:</strong> {r.last_run ? new Date(r.last_run).toLocaleString() : '-'}</div>
-                    <div className="mb-1"><strong>Next Run:</strong> {r.next_run ? new Date(r.next_run).toLocaleString() : '-'}</div>
-                    <div className="d-flex gap-2 mt-2">
-                      <button className="btn btn-sm btn-outline-primary flex-fill" onClick={() => setEditReport(r)}>Edit</button>
-                      <button className="btn btn-sm btn-outline-danger flex-fill" onClick={() => setDeleteReport(r)}>Delete</button>
-                      <button className="btn btn-sm btn-outline-secondary flex-fill" onClick={() => handlePauseResume(r)}>{r.status === 'active' ? 'Pause' : 'Resume'}</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {/* Mobile Pagination for scheduled reports */}
-              {schedTotalPages > 1 && (
-                <nav className="mt-2 position-sticky bottom-0 bg-white py-2" style={{ zIndex: 10 }}>
-                  <ul className="pagination justify-content-center mb-0" style={{ fontSize: '1.2em' }}>
-                    <li className={`page-item${schedPage === 1 ? ' disabled' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setSchedPage(schedPage - 1)}>&laquo;</button></li>
-                    {Array.from({ length: schedTotalPages }, (_, i) => (
-                      <li key={i + 1} className={`page-item${schedPage === i + 1 ? ' active' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setSchedPage(i + 1)}>{i + 1}</button></li>
-                    ))}
-                    <li className={`page-item${schedPage === schedTotalPages ? ' disabled' : ''}`}><button className="page-link" style={{ minWidth: 44, minHeight: 44 }} onClick={() => setSchedPage(schedPage + 1)}>&raquo;</button></li>
-                  </ul>
-                </nav>
-              )}
-            </>
-          )
-        ) : (
-          <div className="table-responsive">
-            <table className="table table-bordered">
-              <thead>
-                <tr>
-                  <th>Recipients</th>
-                  <th>Schedule</th>
-                  <th>Day</th>
-                  <th>Time</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Last Run</th>
-                  <th>Next Run</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scheduledReports.length === 0 ? (
-                  <tr><td colSpan={9} className="text-center text-muted">No scheduled reports.</td></tr>
-                ) : scheduledReports.map(r => (
-                  <tr key={r.id}>
-                    <td>{Array.isArray(r.recipients) ? r.recipients.join(', ') : r.recipients}</td>
-                    <td>{r.schedule_type}</td>
-                    <td>{r.day_of_week}</td>
-                    <td>{r.time}</td>
-                    <td>{r.report_type}</td>
-                    <td>{r.status}</td>
-                    <td>{r.last_run ? new Date(r.last_run).toLocaleString() : '-'}</td>
-                    <td>{r.next_run ? new Date(r.next_run).toLocaleString() : '-'}</td>
-                    <td>
-                      <button className="btn btn-sm btn-outline-primary me-1" onClick={() => setEditReport(r)}>Edit</button>
-                      <button className="btn btn-sm btn-outline-danger me-1" onClick={() => setDeleteReport(r)}>Delete</button>
-                      <button className="btn btn-sm btn-outline-secondary" onClick={() => handlePauseResume(r)}>{r.status === 'active' ? 'Pause' : 'Resume'}</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
+
       {/* Delete confirmation modal: full-screen on mobile */}
       {deleteReport && (
         <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.3)' }} tabIndex={-1}>
@@ -786,23 +910,971 @@ export default function Reports() {
           </div>
         </div>
       )}
+
       {/* Edit modal (reuse schedule modal, pre-fill with editReport) - implementation can be added as needed */}
-      {/* Mobile-specific styles */}
       <style>{`
-        @media (max-width: 600px) {
-          .modal-fullscreen { max-width: 100vw !important; margin: 0; }
+        /* CSS Custom Properties for Reports */
+        :root {
+          --primary-blue: #003366;
+          --primary-orange: #FF6600;
+          --accent-orange: #FF8533;
+          --accent-blue: #0066CC;
+          --background-gradient: linear-gradient(135deg, var(--primary-blue) 0%, var(--accent-blue) 100%);
+          --card-background: rgba(255, 255, 255, 0.1);
+          --card-border: rgba(255, 255, 255, 0.2);
+          --text-primary: #FFFFFF;
+          --text-secondary: rgba(255, 255, 255, 0.8);
+          --text-muted: rgba(255, 255, 255, 0.6);
+          --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          --transition-slow: 0.3s ease;
+          --border-radius: 16px;
+          --border-radius-lg: 20px;
+        }
+
+        /* Main Container */
+        .reports-container {
+          min-height: 100vh;
+          background: var(--background-gradient);
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          padding: 40px 20px;
+          color: var(--text-primary);
+        }
+
+        /* Header Section */
+        .reports-header {
+          text-align: center;
+          margin-bottom: 40px;
+        }
+
+        .reports-title {
+          font-size: 2.5rem;
+          font-weight: 800;
+          margin-bottom: 16px;
+          background: linear-gradient(135deg, var(--primary-orange), var(--accent-orange));
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        .reports-subtitle {
+          font-size: 1.125rem;
+          color: var(--text-secondary);
+          max-width: 600px;
+          margin: 0 auto;
+          line-height: 1.6;
+        }
+
+        /* Tabs */
+        .tabs-container {
+          margin-bottom: 40px;
+        }
+
+        .tabs-nav {
+          display: flex;
+          justify-content: center;
+          gap: 8px;
+          background: var(--card-background);
+          backdrop-filter: blur(20px);
+          border: 1px solid var(--card-border);
+          border-radius: var(--border-radius);
+          padding: 8px;
+        }
+
+        .tab-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          border: none;
+          background: transparent;
+          color: var(--text-secondary);
+          border-radius: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: var(--transition-slow);
+        }
+
+        .tab-btn:hover {
+          color: var(--text-primary);
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        .tab-btn.active {
+          background: var(--primary-orange);
+          color: var(--text-primary);
+        }
+
+        .tab-icon {
+          width: 16px;
+          height: 16px;
+        }
+
+        .tab-label {
+          font-size: 0.875rem;
+        }
+
+        /* Analytics Section */
+        .analytics-section {
+          margin-bottom: 40px;
+        }
+
+        .charts-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+          gap: 24px;
+        }
+
+        .chart-card {
+          background: var(--card-background);
+          backdrop-filter: blur(20px);
+          border: 1px solid var(--card-border);
+          border-radius: var(--border-radius-lg);
+          padding: 24px;
+          transition: var(--transition-slow);
+        }
+
+        .chart-card:hover {
+          transform: translateY(-4px);
+          box-shadow: var(--shadow-lg);
+        }
+
+        .chart-card.full-width {
+          grid-column: 1 / -1;
+        }
+
+        .chart-header {
+          margin-bottom: 20px;
+        }
+
+        .chart-title {
+          font-size: 1.25rem;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+
+        .chart-subtitle {
+          color: var(--text-muted);
+          font-size: 0.875rem;
+        }
+
+        .chart-container {
+          width: 100%;
+          height: 300px;
+        }
+
+        /* Data Section */
+        .data-section {
+          margin-bottom: 40px;
+        }
+
+        .filters-section {
+          background: var(--card-background);
+          backdrop-filter: blur(20px);
+          border: 1px solid var(--card-border);
+          border-radius: var(--border-radius-lg);
+          padding: 24px;
+          margin-bottom: 24px;
+        }
+
+        .filters-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 16px;
+          margin-bottom: 20px;
+        }
+
+        .filter-item {
+          position: relative;
+        }
+
+        .filter-icon {
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--primary-orange);
+          width: 16px;
+          height: 16px;
+          z-index: 2;
+        }
+
+        .filter-input,
+        .filter-select {
+          width: 100%;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid var(--card-border);
+          border-radius: 8px;
+          padding: 12px 12px 12px 40px;
+          color: var(--text-primary);
+          font-size: 0.875rem;
+          transition: var(--transition-slow);
+        }
+
+        .filter-input:focus,
+        .filter-select:focus {
+          outline: none;
+          border-color: var(--primary-orange);
+        }
+
+        .filter-input::placeholder {
+          color: var(--text-muted);
+        }
+
+        .export-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .export-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: var(--transition-slow);
+          font-size: 0.875rem;
+        }
+
+        .export-btn.csv {
+          background: var(--primary-orange);
+          color: white;
+        }
+
+        .export-btn.pdf {
+          background: var(--accent-blue);
+          color: white;
+        }
+
+        .export-btn.schedule {
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-primary);
+          border: 1px solid var(--card-border);
+        }
+
+        .export-btn:hover {
+          transform: translateY(-2px);
+        }
+
+        .btn-icon {
+          width: 14px;
+          height: 14px;
+        }
+
+        /* Data Table */
+        .data-table-container {
+          background: var(--card-background);
+          backdrop-filter: blur(20px);
+          border: 1px solid var(--card-border);
+          border-radius: var(--border-radius-lg);
+          overflow: hidden;
+        }
+
+        .data-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .data-table th {
+          background: rgba(255, 255, 255, 0.05);
+          padding: 16px;
+          text-align: left;
+          font-weight: 600;
+          border-bottom: 1px solid var(--card-border);
+        }
+
+        .data-table td {
+          padding: 16px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .table-row:hover {
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        .status-badge {
+          padding: 4px 12px;
+          border-radius: 20px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+
+        .status-badge.active,
+        .status-badge.completed {
+          background: rgba(34, 197, 94, 0.2);
+          color: #22c55e;
+        }
+
+        .status-badge.pending,
+        .status-badge.in-transit {
+          background: rgba(251, 191, 36, 0.2);
+          color: #fbbf24;
+        }
+
+        .status-badge.cancelled,
+        .status-badge.failed {
+          background: rgba(239, 68, 68, 0.2);
+          color: #ef4444;
+        }
+
+        .action-btn {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          padding: 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: var(--transition-slow);
+        }
+
+        .action-btn:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-primary);
+        }
+
+        .action-btn.view {
+          color: var(--primary-orange);
+        }
+
+        .action-btn.edit {
+          color: var(--accent-blue);
+        }
+
+        .action-btn.delete {
+          color: #ef4444;
+        }
+
+        .action-btn.play {
+          color: #22c55e;
+        }
+
+        .action-btn.pause {
+          color: #fbbf24;
+        }
+
+        /* Mobile Cards */
+        .mobile-cards {
+          padding: 20px;
+        }
+
+        .delivery-card {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--card-border);
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 16px;
+          transition: var(--transition-slow);
+        }
+
+        .delivery-card:hover {
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        .delivery-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+
+        .delivery-card-key {
+          font-weight: 600;
+          color: var(--text-primary);
+        }
+
+        .delivery-card-status {
+          padding: 4px 12px;
+          border-radius: 20px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-secondary);
+        }
+
+        .delivery-card-details {
+          margin-top: 12px;
+          padding-top: 12px;
+          border-top: 1px solid var(--card-border);
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+        }
+
+        /* Scheduled Reports */
+        .scheduled-section {
+          margin-bottom: 40px;
+        }
+
+        .scheduled-reports-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+          gap: 20px;
+        }
+
+        .scheduled-report-card {
+          background: var(--card-background);
+          backdrop-filter: blur(20px);
+          border: 1px solid var(--card-border);
+          border-radius: var(--border-radius-lg);
+          padding: 20px;
+          transition: var(--transition-slow);
+        }
+
+        .scheduled-report-card:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-lg);
+        }
+
+        .report-header {
+          margin-bottom: 16px;
+        }
+
+        .report-info {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+
+        .report-title {
+          font-size: 1rem;
+          font-weight: 600;
+          margin: 0;
+          color: var(--text-primary);
+        }
+
+        .report-schedule {
+          font-size: 0.875rem;
+          color: var(--text-muted);
+        }
+
+        .report-details {
+          margin-bottom: 16px;
+        }
+
+        .detail-item {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 8px;
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+        }
+
+        .report-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        /* Loading and No Data */
+        .loading-container,
+        .no-data {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 60px 20px;
+          text-align: center;
+        }
+
+        .loading-spinner {
+          width: 40px;
+          height: 40px;
+          border: 3px solid rgba(255, 255, 255, 0.1);
+          border-top: 3px solid var(--primary-orange);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        .no-data-icon {
+          width: 48px;
+          height: 48px;
+          color: var(--text-muted);
+          margin-bottom: 16px;
+        }
+
+        .no-data h3 {
+          margin-bottom: 8px;
+          font-weight: 600;
+        }
+
+        .no-data p {
+          color: var(--text-muted);
+          font-size: 0.875rem;
+        }
+
+        /* Notification Toast */
+        .notification-toast {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 9999;
+          min-width: 300px;
+          max-width: 400px;
+        }
+
+        .notification-content {
+          background: var(--card-background);
+          backdrop-filter: blur(20px);
+          border: 1px solid var(--card-border);
+          border-radius: var(--border-radius);
+          padding: 16px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          box-shadow: var(--shadow-lg);
+        }
+
+        .notification-icon {
+          width: 20px;
+          height: 20px;
+          flex-shrink: 0;
+        }
+
+        .notification-toast.success .notification-icon {
+          color: #22c55e;
+        }
+
+        .notification-toast.danger .notification-icon {
+          color: #ef4444;
+        }
+
+        .notification-toast.info .notification-icon {
+          color: #3b82f6;
+        }
+
+        .notification-message {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .notification-message strong {
+          font-weight: 600;
+        }
+
+        .notification-message span {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+        }
+
+        .notification-close {
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          font-size: 1.25rem;
+          cursor: pointer;
+          padding: 0;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .notification-close:hover {
+          color: var(--text-primary);
+        }
+
+        /* Pagination */
+        .pagination,
+        .mobile-pagination {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 16px;
+          margin-top: 20px;
+          padding: 16px;
+        }
+
+        .pagination-btn {
+          background: var(--primary-orange);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 8px 16px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: var(--transition-slow);
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+          background: var(--accent-orange);
+        }
+
+        .pagination-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .pagination-info {
+          color: var(--text-secondary);
+          font-size: 0.875rem;
+        }
+
+        /* React Select Customization */
+        .react-select-container .react-select__control {
+          background: rgba(255, 255, 255, 0.1) !important;
+          border: 1px solid var(--card-border) !important;
+          border-radius: 8px !important;
+          min-height: 44px !important;
+        }
+
+        .react-select-container .react-select__control:hover {
+          border-color: var(--primary-orange) !important;
+        }
+
+        .react-select-container .react-select__control--is-focused {
+          border-color: var(--primary-orange) !important;
+          box-shadow: 0 0 0 1px var(--primary-orange) !important;
+        }
+
+        .react-select-container .react-select__menu {
+          background: var(--card-background) !important;
+          backdrop-filter: blur(20px) !important;
+          border: 1px solid var(--card-border) !important;
+          border-radius: 8px !important;
+        }
+
+        .react-select-container .react-select__option {
+          background: transparent !important;
+          color: var(--text-primary) !important;
+        }
+
+        .react-select-container .react-select__option--is-focused {
+          background: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        .react-select-container .react-select__option--is-selected {
+          background: var(--primary-orange) !important;
+        }
+
+        .react-select-container .react-select__single-value,
+        .react-select-container .react-select__placeholder {
+          color: var(--text-primary) !important;
+        }
+
+        .react-select-container .react-select__multi-value {
+          background: var(--primary-orange) !important;
+          border-radius: 6px !important;
+        }
+
+        .react-select-container .react-select__multi-value__label {
+          color: white !important;
+        }
+
+        .react-select-container .react-select__multi-value__remove {
+          color: white !important;
+        }
+
+        .react-select-container .react-select__multi-value__remove:hover {
+          background: rgba(255, 255, 255, 0.2) !important;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+          .reports-container {
+            padding: 20px 16px;
+          }
+
+          .reports-title {
+            font-size: 2rem;
+          }
+
+          .tabs-nav {
+            flex-direction: column;
+            gap: 4px;
+          }
+
+          .tab-btn {
+            justify-content: center;
+            padding: 16px;
+          }
+
+          .charts-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .filters-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .export-actions {
+            flex-direction: column;
+          }
+
+          .export-btn {
+            justify-content: center;
+          }
+
+          .scheduled-reports-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .data-table {
+            font-size: 0.875rem;
+          }
+
+          .data-table th,
+          .data-table td {
+            padding: 12px 8px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .reports-title {
+            font-size: 1.75rem;
+          }
+
+          .chart-card {
+            padding: 20px;
+          }
+
+          .filters-section {
+            padding: 20px;
+          }
+
+          .notification-toast {
+            left: 20px;
+            right: 20px;
+            min-width: auto;
+          }
+        }
+
+        /* Accessibility */
+        .tab-btn:focus,
+        .export-btn:focus,
+        .action-btn:focus,
+        .pagination-btn:focus {
+          outline: 2px solid var(--primary-orange);
+          outline-offset: 2px;
+        }
+
+        /* Modal Styles */
+        .modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+
+        .modal-dialog {
+          background: var(--card-background);
+          backdrop-filter: blur(20px);
+          border: 1px solid var(--card-border);
+          border-radius: var(--border-radius-lg);
+          max-width: 90vw;
+          max-height: 90vh;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .modal-fullscreen {
+          width: 100vw;
+          height: 100vh;
+          max-width: none;
+          max-height: none;
+          border-radius: 0;
+        }
+
+        .modal-content {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+        }
+
+        .modal-header {
+          padding: 24px;
+          border-bottom: 1px solid var(--card-border);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .modal-title {
+          font-size: 1.25rem;
+          font-weight: 700;
+          margin: 0;
+          color: var(--text-primary);
+        }
+
+        .btn-close {
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          font-size: 1.5rem;
+          cursor: pointer;
+          padding: 0;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 6px;
+          transition: var(--transition-slow);
+        }
+
+        .btn-close:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-primary);
+        }
+
+        .modal-body {
+          padding: 24px;
+          flex: 1;
+          overflow-y: auto;
+        }
+
+        .modal-footer {
+          padding: 24px;
+          border-top: 1px solid var(--card-border);
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+        }
+
+        .form-label {
+          display: block;
+          margin-bottom: 8px;
+          font-weight: 600;
+          color: var(--text-primary);
+        }
+
+        .form-control,
+        .form-select {
+          width: 100%;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid var(--card-border);
+          border-radius: 8px;
+          padding: 12px;
+          color: var(--text-primary);
+          font-size: 0.875rem;
+          transition: var(--transition-slow);
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+          outline: none;
+          border-color: var(--primary-orange);
+        }
+
+        .form-control::placeholder {
+          color: var(--text-muted);
+        }
+
+        .form-check {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+
+        .form-check-input {
+          width: 16px;
+          height: 16px;
+          accent-color: var(--primary-orange);
+        }
+
+        .form-check-label {
+          color: var(--text-primary);
+          font-size: 0.875rem;
+          cursor: pointer;
+        }
+
+        .btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 12px 24px;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: var(--transition-slow);
+          font-size: 0.875rem;
+          text-decoration: none;
+        }
+
+        .btn-primary {
+          background: var(--primary-orange);
+          color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+          background: var(--accent-orange);
+        }
+
+        .btn-secondary {
+          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-primary);
+          border: 1px solid var(--card-border);
+        }
+
+        .btn-secondary:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-danger {
+          background: #ef4444;
+          color: white;
+        }
+
+        .btn-danger:hover {
+          background: #dc2626;
+        }
+
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .w-100 {
+          width: 100%;
+        }
+
+        .d-flex {
+          display: flex;
+        }
+
+        .flex-wrap {
+          flex-wrap: wrap;
+        }
+
+        .gap-2 {
+          gap: 8px;
+        }
+
+        .mb-2 {
+          margin-bottom: 8px;
+        }
+
+        /* Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+          .chart-card:hover,
+          .scheduled-report-card:hover,
+          .export-btn:hover {
+            transform: none;
+          }
         }
       `}</style>
-      {/* DeliveryCard component for mobile list view */}
-      {isMobile && (
-        <style>{`
-          .delivery-card { border: 1px solid #eee; border-radius: 8px; margin-bottom: 1rem; background: #fff; box-shadow: 0 1px 2px rgba(31,33,32,0.03); padding: 1rem; }
-          .delivery-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-          .delivery-card-key { font-weight: bold; color: #1F2120; }
-          .delivery-card-status { font-size: 0.97em; padding: 0.3em 0.7em; border-radius: 1em; background: #f3ede7; color: #333; }
-          .delivery-card-details { font-size: 0.97em; margin-top: 0.7em; border-top: 1px solid #f3ede7; padding-top: 0.7em; }
-        `}</style>
-      )}
     </div>
   );
 }

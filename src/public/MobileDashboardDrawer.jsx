@@ -34,11 +34,11 @@ export default function MobileDashboardDrawer({ open, onClose, userRole, onLogou
           left: 0,
           bottom: 0,
           width: '100vw',
-          background: '#232323',
-          color: '#EBD3AD',
+          background: '#003366',
+          color: '#FFFFFF',
           borderTopLeftRadius: '1.2rem',
           borderTopRightRadius: '1.2rem',
-          boxShadow: '0 -2px 16px rgba(0,0,0,0.18)',
+          boxShadow: '0 -2px 16px rgba(0,51,102,0.3)',
           zIndex: 3100,
           padding: '1.2rem 1.2rem 2.2rem 1.2rem',
           minHeight: '40vh',
@@ -50,15 +50,15 @@ export default function MobileDashboardDrawer({ open, onClose, userRole, onLogou
         aria-modal="true"
       >
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <span className="fw-bold" style={{ fontSize: '1.2rem' }}>Dashboard Menu</span>
-          <button className="btn btn-link text-light fs-3" onClick={onClose} aria-label="Close menu">&times;</button>
+          <span className="fw-bold" style={{ fontSize: '1.2rem', color: '#FF6600' }}>Dashboard Menu</span>
+          <button className="btn btn-link text-light fs-3" onClick={onClose} aria-label="Close menu" style={{ color: '#FF6600' }}>&times;</button>
         </div>
         <ul className="list-unstyled mb-0">
           {dashboardLinks.map(item => (
             <li key={item.route} className="mb-2">
               <NavLink
                 to={item.route}
-                className={({ isActive }) => `d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold${isActive ? ' bg-light text-dark' : ''}`}
+                className={({ isActive }) => `d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold${isActive ? ' bg-light text-dark' : ' text-white'}`}
                 style={{ textDecoration: 'none', fontSize: '1.1rem' }}
                 onClick={onClose}
               >
@@ -69,18 +69,18 @@ export default function MobileDashboardDrawer({ open, onClose, userRole, onLogou
           ))}
         </ul>
         {/* Divider */}
-        <hr style={{ borderColor: '#444', margin: '1.2rem 0' }} />
+        <hr style={{ borderColor: '#FF6600', margin: '1.2rem 0' }} />
         {/* User section */}
         <div className="d-flex align-items-center gap-2 mb-3 px-3">
-          <FaIcons.FaUserCircle size={28} className="me-2" />
-          <span className="fw-semibold" style={{ fontSize: '1.1rem' }}>{userName || 'User'}</span>
+          <FaIcons.FaUserCircle size={28} className="me-2" style={{ color: '#FF6600' }} />
+          <span className="fw-semibold" style={{ fontSize: '1.1rem', color: '#FFFFFF' }}>{userName || 'User'}</span>
         </div>
         <ul className="list-unstyled mb-0">
           {userActions.map(item => (
             <li key={item.label} className="mb-2">
               <NavLink
                 to={item.path}
-                className={({ isActive }) => `d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold${isActive ? ' bg-light text-dark' : ''}`}
+                className={({ isActive }) => `d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold${isActive ? ' bg-light text-dark' : ' text-white'}`}
                 style={{ textDecoration: 'none', fontSize: '1.1rem' }}
                 onClick={onClose}
                 aria-label={item.label}
@@ -92,8 +92,8 @@ export default function MobileDashboardDrawer({ open, onClose, userRole, onLogou
           ))}
           <li key="logout">
             <button
-              className="d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold btn btn-link text-danger w-100"
-              style={{ textDecoration: 'none', fontSize: '1.1rem' }}
+              className="d-flex align-items-center gap-2 px-3 py-2 rounded fw-semibold btn btn-link w-100"
+              style={{ textDecoration: 'none', fontSize: '1.1rem', color: '#FF6600' }}
               onClick={() => { onLogout(); onClose(); }}
               aria-label="Logout"
             >

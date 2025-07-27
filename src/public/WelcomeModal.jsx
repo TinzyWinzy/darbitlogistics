@@ -6,14 +6,14 @@ export default function WelcomeModal() {
 
   useEffect(() => {
     // Only show if not dismissed before
-    if (!localStorage.getItem('morres_welcome_dismissed')) {
+    if (!localStorage.getItem('darlog_welcome_dismissed')) {
       setOpen(true);
     }
   }, []);
 
   const handleClose = () => {
     setOpen(false);
-    localStorage.setItem('morres_welcome_dismissed', '1');
+    localStorage.setItem('darlog_welcome_dismissed', '1');
   };
 
   if (!open) return null;
@@ -29,7 +29,7 @@ export default function WelcomeModal() {
         <button onClick={handleClose} aria-label="Close welcome modal" style={{
           position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888'
         }}>&times;</button>
-        <h2 style={{ marginBottom: 12 }}>Welcome to Morres Logistics!</h2>
+        <h2 style={{ marginBottom: 12 }}>Welcome to Dar Logistics!</h2>
         <p style={{ marginBottom: 16 }}>Your partner in efficient, reliable, and sustainable logistics. Here's how to get started:</p>
         <ul style={{ marginBottom: 16, paddingLeft: 20 }}>
           <li><b>Create a Delivery:</b> Use the Operator Dashboard to dispatch new shipments.</li>

@@ -1,5 +1,5 @@
 {
-  "appId": "com.morres.logistics",
-  "appName": "morres-app",
+  	"appId": "com.darlog.logistics",
+	"appName": "darlog-app",
   "webDir": "dist"
 }

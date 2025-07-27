@@ -1,273 +1,218 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { useContext, useState, useEffect } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MENU_CONFIG, USER_ACTIONS } from '../menuConfig';
-import * as FaIcons from 'react-icons/fa';
 import Dropdown from 'react-bootstrap/Dropdown';
-import db from '../services/db';
-import { isOnline } from '../services/api';
 import { useMediaQuery } from 'react-responsive';
-import React from 'react'; // Added for React.createElement
+import React from 'react';
 import MobileDashboardDrawer from './MobileDashboardDrawer';
+import { useUserMenu } from '../hooks';
+import { getFilteredMenus, renderIcon, isPublicRoute, isDashboardRoute } from '../utils/navigationUtils';
+import { NetworkStatusIndicator, UserMenuDropdown } from '../components/shared';
 
 export default function Navbar({ onHamburgerClick }) {
-  const { user, setUser } = useContext(AuthContext);
+  const { user } = useUserMenu();
   const navigate = useNavigate();
   const [isNavCollapsed, setIsNavCollapsed] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
-  // Network status state
-  const [online, setOnline] = useState(true);
-  useEffect(() => {
-    let mounted = true;
-    async function checkStatus() {
-      const status = await isOnline();
-      if (mounted) setOnline(status);
+  // CSS Custom Properties for Navbar
+  const navbarStyles = `
+    :root {
+      --primary-blue: #003366;
+      --primary-orange: #FF6600;
+      --accent-orange: #FF8533;
+      --font-size-xl: 1.25rem;
+      --font-size-2xl: 1.5rem;
+      --space-2: 0.5rem;
+      --space-3: 0.75rem;
+      --space-4: 1rem;
+      --space-8: 2rem;
+      --radius-sm: 0.375rem;
     }
-    checkStatus();
-    const interval = setInterval(checkStatus, 10000);
-    return () => { mounted = false; clearInterval(interval); };
-  }, []);
-
-  // Define public routes
-  const publicRoutes = [
-    '/', '/track', '/track-delivery', '/login', '/register', '/offerings', '/help', '/plans', '/payment-success'
-  ];
-  const isPublic = publicRoutes.some(route => location.pathname === route || location.pathname.startsWith(route));
-
-  // Define dashboard/operator routes
-  const dashboardRoutes = [
-    '/dashboard', '/loads', '/customers', '/reports', '/billing', '/invoices', '/admin', '/admin/dashboard'
-  ];
-  const isDashboard = dashboardRoutes.some(route => location.pathname.startsWith(route));
+  `;
 
   const handleNavCollapse = () => setIsNavCollapsed(!isNavCollapsed);
 
-  async function handleLogout() {
-    try {
-      localStorage.removeItem('jwt_token');
-      setUser(null);
-      // Clear IndexedDB tables to prevent data leaks between operators
-      await db.deliveries.clear();
-      await db.parentBookings.clear();
-      await db.outbox.clear();
-      navigate('/login');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
-  }
-
   const isMobile = useMediaQuery({ maxWidth: 991 });
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // Remove mobileMenuOpen state and handlers
-  // const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // const handleMobileMenuToggle = () => setMobileMenuOpen(open => !open);
-  // const handleNavLinkClick = () => { if (isMobile) setMobileMenuOpen(false); };
 
-  // Helper to get icon component by name
-  const getIcon = (name) => FaIcons[name] || null;
-
-  // Replace hardcoded menu arrays with:
   const role = user?.role || 'guest';
-  const navMenu = MENU_CONFIG.filter(item => item.showIn.includes('navbar') && item.roles.includes(role));
-  const userMenu = USER_ACTIONS.filter(item => item.roles.includes(role));
-  // Dashboard-specific menu
-  const dashboardNavMenu = MENU_CONFIG.filter(item => item.showIn.includes('sidebar') && item.roles.includes(role));
-  // Public menu
-  const publicNavMenu = MENU_CONFIG.filter(item => item.showIn.includes('navbar') && item.roles.includes(role));
+  const { navbarMenu, userMenu } = getFilteredMenus(role);
 
-  return (
-    <nav
-      className="navbar navbar-expand-lg shadow-sm d-flex justify-content-between align-items-center"
-      style={{
-        background: '#1F2120',
-        borderRadius: '0.75rem',
-        margin: '1.5rem 0 2rem 0',
-        boxShadow: '0 2px 8px rgba(31, 33, 32, 0.08)',
-        padding: '0.75rem 0',
-      }}
-      aria-label="Main navigation"
-    >
-      <div className="d-flex align-items-center">
-        <Link className="navbar-brand fw-bold d-flex align-items-center" to="/" style={{ color: '#EBD3AD', letterSpacing: '0.5px' }}>
-          <img src="/favicon-m.svg" alt="Morres Logistics Logo" width={36} height={36} style={{ marginRight: 10, display: 'inline-block', verticalAlign: 'middle' }} />
-          Morres Logistics
+  // Mobile Navbar Component
+  const MobileNavbar = () => (
+    <nav className="navbar navbar-expand-lg d-lg-none" style={{ background: 'var(--primary-blue)', padding: 'var(--space-3) var(--space-4)' }}>
+      <div className="container-fluid">
+        {/* Brand */}
+        <Link className="navbar-brand d-flex align-items-center" to="/" style={{ color: 'var(--primary-orange)', fontWeight: 'bold', fontSize: 'var(--font-size-xl)' }}>
+          <img src="/logo.svg" alt="Dar Logistics Logo" width={32} height={32} style={{ marginRight: 'var(--space-2)' }} />
+          Dar Logistics
         </Link>
-        {isMobile && (
-          <>
-            <button
-              className="navbar-toggler ms-3"
-              type="button"
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open menu"
-              aria-expanded={drawerOpen}
-              aria-controls="mobile-dashboard-drawer"
-              style={{
-                border: '2px solid #EBD3AD',
-                background: 'transparent',
-                borderRadius: '0.5rem',
-                padding: '0.4em 0.7em',
-                boxShadow: '0 1px 4px rgba(31,33,32,0.10)',
-                transition: 'background 0.2s, border 0.2s',
-              }}
-            >
-              <span
-                className="navbar-toggler-icon"
-                style={{
-                  filter: 'invert(1) brightness(1.5)',
-                  WebkitFilter: 'invert(1) brightness(1.5)',
-                  backgroundImage: 'none',
-                  width: 24,
-                  height: 24,
-                  display: 'inline-block',
-                  background: 'none',
-                  position: 'relative',
-                }}
-              >
-                {/* Custom hamburger icon for high contrast */}
-                <span style={{
-                  display: 'block',
-                  width: 22,
-                  height: 3,
-                  background: '#EBD3AD',
-                  borderRadius: 2,
-                  margin: '4px 0',
-                  transition: 'background 0.2s',
-                }} />
-                <span style={{
-                  display: 'block',
-                  width: 22,
-                  height: 3,
-                  background: '#EBD3AD',
-                  borderRadius: 2,
-                  margin: '4px 0',
-                  transition: 'background 0.2s',
-                }} />
-                <span style={{
-                  display: 'block',
-                  width: 22,
-                  height: 3,
-                  background: '#EBD3AD',
-                  borderRadius: 2,
-                  margin: '4px 0',
-                  transition: 'background 0.2s',
-                }} />
-              </span>
-            </button>
-            <MobileDashboardDrawer
-              open={drawerOpen}
-              onClose={() => setDrawerOpen(false)}
-              userRole={role}
-              onLogout={handleLogout}
-              userName={user?.name || user?.email || 'User'}
-            />
-          </>
-        )}
-      </div>
-      {/* Desktop nav: only show if not dashboard */}
-      {!isMobile && (
-        <div className="collapse navbar-collapse d-flex align-items-center justify-content-end">
-          {isPublic ? (
-            <>
-              <ul className="navbar-nav flex-row gap-2 align-items-center mb-0">
-                {navMenu.map((item, index) => (
-                  <li key={index} className="nav-item">
-                    <NavLink to={item.route} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                      {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
-                      {item.label}
-                    </NavLink>
-                  </li>
-                ))}
-                {user && (
-                  <li className="nav-item">
-                    <NavLink to="/profile" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                      <FaIcons.FaUserCircle className="me-2" /> Profile
-                    </NavLink>
-                  </li>
-                )}
-                {user && (
-                  <li className="nav-item">
-                    <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                      <FaIcons.FaCog className="me-2" /> Settings
-                    </NavLink>
-                  </li>
-                )}
-                {user && user.role === 'admin' && (
-                  <li className="nav-item">
-                    <NavLink to="/admin/dashboard" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-                      <FaIcons.FaUserShield className="me-2" /> Admin
-                    </NavLink>
-                  </li>
-                )}
-              </ul>
-              {user && (
-                <Dropdown align="end" className="ms-3">
-                  <Dropdown.Toggle variant="link" className="text-light d-flex align-items-center" style={{ color: '#EBD3AD', textDecoration: 'none' }} id="userMenuButton">
-                    <FaIcons.FaUserCircle className="me-2" size={24} />
-                    <span className="fw-semibold">{user.name || user.email || 'User'}</span>
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    {userMenu.filter(item => item.label.toLowerCase() !== 'logout').map((item, index) => (
-                      <Dropdown.Item key={index} as={Link} to={item.path} className="d-flex align-items-center">
-                        {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
-                        {item.label}
-                      </Dropdown.Item>
-                    ))}
-                    <Dropdown.Divider />
-                    <Dropdown.Item as="button" className="d-flex align-items-center" onClick={handleLogout}><FaIcons.FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
+
+        {/* Mobile Menu Toggle */}
+        <button
+          className="navbar-toggler border-0"
+          type="button"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          style={{ color: 'var(--primary-orange)', border: 'none' }}
+        >
+          <span className="navbar-toggler-icon"></span>
+        </button>
+
+        {/* Mobile Menu */}
+        <div className={`collapse navbar-collapse ${mobileMenuOpen ? 'show' : ''}`} style={{ background: 'var(--primary-blue)' }}>
+          <ul className="navbar-nav me-auto mb-2 mb-lg-0">
+            {navbarMenu.map((item, index) => (
+              <li key={index} className="nav-item">
+                <NavLink 
+                  to={item.route} 
+                  className="nav-link text-white"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  {renderIcon(item.icon, { className: 'me-2' })}
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+            {user && (
+              <>
+                <li className="nav-item">
+                                  <NavLink 
+                  to="/profile" 
+                  className="nav-link text-white"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  <span className="me-2">👤</span> Profile
+                </NavLink>
+              </li>
+              <li className="nav-item">
+                <NavLink 
+                  to="/settings" 
+                  className="nav-link text-white"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  <span className="me-2">⚙️</span> Settings
+                </NavLink>
+              </li>
+              {user.role === 'admin' && (
+                <li className="nav-item">
+                  <NavLink 
+                    to="/admin/dashboard" 
+                    className="nav-link text-white"
+                    onClick={() => setMobileMenuOpen(false)}
+                    style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                    <span className="me-2">🛡️</span> Admin
+                  </NavLink>
+                </li>
               )}
-            </>
-          ) : (
-            user && (
-              <Dropdown align="end">
-                <Dropdown.Toggle variant="link" className="text-light d-flex align-items-center" style={{ color: '#EBD3AD', textDecoration: 'none' }} id="userMenuButton">
-                  <FaIcons.FaUserCircle className="me-2" size={24} />
+              </>
+            )}
+          </ul>
+          
+          {/* User Menu for Mobile */}
+          {user && (
+            <div className="d-flex flex-column w-100">
+              <div className="text-white p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="d-flex align-items-center mb-2">
+                  <span className="me-2">👤</span>
                   <span className="fw-semibold">{user.name || user.email || 'User'}</span>
-                </Dropdown.Toggle>
-                <Dropdown.Menu>
-                  {userMenu.map((item, index) => (
-                    <Dropdown.Item key={index} as={Link} to={item.path} className="d-flex align-items-center">
-                      {getIcon(item.icon) && React.createElement(getIcon(item.icon), { className: 'me-2' })}
-                      {item.label}
-                    </Dropdown.Item>
-                  ))}
-                  <Dropdown.Divider />
-                  <Dropdown.Item as="button" className="d-flex align-items-center" onClick={handleLogout}><FaIcons.FaSignOutAlt className="me-2" /> Logout</Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            )
+                </div>
+                <UserMenuDropdown 
+                  variant="mobile"
+                  className="w-100"
+                />
+              </div>
+            </div>
           )}
-          {/* Add the Plans link for logged-in users only */}
-          {!isPublic && user && !isDashboard && (
-            <li className="nav-item">
-              <NavLink to="/plans" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Plans</NavLink>
-            </li>
-          )}
-          {/* Network status indicator */}
-          <div style={{ display: 'flex', alignItems: 'center', marginLeft: 18 }}>
-            <span
-              style={{
-                display: 'inline-block',
-                width: 12,
-                height: 12,
-                borderRadius: '50%',
-                background: online ? '#27c93f' : '#e74c3c',
-                marginRight: 0,
-                border: '1.5px solid #fff',
-                boxShadow: online ? '0 0 4px #27c93f88' : '0 0 4px #e74c3c88',
-                transition: 'background 0.2s',
-                cursor: 'pointer',
-              }}
-              aria-label={online ? 'App Online' : 'App Offline'}
-              title={online ? 'App Online' : 'App Offline'}
+
+          {/* Network Status for Mobile */}
+          <div className="d-flex align-items-center justify-content-center p-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <NetworkStatusIndicator 
+              variant="navbar"
+              size="small"
             />
           </div>
         </div>
-      )}
-      {/* Remove mobile nav menu overlay logic entirely */}
+      </div>
     </nav>
+  );
+
+  // Desktop Navbar Component
+  const DesktopNavbar = () => (
+    <nav className="navbar navbar-expand-lg d-none d-lg-block" style={{ background: 'var(--primary-blue)', padding: 'var(--space-4) var(--space-8)' }}>
+      <div className="container-fluid">
+        {/* Brand */}
+        <Link className="navbar-brand d-flex align-items-center" to="/" style={{ color: 'var(--primary-orange)', fontWeight: 'bold', fontSize: 'var(--font-size-2xl)' }}>
+          <img src="/logo.svg" alt="Dar Logistics Logo" width={40} height={40} style={{ marginRight: 'var(--space-3)' }} />
+          Dar Logistics
+        </Link>
+
+        {/* Desktop Navigation */}
+        <div className="navbar-nav me-auto">
+          {navbarMenu.map((item, index) => (
+            <NavLink 
+              key={index}
+              to={item.route} 
+              className="nav-link text-white"
+              style={{ margin: '0 var(--space-2)', padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-sm)' }}
+            >
+              {renderIcon(item.icon, { className: 'me-2' })}
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+
+        {/* Right Side - User Menu & Status */}
+        <div className="d-flex align-items-center">
+          {/* Network Status */}
+          <div className="me-3">
+            <NetworkStatusIndicator 
+              variant="navbar"
+              size="small"
+            />
+          </div>
+
+          {/* User Menu */}
+          {user ? (
+            <UserMenuDropdown variant="navbar" />
+          ) : (
+            // For logged out users, the navbarMenu already includes Login and Send One Delivery
+            // So we don't need to add them again here
+            <div className="d-flex align-items-center">
+              {/* Additional actions for logged out users can be added here if needed */}
+            </div>
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+
+  return (
+    <>
+      <style>{navbarStyles}</style>
+      {/* Mobile Navbar */}
+      <MobileNavbar />
+      
+      {/* Desktop Navbar */}
+      <DesktopNavbar />
+      
+      {/* Mobile Dashboard Drawer for authenticated users */}
+      {user && isMobile && (
+        <MobileDashboardDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          userRole={role}
+          onLogout={() => {
+            // Logout is handled by UserMenuDropdown component
+          }}
+          userName={user?.name || user?.email || 'User'}
+        />
+      )}
+    </>
   );
 } 

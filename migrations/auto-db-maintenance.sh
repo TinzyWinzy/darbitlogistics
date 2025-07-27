@@ -2,7 +2,7 @@
 set -e
 
 # Configurable variables
-DB_NAME="morres"
+DB_NAME="darlog"
 ARCHIVE_DIR="./db_archives"
 MODE="$1"
 

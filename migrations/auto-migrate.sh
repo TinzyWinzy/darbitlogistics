@@ -1,5 +1,5 @@
 #!/bin/bash
-# Auto-migrate script for Morres Logistics (PostgreSQL)
+# Auto-migrate script for Dar Logistics (PostgreSQL)
 # Usage: ./auto-migrate.sh
 #
 # Migration Order:

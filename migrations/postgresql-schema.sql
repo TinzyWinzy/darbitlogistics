@@ -4,7 +4,6 @@ DROP TABLE IF EXISTS environmental_incidents CASCADE;
 DROP TABLE IF EXISTS checkpoint_logs CASCADE;
 DROP TABLE IF EXISTS deliveries CASCADE;
 DROP TABLE IF EXISTS parent_bookings CASCADE;
-DROP TABLE IF EXISTS sessions CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 -- Create UUID extension for better IDs
@@ -228,7 +227,7 @@ CREATE TABLE IF NOT EXISTS checkpoint_logs (
     delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
     checkpoint_type checkpoint_type NOT NULL,
     location TEXT NOT NULL,
-    operator_id INTEGER REFERENCES users(id) ON DELETE RESTRICT,
+    operator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     status delivery_status NOT NULL,
     coordinates TEXT,
     comment TEXT,
@@ -245,7 +244,7 @@ CREATE TABLE IF NOT EXISTS environmental_incidents (
     incident_type TEXT NOT NULL,
     description TEXT NOT NULL,
     severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
-    reported_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    reported_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
     location TEXT NOT NULL,
     coordinates TEXT,
     reported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -260,7 +259,7 @@ CREATE TABLE IF NOT EXISTS sampling_records (
     id SERIAL PRIMARY KEY,
     delivery_tracking_id TEXT REFERENCES deliveries(tracking_id) ON DELETE CASCADE,
     sample_code TEXT UNIQUE NOT NULL,
-    collected_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    collected_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
     collection_location TEXT NOT NULL,
     collection_date TIMESTAMP WITH TIME ZONE NOT NULL,
     sample_type TEXT NOT NULL,
@@ -714,3 +713,34 @@ CREATE INDEX IF NOT EXISTS idx_environmental_incidents_delivery ON environmental
 CREATE INDEX IF NOT EXISTS idx_environmental_incidents_status ON environmental_incidents(status);
 CREATE INDEX IF NOT EXISTS idx_sampling_records_delivery ON sampling_records(delivery_tracking_id);
 CREATE INDEX IF NOT EXISTS idx_sampling_records_status ON sampling_records(analysis_status); 
+
+-- PHASE 1: User Soft Delete and Safe FK Handling
+
+-- 1. Add deactivated column to users (soft delete)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'deactivated') THEN
+        ALTER TABLE users ADD COLUMN deactivated BOOLEAN NOT NULL DEFAULT false;
+    END IF;
+END $$;
+
+-- 2. Update all FKs referencing users(id) to ON DELETE SET NULL
+-- parent_bookings.created_by_user_id
+ALTER TABLE IF EXISTS parent_bookings DROP CONSTRAINT IF EXISTS parent_bookings_created_by_user_id_fkey;
+ALTER TABLE IF EXISTS parent_bookings ADD CONSTRAINT parent_bookings_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL;
+
+-- deliveries.created_by_user_id
+ALTER TABLE IF EXISTS deliveries DROP CONSTRAINT IF EXISTS deliveries_created_by_user_id_fkey;
+ALTER TABLE IF EXISTS deliveries ADD CONSTRAINT deliveries_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL;
+
+-- checkpoint_logs.operator_id
+ALTER TABLE IF EXISTS checkpoint_logs DROP CONSTRAINT IF EXISTS checkpoint_logs_operator_id_fkey;
+ALTER TABLE IF EXISTS checkpoint_logs ADD CONSTRAINT checkpoint_logs_operator_id_fkey FOREIGN KEY (operator_id) REFERENCES users(id) ON DELETE SET NULL;
+
+-- sampling_records.collected_by_user_id
+ALTER TABLE IF EXISTS sampling_records DROP CONSTRAINT IF EXISTS sampling_records_collected_by_user_id_fkey;
+ALTER TABLE IF EXISTS sampling_records ADD CONSTRAINT sampling_records_collected_by_user_id_fkey FOREIGN KEY (collected_by_user_id) REFERENCES users(id) ON DELETE SET NULL;
+
+-- environmental_incidents.reported_by_user_id
+ALTER TABLE IF EXISTS environmental_incidents DROP CONSTRAINT IF EXISTS environmental_incidents_reported_by_user_id_fkey;
+ALTER TABLE IF EXISTS environmental_incidents ADD CONSTRAINT environmental_incidents_reported_by_user_id_fkey FOREIGN KEY (reported_by_user_id) REFERENCES users(id) ON DELETE SET NULL; 

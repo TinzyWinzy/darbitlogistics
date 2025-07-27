@@ -452,7 +452,7 @@ const AdminDashboard = () => {
         </div>
       )}
       <div className="text-center text-muted small mt-5">
-        For support: <a href="mailto:jackfeng@morres.com" style={{ color: '#1F2120' }}>jackfeng@morres.com</a> | <a href="tel:+263788888886" style={{ color: '#1F2120' }}>+263 78 888 8886</a>
+        For support: <a href="mailto:support@darlogistics.co.zw" style={{ color: '#1F2120' }}>support@darlogistics.co.zw</a> | <a href="tel:+263781334474" style={{ color: '#1F2120' }}>+263 781 334474</a>
         <br />
         <span className="text-danger">For authorized personnel only.</span>
       </div>

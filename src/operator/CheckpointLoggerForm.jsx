@@ -39,11 +39,6 @@ export default function CheckpointLoggerForm({
     setForm(f => ({ ...f, timestamp: new Date().toISOString().slice(0, 16) }));
   }, [selectedId]);
 
-  // Remove the operator selection dropdown and related logic
-  // In the form state, keep operatorId set to user?.id, but do not render a select or allow editing
-  // Remove operators state, fetchOperators, and any validation for operatorId
-  // When submitting, always use user.id as operatorId
-
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
     setForm(prev => ({
@@ -128,151 +123,211 @@ export default function CheckpointLoggerForm({
   };
 
   return (
-    <div className="card shadow-sm border-0 mb-3 bg-light p-3" onClick={e => e.stopPropagation()}>
-      <div className="card-header bg-white d-flex align-items-center border-bottom pb-2 mb-2">
-        <span className="material-icons-outlined me-2" style={{ color: '#1F2120' }}>edit_location_alt</span>
-        <h5 className="mb-0 fw-bold" style={{ color: '#1F2120', fontSize: '1.08em' }}>Log Delivery Checkpoint</h5>
+    <div className="modern-card slide-up" onClick={e => e.stopPropagation()}>
+      <div className="modern-card-header d-flex align-items-center">
+        <span className="material-icons-outlined me-2" style={{ color: 'var(--brand-primary)' }}>edit_location_alt</span>
+        <h5 className="mb-0 fw-bold" style={{ color: 'var(--brand-primary)', fontSize: '1.1em' }}>
+          Log Delivery Checkpoint
+        </h5>
       </div>
-      <form onSubmit={handleSubmit} className="row g-3" aria-label="Checkpoint Logger Form">
-        <div className="col-md-6">
-          <label htmlFor="locationInput" className="form-label fw-semibold">Location <span className="text-danger">*</span></label>
-          <input
-            type="text"
-            className={`form-control${fieldErrors.location ? ' is-invalid' : ''}`}
-            id="locationInput"
-            name="location"
-            value={form.location}
-            onChange={handleChange}
-            required
-            aria-required="true"
-            autoComplete="off"
-          />
-          {fieldErrors.location && <div className="invalid-feedback">{fieldErrors.location}</div>}
-        </div>
-        <div className="col-md-6">
-          <label htmlFor="statusSelect" className="form-label fw-semibold">Status <span className="text-danger">*</span></label>
-          <select
-            className={`form-select${fieldErrors.status ? ' is-invalid' : ''}`}
-            id="statusSelect"
-            name="status"
-            value={form.status}
-            onChange={handleChange}
-            required
-            aria-required="true"
-          >
-            <option value="">Select status...</option>
-            {STATUS_OPTIONS.map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-          {fieldErrors.status && <div className="invalid-feedback">{fieldErrors.status}</div>}
-        </div>
-        <div className="col-md-6">
-          <label htmlFor="operatorSelect" className="form-label fw-semibold">Operator <span className="text-danger">*</span></label>
-          <input
-            type="text"
-            className="form-control"
-            id="operatorSelect"
-            name="operatorId"
-            value={user?.username || ''}
-            onChange={handleChange}
-            disabled
-            aria-disabled="true"
-          />
-          {fieldErrors.operatorId && <div className="invalid-feedback">{fieldErrors.operatorId}</div>}
-        </div>
-        <div className="col-12">
-          <label htmlFor="commentInput" className="form-label">Comment</label>
-          <textarea
-            className="form-control"
-            id="commentInput"
-            name="comment"
-            value={form.comment}
-            onChange={handleChange}
-            rows={3}
-            autoComplete="off"
-          />
-        </div>
-        <div className="col-md-6">
-          <label htmlFor="coordinatesInput" className="form-label">Coordinates</label>
-          <input
-            type="text"
-            className="form-control"
-            id="coordinatesInput"
-            name="coordinates"
-            value={form.coordinates}
-            onChange={handleChange}
-            autoComplete="off"
-          />
-        </div>
-        <div className="col-md-6">
-          <label htmlFor="timestampInput" className="form-label">Timestamp</label>
-          <input
-            type="datetime-local"
-            className="form-control"
-            id="timestampInput"
-            name="timestamp"
-            value={form.timestamp}
-            onChange={handleChange}
-          />
-        </div>
-        <div className="col-12">
-          <div className="form-check">
-            <input
-              className="form-check-input"
-              type="checkbox"
-              id="hasIssue"
-              name="hasIssue"
-              checked={form.hasIssue}
-              onChange={handleChange}
-            />
-            <label className="form-check-label" htmlFor="hasIssue">
-              Issue at this checkpoint?
+      
+      <div className="modern-card-body">
+        <form onSubmit={handleSubmit} className="row g-4" aria-label="Checkpoint Logger Form">
+          {/* Location Input */}
+          <div className="col-md-6">
+            <label htmlFor="locationInput" className="modern-form-label">
+              Location <span className="text-danger">*</span>
             </label>
-          </div>
-        </div>
-        {form.hasIssue && (
-          <div className="col-12">
-            <label htmlFor="issueDetailsInput" className="form-label">Issue Details</label>
-            <textarea
-              className="form-control"
-              id="issueDetailsInput"
-              name="issueDetails"
-              value={form.issueDetails}
+            <input
+              type="text"
+              className={`modern-form-control${fieldErrors.location ? ' is-invalid' : ''}`}
+              id="locationInput"
+              name="location"
+              value={form.location}
               onChange={handleChange}
-              rows={2}
+              required
+              aria-required="true"
+              autoComplete="off"
+              placeholder="Enter checkpoint location"
+            />
+            {fieldErrors.location && (
+              <div className="invalid-feedback">{fieldErrors.location}</div>
+            )}
+          </div>
+
+          {/* Status Select */}
+          <div className="col-md-6">
+            <label htmlFor="statusSelect" className="modern-form-label">
+              Status <span className="text-danger">*</span>
+            </label>
+            <select
+              className={`modern-form-control${fieldErrors.status ? ' is-invalid' : ''}`}
+              id="statusSelect"
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              required
+              aria-required="true"
+            >
+              <option value="">Select status...</option>
+              {STATUS_OPTIONS.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            {fieldErrors.status && (
+              <div className="invalid-feedback">{fieldErrors.status}</div>
+            )}
+          </div>
+
+          {/* Operator Input */}
+          <div className="col-md-6">
+            <label htmlFor="operatorSelect" className="modern-form-label">
+              Operator <span className="text-danger">*</span>
+            </label>
+            <input
+              type="text"
+              className="modern-form-control"
+              id="operatorSelect"
+              name="operatorId"
+              value={user?.username || ''}
+              onChange={handleChange}
+              disabled
+              aria-disabled="true"
+              style={{ backgroundColor: 'var(--gray-100)' }}
+            />
+            {fieldErrors.operatorId && (
+              <div className="invalid-feedback">{fieldErrors.operatorId}</div>
+            )}
+          </div>
+
+          {/* Coordinates Input */}
+          <div className="col-md-6">
+            <label htmlFor="coordinatesInput" className="modern-form-label">
+              Coordinates
+            </label>
+            <input
+              type="text"
+              className="modern-form-control"
+              id="coordinatesInput"
+              name="coordinates"
+              value={form.coordinates}
+              onChange={handleChange}
+              autoComplete="off"
+              placeholder="Latitude, Longitude (optional)"
             />
           </div>
-        )}
-        <div className="col-12 mt-2">
-          <button
-            type="submit"
-            className="btn fw-bold w-100"
-            style={{ background: '#1F2120', color: '#EBD3AD', fontSize: '1.08rem', boxShadow: '0 2px 8px rgba(31,33,32,0.08)', padding: '0.5em 0.7em' }}
-            disabled={submitting}
-            aria-label="Log Checkpoint"
-          >
-            {submitting ? (
-              <span><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Logging...</span>
-            ) : (
-              <span><span className="material-icons-outlined align-middle me-2">add_location_alt</span>Log Checkpoint</span>
-            )}
-          </button>
-        </div>
-        {feedback && (
-          <div
-            className={`mt-2 alert ${feedback.includes('success') ? 'alert-success' : 'alert-danger'} d-flex align-items-center`}
-            role="alert"
-            aria-live="assertive"
-            aria-atomic="true"
-          >
-            <span className="material-icons-outlined me-2" style={{ fontSize: '1.15rem' }}>
-              {feedback.includes('success') ? 'check_circle' : 'error_outline'}
-            </span>
-            <span>{feedback}</span>
+
+          {/* Timestamp Input */}
+          <div className="col-md-6">
+            <label htmlFor="timestampInput" className="modern-form-label">
+              Timestamp
+            </label>
+            <input
+              type="datetime-local"
+              className="modern-form-control"
+              id="timestampInput"
+              name="timestamp"
+              value={form.timestamp}
+              onChange={handleChange}
+            />
           </div>
-        )}
-      </form>
+
+          {/* Issue Checkbox */}
+          <div className="col-12">
+            <div className="modern-card p-3" style={{ backgroundColor: 'var(--gray-50)' }}>
+              <div className="form-check">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="hasIssue"
+                  name="hasIssue"
+                  checked={form.hasIssue}
+                  onChange={handleChange}
+                />
+                <label className="form-check-label fw-semibold" htmlFor="hasIssue">
+                  <span className="material-icons-outlined me-2" style={{ color: 'var(--warning)' }}>warning</span>
+                  Report an issue at this checkpoint?
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Issue Details */}
+          {form.hasIssue && (
+            <div className="col-12 slide-up">
+              <label htmlFor="issueDetailsInput" className="modern-form-label">
+                Issue Details <span className="text-danger">*</span>
+              </label>
+              <textarea
+                className="modern-form-control"
+                id="issueDetailsInput"
+                name="issueDetails"
+                value={form.issueDetails}
+                onChange={handleChange}
+                rows={3}
+                placeholder="Describe the issue in detail..."
+                required={form.hasIssue}
+              />
+            </div>
+          )}
+
+          {/* Comment Input */}
+          <div className="col-12">
+            <label htmlFor="commentInput" className="modern-form-label">
+              Additional Comments
+            </label>
+            <textarea
+              className="modern-form-control"
+              id="commentInput"
+              name="comment"
+              value={form.comment}
+              onChange={handleChange}
+              rows={3}
+              autoComplete="off"
+              placeholder="Add any additional notes or observations..."
+            />
+          </div>
+
+          {/* Submit Button */}
+          <div className="col-12">
+            <button
+              type="submit"
+              className="btn-modern btn-modern-primary w-100"
+              disabled={submitting}
+              aria-label="Log Checkpoint"
+            >
+              {submitting ? (
+                <>
+                  <div className="modern-loading me-2" role="status" aria-hidden="true"></div>
+                  Logging Checkpoint...
+                </>
+              ) : (
+                <>
+                  <span className="material-icons-outlined">add_location_alt</span>
+                  Log Checkpoint
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Feedback Message */}
+          {feedback && (
+            <div className="col-12">
+              <div
+                className={`alert ${feedback.includes('success') ? 'alert-success' : 'alert-danger'} modern-card d-flex align-items-center`}
+                role="alert"
+                aria-live="assertive"
+                aria-atomic="true"
+              >
+                <span className="material-icons-outlined me-2" style={{ fontSize: '1.2rem' }}>
+                  {feedback.includes('success') ? 'check_circle' : 'error_outline'}
+                </span>
+                <span>{feedback}</span>
+              </div>
+            </div>
+          )}
+        </form>
+      </div>
     </div>
   );
 } 

@@ -27,36 +27,55 @@ export default function HelpCenter() {
   ];
 
   return (
-    <div className="help-center-container container py-4" style={{ maxWidth: 800, margin: '0 auto' }}>
-      <header className="help-center-header d-flex flex-column align-items-center mb-4 gap-2 text-center">
-        <FaRegLightbulb size={36} className="text-primary mb-2" />
-        <h2 className="fw-bold mb-0">Morres Logistics Help Center</h2>
-      </header>
-      <hr className="help-center-divider my-3" />
+    <div className="min-vh-100" style={{ 
+      background: 'linear-gradient(135deg, #003366 0%, #0066CC 100%)',
+      color: 'white'
+    }}>
+      <div className="w-100" style={{ 
+        padding: window.innerWidth <= 768 ? '40px 20px' : '80px 120px'
+      }}>
+        <div className="row justify-content-center">
+          <div className="col-lg-10">
+            <header className="help-center-header d-flex flex-column align-items-center mb-5 gap-3 text-center">
+              <FaRegLightbulb size={48} style={{ color: '#FF6600' }} />
+              <h2 className="fw-bold mb-0" style={{ color: 'white', fontSize: '2.5rem' }}>Dar Logistics Help Center</h2>
+              <p style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '1.1rem' }}>
+                Get the support you need to make the most of our logistics platform
+              </p>
+            </header>
 
       {/* Quick Links as Gravity Cards (only for logged-in users) */}
       {user && (
-        <section className="mb-4">
-          <div className="gravity-card mb-3 p-3 p-md-4" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)' }}>
-            <div className="d-flex align-items-center gap-2 mb-3">
-              <FaRegArrowAltCircleRight className="text-primary fs-3" />
-              <h3 className="mb-0 fs-5 text-primary">Quick Links</h3>
+        <section className="mb-5">
+          <div className="p-4 rounded" style={{ 
+            background: 'rgba(255, 255, 255, 0.1)', 
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '16px'
+          }}>
+            <div className="d-flex align-items-center gap-3 mb-4">
+              <FaRegArrowAltCircleRight style={{ color: '#FF6600', fontSize: '1.5rem' }} />
+              <h3 className="mb-0" style={{ color: 'white', fontSize: '1.5rem' }}>Quick Links</h3>
             </div>
-            <div className="row g-3">
+            <div className="row g-4">
               {quickLinks.map(link => (
                 <div className="col-12 col-sm-6 col-md-4" key={link.to}>
-                  <Link to={link.to} className="gravity-card d-flex align-items-center gap-3 p-3 text-decoration-none h-100 help-link-card"
+                  <Link to={link.to} className="d-flex align-items-center gap-3 p-4 text-decoration-none h-100 rounded"
                     style={{
-                      background: 'rgba(255,255,255,0.97)',
-                      borderRadius: '1rem',
-                      boxShadow: '0 2px 8px rgba(31,33,32,0.08)',
-                      color: '#1F2120',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      backdropFilter: 'blur(10px)',
+                      transition: 'all 0.3s ease'
                     }}
+                    onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
                   >
-                    <span className="fs-2">{link.icon}</span>
+                    <span style={{ fontSize: '1.5rem' }}>{link.icon}</span>
                     <div>
                       <div className="fw-bold">{link.label}</div>
-                      {link.desc && <div className="small text-muted">{link.desc}</div>}
+                      {link.desc && <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>{link.desc}</div>}
                     </div>
                   </Link>
                 </div>
@@ -67,94 +86,155 @@ export default function HelpCenter() {
       )}
 
       {/* Getting Started Card */}
-      <section className="mb-4">
-        <div className="gravity-card p-4 text-center" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)', maxWidth: 700, margin: '0 auto' }}>
-          <div className="d-flex flex-column align-items-center gap-2 mb-2">
-            <FaRegCheckCircle className="text-primary fs-3 mb-1" />
-            <h3 className="mb-0 fs-5 text-primary">Getting Started: Step-by-Step</h3>
+      <section className="mb-5">
+        <div className="p-5 text-center rounded" style={{ 
+          background: 'rgba(255, 255, 255, 0.1)', 
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          borderRadius: '16px',
+          maxWidth: 800,
+          margin: '0 auto'
+        }}>
+          <div className="d-flex flex-column align-items-center gap-3 mb-4">
+            <FaRegCheckCircle style={{ color: '#FF6600', fontSize: '1.5rem' }} />
+            <h3 className="mb-0" style={{ color: 'white', fontSize: '1.5rem' }}>Getting Started: Step-by-Step</h3>
           </div>
-          <ol className="ps-3 mb-0 text-start" style={{ maxWidth: 600, margin: '0 auto' }}>
-            <li><b>Sign In:</b> Log in with your operator or customer credentials. <span className="text-muted small">(Contact admin if you need access.)</span></li>
-            <li><b>For Operators:</b> Go to <b>Operator Dashboard</b> → <b>New Delivery</b> to dispatch a load. Fill all required fields, double-check consignment and driver details, and submit.</li>
-            <li><b>For Customers:</b> Use your <b>tracking code</b> to follow your delivery in real time via the <b>Track Delivery</b> page.</li>
-            <li><b>Update Checkpoints:</b> Operators should log each checkpoint promptly for full visibility. <span className="text-muted small">(Accurate logs = fewer support issues!)</span></li>
-            <li><b>Billing & Subscriptions:</b> Review your billing dashboard and manage your subscription plans as needed.</li>
+          <ol className="ps-4 mb-0 text-start" style={{ maxWidth: 700, margin: '0 auto', color: 'rgba(255, 255, 255, 0.9)' }}>
+            <li className="mb-2"><b>Sign In:</b> Log in with your operator or customer credentials. <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.9rem' }}>(Contact admin if you need access.)</span></li>
+            <li className="mb-2"><b>For Operators:</b> Go to <b>Operator Dashboard</b> → <b>New Delivery</b> to dispatch a load. Fill all required fields, double-check consignment and driver details, and submit.</li>
+            <li className="mb-2"><b>For Customers:</b> Use your <b>tracking code</b> to follow your delivery in real time via the <b>Track Delivery</b> page.</li>
+            <li className="mb-2"><b>Update Checkpoints:</b> Operators should log each checkpoint promptly for full visibility. <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.9rem' }}>(Accurate logs = fewer support issues!)</span></li>
+            <li className="mb-2"><b>Billing & Subscriptions:</b> Review your billing dashboard and manage your subscription plans as needed.</li>
           </ol>
-          <div className="mt-2 text-secondary small d-flex align-items-center justify-content-center">
-            <FaRegLightbulb className="me-1 text-warning" />
-            <span>Tip: Always keep your contact info up to date for SMS/email notifications.</span>
+          <div className="mt-4 d-flex align-items-center justify-content-center" style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+            <FaRegLightbulb className="me-2" style={{ color: '#FF6600' }} />
+            <span style={{ fontSize: '0.9rem' }}>Tip: Always keep your contact info up to date for SMS/email notifications.</span>
           </div>
         </div>
       </section>
 
       {/* FAQ as Gravity Cards */}
-      <section className="mb-4">
-        <div className="gravity-card p-4" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)', maxWidth: 700, margin: '0 auto' }}>
-          <div className="d-flex flex-column align-items-center gap-2 mb-2 text-center">
-            <FaQuestionCircle className="text-primary fs-3 mb-1" />
-            <h3 className="mb-0 fs-5 text-primary">Frequently Asked Questions</h3>
+      <section className="mb-5">
+        <div className="p-5 rounded" style={{ 
+          background: 'rgba(255, 255, 255, 0.1)', 
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          borderRadius: '16px',
+          maxWidth: 800,
+          margin: '0 auto'
+        }}>
+          <div className="d-flex flex-column align-items-center gap-3 mb-4 text-center">
+            <FaQuestionCircle style={{ color: '#FF6600', fontSize: '1.5rem' }} />
+            <h3 className="mb-0" style={{ color: 'white', fontSize: '1.5rem' }}>Frequently Asked Questions</h3>
           </div>
           <div className="help-center-faq-list">
-            <details className="mb-2 border-0 rounded p-2 bg-light-subtle gravity-card" style={{ boxShadow: '0 2px 8px rgba(31,33,32,0.08)' }}>
-              <summary className="fw-semibold text-dark pointer"><FaRegListAlt className="me-2 text-primary" />What is a Parent Booking?</summary>
-              <p className="ms-4">A Parent Booking groups multiple deliveries under a single contract or shipment, making it easier to manage large or recurring orders. Always select the correct parent booking to ensure accurate tracking and billing.</p>
+            <details className="mb-3 border-0 rounded p-3" style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px'
+            }}>
+              <summary className="fw-semibold pointer" style={{ color: 'white' }}><FaRegListAlt className="me-2" style={{ color: '#FF6600' }} />What is a Parent Booking?</summary>
+              <p className="ms-4 mt-2" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>A Parent Booking groups multiple deliveries under a single contract or shipment, making it easier to manage large or recurring orders. Always select the correct parent booking to ensure accurate tracking and billing.</p>
             </details>
-            <details className="mb-2 border-0 rounded p-2 bg-light-subtle gravity-card" style={{ boxShadow: '0 2px 8px rgba(31,33,32,0.08)' }}>
-              <summary className="fw-semibold text-dark pointer"><FaRegUser className="me-2 text-primary" />How do I receive SMS/email updates?</summary>
-              <p className="ms-4">You'll automatically receive notifications at every checkpoint if your phone number/email is registered with the delivery. Check your spam folder if you don't see updates.</p>
+            <details className="mb-3 border-0 rounded p-3" style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px'
+            }}>
+              <summary className="fw-semibold pointer" style={{ color: 'white' }}><FaRegUser className="me-2" style={{ color: '#FF6600' }} />How do I receive SMS/email updates?</summary>
+              <p className="ms-4 mt-2" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>You'll automatically receive notifications at every checkpoint if your phone number/email is registered with the delivery. Check your spam folder if you don't see updates.</p>
             </details>
-            <details className="mb-2 border-0 rounded p-2 bg-light-subtle gravity-card" style={{ boxShadow: '0 2px 8px rgba(31,33,32,0.08)' }}>
-              <summary className="fw-semibold text-dark pointer"><FaRegClock className="me-2 text-primary" />Who can update delivery status?</summary>
-              <p className="ms-4">Only authorized operators can update delivery checkpoints and status. Customers can track but not modify deliveries. If you need to update info, contact your operator.</p>
+            <details className="mb-3 border-0 rounded p-3" style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px'
+            }}>
+              <summary className="fw-semibold pointer" style={{ color: 'white' }}><FaRegClock className="me-2" style={{ color: '#FF6600' }} />Who can update delivery status?</summary>
+              <p className="ms-4 mt-2" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Only authorized operators can update delivery checkpoints and status. Customers can track but not modify deliveries. If you need to update info, contact your operator.</p>
             </details>
-            <details className="mb-2 border-0 rounded p-2 bg-light-subtle gravity-card" style={{ boxShadow: '0 2px 8px rgba(31,33,32,0.08)' }}>
-              <summary className="fw-semibold text-dark pointer"><FaRegEnvelope className="me-2 text-primary" />What if I forget my tracking code?</summary>
-              <p className="ms-4">Contact your operator or Morres Logistics support to retrieve your tracking code. Always save your code for future reference.<br/>Support: <a href="mailto:jackfeng@morres.com">jackfeng@morres.com</a> | <a href="tel:+263788888886">+263 78 888 8886</a></p>
+            <details className="mb-3 border-0 rounded p-3" style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px'
+            }}>
+              <summary className="fw-semibold pointer" style={{ color: 'white' }}><FaRegEnvelope className="me-2" style={{ color: '#FF6600' }} />What if I forget my tracking code?</summary>
+              <p className="ms-4 mt-2" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Contact your operator or Dar Logistics support to retrieve your tracking code. Always save your code for future reference.<br/>Support: <a href="mailto:support@darlogistics.co.zw" style={{ color: '#FF6600' }}>support@darlogistics.co.zw</a> | <a href="tel:+263781334474" style={{ color: '#FF6600' }}>+263 781 334474</a></p>
             </details>
-            <details className="mb-2 border-0 rounded p-2 bg-light-subtle gravity-card" style={{ boxShadow: '0 2px 8px rgba(31,33,32,0.08)' }}>
-              <summary className="fw-semibold text-dark pointer"><FaRegPaperPlane className="me-2 text-primary" />How do I escalate an issue or get urgent help?</summary>
-              <p className="ms-4">If you have an urgent issue, email <a href="mailto:jackfeng@morres.com">jackfeng@morres.com</a> or use the feedback form below. For emergencies, call your assigned operator directly.<br/>Support: <a href="tel:+263788888886">+263 78 888 8886</a></p>
+            <details className="mb-3 border-0 rounded p-3" style={{ 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px'
+            }}>
+              <summary className="fw-semibold pointer" style={{ color: 'white' }}><FaRegPaperPlane className="me-2" style={{ color: '#FF6600' }} />How do I escalate an issue or get urgent help?</summary>
+              <p className="ms-4 mt-2" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>If you have an urgent issue, email <a href="mailto:support@darlogistics.co.zw" style={{ color: '#FF6600' }}>support@darlogistics.co.zw</a> or use the feedback form below. For emergencies, call your assigned operator directly.<br/>Support: <a href="tel:+263781334474" style={{ color: '#FF6600' }}>+263 781 334474</a></p>
             </details>
           </div>
         </div>
       </section>
 
       {/* Feedback/Contact Form Card */}
-      <section className="mb-4">
-        <div className="gravity-card p-4" style={{ background: 'rgba(255,255,255,0.97)', borderRadius: '1.2rem', boxShadow: '0 4px 24px rgba(31,33,32,0.08)', maxWidth: 500, margin: '0 auto' }}>
-          <div className="d-flex flex-column align-items-center gap-2 mb-2 text-center">
-            <FaRegEnvelope className="text-primary fs-3 mb-1" />
-            <h3 className="mb-0 fs-5 text-primary">Still Need Help?</h3>
+      <section className="mb-5">
+        <div className="p-5 rounded" style={{ 
+          background: 'rgba(255, 255, 255, 0.1)', 
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          borderRadius: '16px',
+          maxWidth: 600,
+          margin: '0 auto'
+        }}>
+          <div className="d-flex flex-column align-items-center gap-3 mb-4 text-center">
+            <FaRegEnvelope style={{ color: '#FF6600', fontSize: '1.5rem' }} />
+            <h3 className="mb-0" style={{ color: 'white', fontSize: '1.5rem' }}>Still Need Help?</h3>
           </div>
-          <form onSubmit={handleFeedbackSubmit} className="d-flex flex-column gap-2 align-items-center" style={{ maxWidth: 420, margin: '0 auto' }} aria-label="Help Center Feedback Form">
-            <label htmlFor="feedback" className="fw-medium align-self-start">Describe your issue or question:</label>
+          <form onSubmit={handleFeedbackSubmit} className="d-flex flex-column gap-3 align-items-center" style={{ maxWidth: 500, margin: '0 auto' }} aria-label="Help Center Feedback Form">
+            <label htmlFor="feedback" className="fw-medium align-self-start" style={{ color: 'white' }}>Describe your issue or question:</label>
             <textarea
               id="feedback"
               value={feedback}
               onChange={e => setFeedback(e.target.value)}
-              rows={3}
+              rows={4}
               className="form-control"
               placeholder="Type your question or describe your issue..."
               required
               aria-required="true"
-              style={{ resize: 'vertical', minHeight: 80 }}
+              style={{ 
+                resize: 'vertical', 
+                minHeight: 100,
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                color: 'white',
+                backdropFilter: 'blur(10px)'
+              }}
             />
             <button
               type="submit"
-              className="btn btn-dark fw-bold px-4 mt-1 align-self-start"
-              style={{ background: '#1F2120', color: '#EBD3AD' }}
+              className="btn fw-bold px-5 py-3 align-self-start"
+              style={{ 
+                background: 'linear-gradient(135deg, #FF6600, #FF8533)',
+                border: 'none',
+                color: 'white',
+                borderRadius: '12px'
+              }}
               disabled={feedback.length === 0}
               aria-disabled={feedback.length === 0}
             >
               Send Message
             </button>
-            {submitted && <span className="text-primary fw-medium mt-1">Thank you! We'll get back to you soon.</span>}
+            {submitted && <span className="fw-medium mt-2" style={{ color: '#28a745' }}>Thank you! We'll get back to you soon.</span>}
           </form>
-          <div className="mt-3 text-secondary small text-center">
-            Or email us directly at <a href="mailto:jackfeng@morres.com">jackfeng@morres.com</a> or call <a href="tel:+263788888886">+263 78 888 8886</a>
+          <div className="mt-4 text-center" style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.9rem' }}>
+            Or email us directly at <a href="mailto:support@darlogistics.co.zw" style={{ color: '#FF6600' }}>support@darlogistics.co.zw</a> or call <a href="tel:+263781334474" style={{ color: '#FF6600' }}>+263 781 334474</a>
           </div>
         </div>
       </section>
+          </div>
+        </div>
+      </div>
     </div>
   );
 } 

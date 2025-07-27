@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Schema health check for Morres Logistics
+// Schema health check for Dar Logistics
 // Usage: node check-schema-health.js
 import pg from 'pg';
 const { Client } = pg;

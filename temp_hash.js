@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 const password = process.argv[2];
 
 if (!password) {
-  console.error('Usage: node morres-app/temp_hash.js <password-to-hash>');
+  console.error('Usage: node darlog-app/temp_hash.js <password-to-hash>');
   process.exit(1);
 }
 

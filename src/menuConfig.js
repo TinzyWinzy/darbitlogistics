@@ -37,6 +37,13 @@ export const MENU_CONFIG = [
     showIn: ['sidebar', 'mobile'],
   },
   {
+    label: 'Send One Delivery',
+    route: '/send-one-delivery',
+    icon: 'FaTruck',
+    roles: ['guest', 'user', 'operator', 'admin'],
+    showIn: ['navbar', 'mobile'],
+  },
+  {
     label: 'Help',
     route: '/help',
     icon: 'FaQuestionCircle',

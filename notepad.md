@@ -1,5 +1,5 @@
 project:
-  name: Morres Logistics SMS Tracking System
+  name: Dar Logistics SMS Tracking System
   description: |
     An internal logistics system that allows operators to update shipment checkpoint status,
     triggering automatic SMS notifications to customers. Built using Vite + postgres +
@@ -29,7 +29,7 @@ stack:
 env_variables:
   AT_USERNAME: your_africas_talking_username
   AT_API_KEY: your_africas_talking_api_key
-  AT_SENDER_ID: MorresLogistics
+  AT_SENDER_ID: DarLogistics
   SUPABASE_URL: your_supabase_project_url
   SUPABASE_ANON_KEY: your_supabase_anon_key
 

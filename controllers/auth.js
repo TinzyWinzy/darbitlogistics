@@ -11,12 +11,12 @@ export async function loginUser(req, res) {
   
   try {
     const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1',
+      'SELECT * FROM users WHERE username = $1 AND deactivated = false',
       [username]
     );
     
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid credentials or account deactivated' });
     }
     
     const user = result.rows[0];
@@ -180,18 +180,18 @@ export async function deleteUser(req, res) {
   const { id } = req.params;
   if (!id) return res.status(400).json({ error: 'User id required' });
   try {
-    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id, username, role', [id]);
+    const result = await pool.query('UPDATE users SET deactivated = true WHERE id = $1 RETURNING id, username, role, deactivated', [id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     // Log admin action
     if (req.user && req.user.username) {
       await pool.query(
         'INSERT INTO admin_logs (action, actor, target, details) VALUES ($1, $2, $3, $4)',
-        ['delete_user', req.user.username, id, JSON.stringify({})]
+        ['deactivate_user', req.user.username, id, JSON.stringify({})]
       );
     }
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Error deleting user:', err);
-    res.status(500).json({ error: 'Failed to delete user' });
+    console.error('Error deactivating user:', err);
+    res.status(500).json({ error: 'Failed to deactivate user' });
   }
 } 

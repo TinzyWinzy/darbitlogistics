@@ -92,15 +92,16 @@ export default defineConfig(({ mode }) => {
         // PWA Manifest options
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
-          name: 'Morres Logistics',
-          short_name: 'Morres',
-          description: 'Morres Logistics Tracking',
-          theme_color: '#ffffff',
+          name: 'Dar Logistics',
+          short_name: 'DarLog',
+          description: 'Dar Logistics Tracking',
+          theme_color: '#003366',
+          background_color: '#ffffff',
           icons: [
             {
-              src: 'logo.jpg',
+              src: 'pwa-192x192.png',
               sizes: '192x192',
-              type: 'image/jpeg'
+              type: 'image/png'
             },
             {
               src: 'pwa-512x512.png',

@@ -1,4 +1,4 @@
-# Morres Logistics SMS Tracking System
+# Dar Logistics SMS Tracking System
 
 An internal logistics system for real-time shipment tracking and automated SMS notifications. Built with Vite + React, Supabase, and Africa's Talking. Operators update checkpoints, customers track deliveries, and everyone gets instant status updates.
 
@@ -37,7 +37,7 @@ VITE_API_URL=https://your-backend.onrender.com
 ```
 
 ### Local Development Setup
-For local development, create a file named `.env.local` in the `morres-app` directory. This file is ignored by Git and will override production settings. Add the following to it:
+For local development, create a file named `.env.local` in the `darlog-app` directory. This file is ignored by Git and will override production settings. Add the following to it:
 
 ```
 VITE_API_URL=http://localhost:3000
@@ -51,7 +51,7 @@ This will point your local frontend to your local backend server. Remember to re
 ### 1. GitHub
 ```bash
 git init
-git remote add origin https://github.com/YOUR_USERNAME/morres-logistics.git
+git remote add origin https://github.com/YOUR_USERNAME/darlog-logistics.git
 git add .
 git commit -m "Initial MVP commit"
 git branch -M main
@@ -59,12 +59,12 @@ git push -u origin main
 ```
 
 ### 2. Vercel (Frontend)
-- Import repo, set root to `/morres-app`
+- Import repo, set root to `/darlog-app`
 - Set env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_URL`
 - Deploy
 
 ### 3. Render (Backend)
-- New Web Service, root `/morres-app`
+- New Web Service, root `/darlog-app`
 - Build: `npm install`
 - Start: `node server.js`
 - Env vars: `AT_USERNAME`, `AT_API_KEY`, `AT_SENDER_ID`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`

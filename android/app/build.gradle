@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.morres.logistics"
+    namespace "com.darlog.logistics"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.morres.logistics"
+        applicationId "com.darlog.logistics"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

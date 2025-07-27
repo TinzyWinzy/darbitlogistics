@@ -20,7 +20,7 @@ const pool = connectionString
   : new pg.Pool({
       user: process.env.PGUSER || 'postgres',
       host: process.env.PGHOST || 'localhost',
-      database: process.env.PGDATABASE || 'morres',
+      database: process.env.PGDATABASE || 'darlog',
       password: process.env.PGPASSWORD || 'postgres',
       port: parseInt(process.env.PGPORT || '5432'),
       ssl: false // Local connections typically don't use SSL

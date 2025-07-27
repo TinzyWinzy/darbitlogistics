@@ -11,9 +11,9 @@ function getDeadlineBadgeClass(deadline) {
   const deadlineDate = new Date(deadline);
   const daysUntilDeadline = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
 
-  if (daysUntilDeadline < 0) return 'bg-danger';
-  if (daysUntilDeadline <= 3) return 'bg-warning text-dark';
-  return 'bg-success';
+  if (daysUntilDeadline < 0) return 'modern-badge-danger';
+  if (daysUntilDeadline <= 3) return 'modern-badge-warning';
+  return 'modern-badge-success';
 }
 
 function getTimeLeft(deadline) {
@@ -31,12 +31,12 @@ function getTimeLeft(deadline) {
 
 // Add color map for custom statuses
 const statusBadgeColors = {
-  'Delayed': 'bg-danger',
-  'Awaiting Payment': 'bg-warning text-dark',
-  'In Customs': 'bg-info',
-  'Completed': 'bg-success',
-  'Active': 'bg-primary',
-  '': 'bg-secondary',
+  'Delayed': 'modern-badge-danger',
+  'Awaiting Payment': 'modern-badge-warning',
+  'In Customs': 'modern-badge-info',
+  'Completed': 'modern-badge-success',
+  'Active': 'modern-badge-info',
+  '': 'modern-badge-secondary',
 };
 
 // Progress steps for delivery status
@@ -130,351 +130,383 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, 
     if (onSelectDelivery) onSelectDelivery(id === selectedId ? null : id);
   };
 
-  // Clear all user-specific state on user change/logout
-  // Remove this effect:
-  // useEffect(() => {
-  //   if (!user) {
-  //     setOpenBookingId(null);
-  //     // Add any other user-specific state resets here if needed
-  //   }
-  // }, [user]);
-
   // Reset page if filters/search change
   useEffect(() => { setPage(1); }, [search, progressFilter, customStatusFilter, progressSort, progressSortOrder]);
 
   return (
-    <div className="card shadow-sm border-0 mb-4" role="region" aria-labelledby="consignment-monitor-heading">
+    <div className="modern-card glassmorphism-card" role="region" aria-labelledby="consignment-monitor-heading">
       {/* Strategic Operations Console Banner */}
-      <div className="bg-warning text-dark text-center py-1 small fw-bold" style={{ letterSpacing: '1px', borderTopLeftRadius: '0.5rem', borderTopRightRadius: '0.5rem' }}>
+      <div className="modern-card-header bg-warning text-dark text-center py-3 small fw-bold" style={{ letterSpacing: '1px', background: 'linear-gradient(135deg, var(--warning-yellow), #ffd54f)' }}>
+        <span className="material-icons-outlined me-2">monitoring</span>
         STRATEGIC OPERATIONS CONSOLE
       </div>
-      <div className="card-body px-2 px-md-3">
-        <h2 id="consignment-monitor-heading" className="h5 fw-bold mb-3" style={{ color: '#1F2120' }}>
-          <span className="material-icons-outlined align-middle me-2" style={{ color: '#1F2120' }}>list_alt</span>
+      
+      <div className="modern-card-body">
+        <h2 id="consignment-monitor-heading" className="h5 fw-bold mb-4" style={{ color: 'var(--primary-blue)' }}>
+          <span className="material-icons-outlined align-middle me-2" style={{ color: 'var(--primary-orange)' }}>list_alt</span>
           Consignment & Load Monitoring
         </h2>
-        {/* Search and Filter Controls */}
-        <div className="cm-filter-bar">
-          <div className="input-group flex-grow-1" style={{ minWidth: 180, maxWidth: 320 }}>
-            <span className="input-group-text bg-white" style={{ color: '#1F2120', padding: '0.2em 0.6em', fontSize: '1em' }}>
-              <span className="material-icons-outlined" style={{ fontSize: '1.1em' }}>search</span>
-            </span>
-            <input
-              type="text"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Search consignments or loads..."
-              className="form-control"
-              disabled={loading}
-              style={{ fontSize: '0.97em', padding: '0.3em 0.6em' }}
-            />
-          </div>
-          <div className="d-flex align-items-center gap-1" style={{ minWidth: 120 }}>
-            <label htmlFor="progressFilter" className="form-label text-muted mb-0 small" style={{ fontSize: '0.95em' }}>Status:</label>
-            <select
-              id="progressFilter"
-              className="form-select form-select-sm"
-              style={{ flexBasis: '100px', fontSize: '0.95em', padding: '0.2em 0.5em' }}
-              value={progressFilter}
-              onChange={e => { setProgressFilter(e.target.value); setPage(1); }}
-            >
-              <option value="all">All</option>
-              <option value="completed">Completed</option>
-              <option value="in-progress">In Progress</option>
-              <option value="not-started">Not Started</option>
-              <option value="overdue">Overdue</option>
-            </select>
-          </div>
-          <div className="d-flex align-items-center gap-1" style={{ minWidth: 120 }}>
-            <label htmlFor="customStatusFilter" className="form-label text-muted mb-0 small" style={{ fontSize: '0.95em' }}>Custom Status:</label>
-            <select
-              id="customStatusFilter"
-              className="form-select form-select-sm"
-              style={{ flexBasis: '100px', fontSize: '0.95em', padding: '0.2em 0.5em' }}
-              value={customStatusFilter}
-              onChange={e => { setCustomStatusFilter(e.target.value); setPage(1); }}
-            >
-              <option value="all">All</option>
-              <option value="Delayed">Delayed</option>
-              <option value="Awaiting Payment">Awaiting Payment</option>
-              <option value="In Customs">In Customs</option>
-              <option value="Completed">Completed</option>
-              <option value="Active">Active</option>
-            </select>
-          </div>
-          <div className="d-flex align-items-center gap-1" style={{ minWidth: 120 }}>
-            <label htmlFor="progressSort" className="form-label text-muted mb-0 small" style={{ fontSize: '0.95em' }}>Sort by:</label>
-            <select
-              id="progressSort"
-              className="form-select form-select-sm"
-              style={{ flexBasis: '100px', fontSize: '0.95em', padding: '0.2em 0.5em' }}
-              value={progressSort}
-              onChange={e => { setProgressSort(e.target.value); setPage(1); }}
-            >
-              <option value="deadline">Deadline</option>
-              <option value="progress">Progress</option>
-              <option value="tonnage">Tonnage</option>
-              <option value="customer">Customer</option>
-            </select>
-            <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => { setProgressSortOrder(order => order === 'asc' ? 'desc' : 'asc'); setPage(1); }}
-              aria-label="Toggle sort order"
-              style={{ padding: '0.2em 0.5em', fontSize: '1em', marginLeft: 2 }}
-            >
-              {progressSortOrder === 'asc' ? '↑' : '↓'}
-            </button>
+
+        {/* Modern Search and Filter Controls */}
+        <div className="modern-card glassmorphism-card mb-4">
+          <div className="modern-card-body">
+            <div className="row g-3">
+              <div className="col-12 col-md-4">
+                <label htmlFor="searchInput" className="modern-form-label">Search</label>
+                <div className="input-group">
+                  <span className="input-group-text glassmorphism-input" style={{ color: 'var(--primary-orange)' }}>
+                    <span className="material-icons-outlined" style={{ fontSize: '1.1em' }}>search</span>
+                  </span>
+                  <input
+                    type="text"
+                    id="searchInput"
+                    value={search}
+                    onChange={e => { setSearch(e.target.value); setPage(1); }}
+                    placeholder="Search consignments or loads..."
+                    className="modern-form-control glassmorphism-input"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+              
+              <div className="col-12 col-md-2">
+                <label htmlFor="progressFilter" className="modern-form-label">Status</label>
+                <select
+                  id="progressFilter"
+                  className="modern-form-control glassmorphism-input"
+                  value={progressFilter}
+                  onChange={e => { setProgressFilter(e.target.value); setPage(1); }}
+                >
+                  <option value="all">All</option>
+                  <option value="completed">Completed</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="not-started">Not Started</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+              </div>
+              
+              <div className="col-12 col-md-2">
+                <label htmlFor="customStatusFilter" className="modern-form-label">Custom Status</label>
+                <select
+                  id="customStatusFilter"
+                  className="modern-form-control glassmorphism-input"
+                  value={customStatusFilter}
+                  onChange={e => { setCustomStatusFilter(e.target.value); setPage(1); }}
+                >
+                  <option value="all">All</option>
+                  <option value="Delayed">Delayed</option>
+                  <option value="Awaiting Payment">Awaiting Payment</option>
+                  <option value="In Customs">In Customs</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Active">Active</option>
+                </select>
+              </div>
+              
+              <div className="col-12 col-md-2">
+                <label htmlFor="progressSort" className="modern-form-label">Sort by</label>
+                <select
+                  id="progressSort"
+                  className="modern-form-control glassmorphism-input"
+                  value={progressSort}
+                  onChange={e => { setProgressSort(e.target.value); setPage(1); }}
+                >
+                  <option value="deadline">Deadline</option>
+                  <option value="progress">Progress</option>
+                  <option value="tonnage">Tonnage</option>
+                  <option value="customer">Customer</option>
+                </select>
+              </div>
+              
+              <div className="col-12 col-md-2">
+                <label className="modern-form-label">Order</label>
+                <button
+                  className="btn-modern btn-modern-secondary w-100 glassmorphism-btn"
+                  onClick={() => { setProgressSortOrder(order => order === 'asc' ? 'desc' : 'asc'); setPage(1); }}
+                  aria-label="Toggle sort order"
+                >
+                  {progressSortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+
         {/* Summary UI for pagination */}
         {total > 0 && (
-          <div className="small text-muted mb-2" style={{marginLeft: 2}}>
+          <div className="modern-badge modern-badge-info glassmorphism-badge mb-3">
+            <span className="material-icons-outlined" style={{ fontSize: '1rem' }}>info</span>
             Showing {Math.min((page - 1) * pageSize + 1, total)}-
             {Math.min(page * pageSize, total)} of {total} consignments
           </div>
         )}
-        {/* Responsive stacking for small screens */}
-        <style>{`
-          @media (max-width: 600px) {
-            .d-flex.flex-wrap.align-items-center.gap-2.mb-2 {
-              flex-direction: column !important;
-              align-items: stretch !important;
-              row-gap: 0.5rem !important;
-              column-gap: 0 !important;
-            }
-            .input-group.flex-grow-1 {
-              max-width: 100% !important;
-            }
-          }
-        `}</style>
-        <style>{`
-          @media (max-width: 700px) {
-            .accordion-item, .list-group-item { border-radius: 0.6rem !important; margin-bottom: 0.7em !important; }
-            .accordion-header, .accordion-button { font-size: 1.08em !important; min-height: 2.7em !important; }
-            .accordion-button { padding: 0.7em 1em !important; }
-            .accordion-body { padding: 0.8em 0.6em 0.6em 0.6em !important; }
-            .list-group-item { font-size: 1.05em !important; padding: 0.8em 1em !important; }
-            .badge, .progress-bar { font-size: 1em !important; padding: 0.4em 0.8em !important; }
-            .d-flex.flex-wrap.gap-2.justify-content-end { flex-direction: column !important; align-items: flex-start !important; gap: 0.4em !important; }
-          }
-        `}</style>
 
         {loading ? (
-          <Spinner />
+          <div className="d-flex justify-content-center py-5">
+            <div className="modern-loading" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+          </div>
         ) : error ? (
-          <div className="alert alert-danger">Error: {error}</div>
+          <div className="alert alert-danger modern-card glassmorphism-card">
+            <span className="material-icons-outlined me-2">error_outline</span>
+            Error: {error}
+          </div>
         ) : paginatedBookings.length === 0 ? (
-          <div className="alert alert-warning">No consignments found matching your criteria.</div>
+          <div className="alert alert-warning modern-card glassmorphism-card text-center py-5">
+            <span className="material-icons-outlined mb-3" style={{ fontSize: '3rem', opacity: 0.5 }}>search_off</span>
+            <h5>No consignments found</h5>
+            <p className="text-muted">Try adjusting your search criteria or filters.</p>
+          </div>
         ) : (
           <>
-            <div className="accordion" id="bookingAccordion" style={{ background: '#f7f7f5', borderRadius: 8, padding: '0.5rem 0.2rem' }}>
+            <div className="accordion" id="bookingAccordion">
               {paginatedBookings.map((booking) => (
                 <div
-                  className="accordion-item mb-2 p-2"
+                  className="modern-accordion-item glassmorphism-card"
                   key={booking.id}
-                  style={{
-                    borderRadius: '0.4rem',
-                    border: '1px solid #eee',
-                    background: '#fff',
-                    marginBottom: 6,
-                    boxShadow: '0 1px 2px rgba(31,33,32,0.03)',
-                    padding: '0.5rem 0.7rem',
-                  }}
                 >
-                  <h2 className="accordion-header" id={`heading-${booking.id}`}
-                    style={{ fontSize: '1.05em', marginBottom: 0 }}>
+                  <h2 className="accordion-header" id={`heading-${booking.id}`}>
                     <button
-                      className={`accordion-button ${openBookingId !== booking.id ? 'collapsed' : ''}`}
+                      className={`accordion-button glassmorphism-btn ${openBookingId !== booking.id ? 'collapsed' : ''}`}
                       type="button"
                       onClick={() => setOpenBookingId(openBookingId === booking.id ? null : booking.id)}
                       aria-expanded={openBookingId === booking.id}
                       aria-controls={`collapse-${booking.id}`}
-                      style={{
-                        padding: '0.4em 0.7em',
-                        fontSize: '1em',
-                        background: '#f9f9f7',
-                        borderRadius: '0.3rem',
-                        minHeight: 0,
-                      }}
                     >
                       <div className="w-100 d-flex justify-content-between align-items-center pe-2">
                         <div>
-                          <strong style={{ color: '#1F2120', fontSize: '1em' }}>{booking.customerName}</strong>
-                          <small className="text-muted ms-2" style={{ fontSize: '0.93em' }}>({booking.bookingCode})</small>
-                          <div className="text-muted small mt-1" style={{ fontSize: '0.92em' }}>
+                          <strong style={{ color: 'var(--primary-blue)', fontSize: '1.1em' }}>
+                            {booking.customerName}
+                          </strong>
+                          <small className="text-muted ms-2" style={{ fontSize: '0.9em' }}>
+                            ({booking.bookingCode})
+                          </small>
+                          <div className="text-muted small mt-1" style={{ fontSize: '0.9em' }}>
                             {booking.loadingPoint} &rarr; {booking.destination}
                           </div>
                         </div>
-                        <span className={`badge ${getDeadlineBadgeClass(booking.deadline)}`} style={{ fontSize: '0.93em', padding: '0.35em 0.7em' }}>
+                        <span className={`modern-badge glassmorphism-badge ${getDeadlineBadgeClass(booking.deadline)}`}>
                           {getTimeLeft(booking.deadline)}
                         </span>
                       </div>
                     </button>
                   </h2>
+                  
                   <div
                     id={`collapse-${booking.id}`}
                     className={`accordion-collapse collapse ${openBookingId === booking.id ? 'show' : ''}`}
                   >
-                    <div className="accordion-body" style={{ padding: '0.7em 0.5em 0.5em 0.5em', fontSize: '0.97em' }}>
+                    <div className="modern-accordion-body">
                       {/* Consignment Progress Bar with label */}
-                      <div className="mb-2">
-                        <div className="fw-bold mb-1" style={{ fontSize: '0.98em', color: '#1976d2' }}>
+                      <div className="mb-4">
+                        <div className="fw-bold mb-2" style={{ fontSize: '1em', color: 'var(--primary-blue)' }}>
                           Consignment Progress: {booking.completionPercentage}% Complete
                         </div>
-                        <div className="progress mb-2" style={{ height: '14px', background: '#f3ede7' }}>
+                        <div className="modern-progress glassmorphism-progress">
                           <div
-                            className="progress-bar"
+                            className="modern-progress-bar"
                             role="progressbar"
-                            style={{ width: `${booking.completionPercentage}%`, backgroundColor: '#1976d2', fontSize: '0.93em', padding: 0, transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)' }}
+                            style={{ 
+                              width: `${booking.completionPercentage}%`,
+                              background: 'linear-gradient(135deg, var(--primary-orange), var(--accent-orange))'
+                            }}
                             aria-valuenow={booking.completionPercentage}
                             aria-valuemin={0}
                             aria-valuemax={100}
                           >
-                            {/* Optionally show % inside bar on desktop */}
-                            <span className="d-none d-md-inline" style={{ color: '#fff', fontWeight: 500 }}>{booking.completionPercentage}%</span>
+                            <span className="d-none d-md-inline" style={{ color: '#fff', fontWeight: 500 }}>
+                              {booking.completionPercentage}%
+                            </span>
                           </div>
                         </div>
                       </div>
-                      <div className="row g-2 text-muted small mb-2" style={{ fontSize: '0.92em' }}>
-                        <div className="col"><strong>From:</strong> {booking.loadingPoint}</div>
-                        <div className="col"><strong>To:</strong> {booking.destination}</div>
-                        <div className="col"><strong>Mineral:</strong> {booking.mineralType || 'N/A'}</div>
+
+                      <div className="row g-3 mb-4">
+                        <div className="col-md-3">
+                          <div className="modern-card glassmorphism-card p-3 text-center">
+                            <div className="fw-bold" style={{ color: 'var(--primary-blue)' }}>{booking.loadingPoint}</div>
+                            <small className="text-muted">From</small>
+                          </div>
+                        </div>
+                        <div className="col-md-3">
+                          <div className="modern-card glassmorphism-card p-3 text-center">
+                            <div className="fw-bold" style={{ color: 'var(--success-green)' }}>{booking.destination}</div>
+                            <small className="text-muted">To</small>
+                          </div>
+                        </div>
+                        <div className="col-md-3">
+                          <div className="modern-card glassmorphism-card p-3 text-center">
+                            <div className="fw-bold" style={{ color: 'var(--info-cyan)' }}>{booking.mineralType || 'N/A'}</div>
+                            <small className="text-muted">Mineral</small>
+                          </div>
+                        </div>
+                        <div className="col-md-3">
+                          <div className="modern-card glassmorphism-card p-3 text-center">
+                            <div className="fw-bold" style={{ color: 'var(--warning-yellow)' }}>{booking.totalTonnage}t</div>
+                            <small className="text-muted">Total</small>
+                          </div>
+                        </div>
                       </div>
-                      <div className="row g-2 text-muted small mb-2" style={{ fontSize: '0.92em' }}>
-                        <div className="col"><strong>Total:</strong> {booking.totalTonnage}t</div>
-                        <div className="col"><strong>Completed:</strong> {booking.completedTonnage}t</div>
-                        <div className="col"><strong>Loads:</strong> {(booking.deliveries || []).length}</div>
+
+                      <div className="row g-3 mb-4">
+                        <div className="col-md-4">
+                          <div className="modern-card glassmorphism-card p-3 text-center">
+                            <div className="fw-bold" style={{ color: 'var(--success-green)' }}>{booking.completedTonnage}t</div>
+                            <small className="text-muted">Completed</small>
+                          </div>
+                        </div>
+                        <div className="col-md-4">
+                          <div className="modern-card glassmorphism-card p-3 text-center">
+                            <div className="fw-bold" style={{ color: 'var(--primary-blue)' }}>{(booking.deliveries || []).length}</div>
+                            <small className="text-muted">Loads</small>
+                          </div>
+                        </div>
+                        <div className="col-md-4">
+                          <div className="modern-card glassmorphism-card p-3 text-center">
+                            <div className="fw-bold" style={{ color: 'var(--info-cyan)' }}>{booking.remainingTonnage}t</div>
+                            <small className="text-muted">Remaining</small>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Deliveries List */}
                       {(booking.deliveries || []).length > 0 ? (
-                        <ul className="list-group list-group-flush" style={{ marginTop: 2 }}>
-                          {(booking.deliveries || []).map((delivery, index) => {
-                            // Normalize fields for both camelCase and snake_case
-                            const trackingId = delivery.trackingId || delivery.tracking_id || index;
-                            const driverDetails = delivery.driverDetails || delivery.driver_details || {};
-                            const driverName = driverDetails.name || 'N/A';
-                            const vehicleReg = driverDetails.vehicleReg || driverDetails.vehicle_reg || 'N/A';
-                            const currentStatus = delivery.currentStatus || delivery.current_status || 'Pending';
-                            const isCompleted = delivery.isCompleted ?? delivery.is_completed ?? false;
-                            const tonnage = Number(delivery.tonnage || 0);
-                            const containerCount = Number(delivery.containerCount ?? delivery.container_count ?? 0);
-                            const value = Number(delivery.value ?? 0);
-                            const cost = Number(delivery.cost ?? 0);
-                            const customStatus = delivery.customStatus || delivery.custom_status || '';
+                        <div className="modern-card glassmorphism-card">
+                          <div className="modern-card-header">
+                            <h6 className="mb-0">Dispatched Loads</h6>
+                          </div>
+                          <div className="modern-card-body p-0">
+                            <ul className="list-group list-group-flush">
+                              {(booking.deliveries || []).map((delivery, index) => {
+                                // Normalize fields for both camelCase and snake_case
+                                const trackingId = delivery.trackingId || delivery.tracking_id || index;
+                                const driverDetails = delivery.driverDetails || delivery.driver_details || {};
+                                const driverName = driverDetails.name || 'N/A';
+                                const vehicleReg = driverDetails.vehicleReg || driverDetails.vehicle_reg || 'N/A';
+                                const currentStatus = delivery.currentStatus || delivery.current_status || 'Pending';
+                                const isCompleted = delivery.isCompleted ?? delivery.is_completed ?? false;
+                                const tonnage = Number(delivery.tonnage || 0);
+                                const containerCount = Number(delivery.containerCount ?? delivery.container_count ?? 0);
+                                const value = Number(delivery.value ?? 0);
+                                const cost = Number(delivery.cost ?? 0);
+                                const customStatus = delivery.customStatus || delivery.custom_status || '';
 
-                            const isSelected = selectedId === trackingId;
-                            const itemStyle = {
-                              cursor: 'pointer',
-                              fontSize: '0.96em',
-                              padding: '0.5em 0.7em',
-                              ...(isSelected && {
-                                backgroundColor: '#1F2120',
-                                color: '#EBD3AD',
-                                borderColor: '#1F2120',
-                              })
-                            };
-                            const headerStyle = {
-                              color: isSelected ? '#EBD3AD' : '#1F2120',
-                              fontSize: '1em',
-                            };
+                                const isSelected = selectedId === trackingId;
+                                const itemStyle = {
+                                  cursor: 'pointer',
+                                  fontSize: '0.96em',
+                                  padding: '1rem',
+                                  transition: 'var(--transition-slow)',
+                                  background: isSelected ? 'linear-gradient(135deg, var(--primary-blue), var(--accent-blue))' : 'rgba(255, 255, 255, 0.1)',
+                                  backdropFilter: 'blur(20px)',
+                                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                                  borderRadius: '12px',
+                                  margin: '0.5rem',
+                                  ...(isSelected && {
+                                    color: 'white',
+                                    borderColor: 'var(--primary-orange)',
+                                  })
+                                };
+                                const headerStyle = {
+                                  color: isSelected ? 'white' : 'var(--primary-blue)',
+                                  fontSize: '1em',
+                                };
 
-                            return (
-                              <li
-                                key={trackingId}
-                                className="list-group-item list-group-item-action p-2"
-                                style={itemStyle}
-                                onClick={() => handleSelect(trackingId)}
-                              >
-                                {/* Modern Card Layout */}
-                                <div className="row align-items-center g-2">
-                                  <div className="col-12 col-md-8">
-                                    <div className="d-flex justify-content-between align-items-center">
-                                      <div>
-                                        <strong className="d-block" style={headerStyle}>{trackingId}</strong>
-                                        <small className={isSelected ? 'text-white-50' : 'text-muted'} style={{ fontSize: '0.92em' }}>
-                                          {driverName} ({vehicleReg})
-                                        </small>
+                                return (
+                                  <li
+                                    key={trackingId}
+                                    className="list-group-item list-group-item-action glassmorphism-item"
+                                    style={itemStyle}
+                                    onClick={() => handleSelect(trackingId)}
+                                  >
+                                    {/* Modern Card Layout */}
+                                    <div className="row align-items-center g-3">
+                                      <div className="col-12 col-md-8">
+                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                          <div>
+                                            <strong className="d-block" style={headerStyle}>
+                                              {trackingId}
+                                            </strong>
+                                            <small className={isSelected ? 'text-white-50' : 'text-muted'} style={{ fontSize: '0.9em' }}>
+                                              {driverName} ({vehicleReg})
+                                            </small>
+                                          </div>
+                                          <span className={`modern-badge glassmorphism-badge ${isCompleted ? 'modern-badge-success' : 'modern-badge-info'}`}>
+                                            {currentStatus}
+                                          </span>
+                                        </div>
+                                        
+                                        {/* Delivery Status Progress Bar with label */}
+                                        <div className="mb-2">
+                                          <span className="small text-muted">Delivery Status: {currentStatus}</span>
+                                          <DeliveryProgressBar status={currentStatus} />
+                                        </div>
                                       </div>
-                                      <span className={`badge rounded-pill align-self-center fs-6 ${isCompleted ? 'bg-success' : 'bg-info'}`} style={{ fontSize: '0.93em', padding: '0.3em 0.7em' }}>
-                                        {currentStatus}
-                                      </span>
+                                      
+                                      <div className="col-12 col-md-4">
+                                        <div className="d-flex flex-wrap gap-2 justify-content-end">
+                                          <span className="modern-badge modern-badge-secondary glassmorphism-badge" title="Tonnage">
+                                            <span className="material-icons-outlined" style={{ fontSize: '1rem' }}>scale</span>
+                                            {tonnage.toLocaleString()}t
+                                          </span>
+                                          <span className="modern-badge modern-badge-secondary glassmorphism-badge" title="Containers">
+                                            <span className="material-icons-outlined" style={{ fontSize: '1rem' }}>inventory_2</span>
+                                            {containerCount}
+                                          </span>
+                                          <span className="modern-badge modern-badge-success glassmorphism-badge" title="Value">
+                                            <span className="material-icons-outlined" style={{ fontSize: '1rem' }}>attach_money</span>
+                                            ${value.toLocaleString()}
+                                          </span>
+                                          <span className="modern-badge modern-badge-danger glassmorphism-badge" title="Cost">
+                                            <span className="material-icons-outlined" style={{ fontSize: '1rem' }}>money_off</span>
+                                            ${cost.toLocaleString()}
+                                          </span>
+                                        </div>
+                                      </div>
                                     </div>
-                                    {/* Delivery Status Progress Bar with label */}
-                                    <div className="mt-1">
-                                      <span className="small text-muted">Delivery Status: {currentStatus}</span>
-                                      <DeliveryProgressBar status={currentStatus} />
-                                    </div>
-                                  </div>
-                                  <div className="col-12 col-md-4">
-                                    <div className="d-flex flex-wrap gap-2 justify-content-end">
-                                      <span className="badge bg-light text-dark border" title="Tonnage" style={{ fontSize: '0.92em' }}>
-                                        <span className="material-icons-outlined align-middle" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>scale</span> {tonnage.toLocaleString()}t
-                                      </span>
-                                      <span className="badge bg-light text-dark border" title="Containers" style={{ fontSize: '0.92em' }}>
-                                        <span className="material-icons-outlined align-middle" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>inventory_2</span> {containerCount}
-                                      </span>
-                                      <span className="badge bg-light text-success border" title="Value" style={{ fontSize: '0.92em' }}>
-                                        <span className="material-icons-outlined align-middle" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>attach_money</span> ${value.toLocaleString()}
-                                      </span>
-                                      <span className="badge bg-light text-danger border" title="Cost" style={{ fontSize: '0.92em' }}>
-                                        <span className="material-icons-outlined align-middle" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>money_off</span> ${cost.toLocaleString()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                                {/* Old meta row can be removed or left for redundancy */}
-                                {/* <div className={`mt-2 pt-2 border-top d-flex justify-content-between small ${isSelected ? 'text-white-50 border-top-light' : 'text-muted'}`} style={{ fontSize: '0.91em' }}>
-                                  <span>
-                                    <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>scale</span>
-                                    {' '}{delivery.tonnage}t
-                                  </span>
-                                  <span>
-                                    <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>local_shipping</span>
-                                    {' '}{delivery.vehicleType}
-                                  </span>
-                                  <span>
-                                    <span className="material-icons-outlined" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>diamond</span>
-                                    {' '}{delivery.mineralType || 'N/A'}
-                                  </span>
-                                  <span className="badge ms-2" style={{ fontSize: '0.93em', padding: '0.3em 0.7em', background: statusBadgeColors[delivery.customStatus] || 'bg-secondary' }} title={delivery.customStatus}>
-                                    {delivery.customStatus || 'N/A'}
-                                  </span>
-                                  <span className="ms-2 text-success" title="Value">${delivery.value?.toLocaleString() || '0'}</span>
-                                  <span className="ms-2 text-danger" title="Cost">${delivery.cost?.toLocaleString() || '0'}</span>
-                                </div> */}
-                                {/* Inline CheckpointLoggerForm below selected delivery */}
-                                {isSelected && (
-                                  <div className="mt-3">
-                                    <CheckpointLoggerForm
-                                      deliveries={booking.deliveries}
-                                      user={user}
-                                      onSubmitCheckpoint={onSubmitCheckpoint}
-                                      onSuccess={onSuccess}
-                                      onFeedback={onFeedback}
-                                      selectedId={selectedId}
-                                      setSelectedId={setSelectedId}
-                                    />
-                                  </div>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
+                                    
+                                    {/* Inline CheckpointLoggerForm below selected delivery */}
+                                    {isSelected && (
+                                      <div className="mt-3 slide-up">
+                                        <CheckpointLoggerForm
+                                          deliveries={booking.deliveries}
+                                          user={user}
+                                          onSubmitCheckpoint={onSubmitCheckpoint}
+                                          onSuccess={onSuccess}
+                                          onFeedback={onFeedback}
+                                          selectedId={selectedId}
+                                          setSelectedId={setSelectedId}
+                                        />
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        </div>
                       ) : (
-                        <p className="text-muted text-center small mt-2" style={{ fontSize: '0.92em' }}>No loads dispatched for this consignment yet.</p>
+                        <div className="text-center text-muted py-4">
+                          <span className="material-icons-outlined mb-3" style={{ fontSize: '3rem', opacity: 0.3 }}>local_shipping</span>
+                          <p className="mb-0">No loads dispatched for this consignment yet.</p>
+                        </div>
                       )}
                     </div>
                   </div>
-                  <div className="d-flex justify-content-between align-items-center mt-1" style={{ fontSize: '0.91em' }}>
-                    <span className="text-muted small">Last updated by: {booking.lastUpdatedBy || 'N/A'} on {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString() : 'N/A'}</span>
-                    <button className="btn btn-outline-danger btn-sm" style={{ fontSize: '0.82rem', padding: '0.2em 0.6em' }} disabled title="Flag for Review (internal)">
-                      <span className="material-icons-outlined align-middle" style={{ fontSize: '1rem' }}>flag</span> Flag for Review
+                  
+                  <div className="modern-card-header d-flex justify-content-between align-items-center glassmorphism-header">
+                    <span className="text-muted small">
+                      Last updated by: {booking.lastUpdatedBy || 'N/A'} on {booking.updatedAt ? new Date(booking.updatedAt).toLocaleString() : 'N/A'}
+                    </span>
+                    <button className="btn-modern btn-modern-secondary btn-sm glassmorphism-btn" disabled title="Flag for Review (internal)">
+                      <span className="material-icons-outlined">flag</span>
+                      Flag for Review
                     </button>
                   </div>
                 </div>
               ))}
             </div>
+            
             <PaginationBar
               page={page}
               setPage={setPage}
@@ -484,10 +516,185 @@ const ConsignmentMonitor = ({ parentBookings, loading, error, onSelectDelivery, 
             />
           </>
         )}
-        <div className="mt-4 text-center text-muted small">
-          For support: <a href="mailto:jackfeng@morres.com" style={{ color: '#1F2120' }}>jackfeng@morres.com</a> | <a href="tel:+263788888886" style={{ color: '#1F2120' }}>+263 78 888 8886</a>
+        
+        <div className="text-center text-muted small mt-4">
+          <p className="mb-1">Need support?</p>
+          <div className="d-flex justify-content-center gap-3">
+            <a href="mailto:support@darlogistics.co.zw" className="text-decoration-none glassmorphism-link" style={{ color: 'var(--primary-orange)' }}>
+              <span className="material-icons-outlined" style={{ fontSize: '1rem' }}>email</span>
+              support@darlogistics.co.zw
+            </a>
+            <a href="tel:+263781334474" className="text-decoration-none glassmorphism-link" style={{ color: 'var(--primary-orange)' }}>
+              <span className="material-icons-outlined" style={{ fontSize: '1rem' }}>phone</span>
+              +263 781 334474
+            </a>
+          </div>
         </div>
       </div>
+
+      {/* Modern Design Styles */}
+      <style>{`
+        .glassmorphism-card {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .glassmorphism-input {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 8px;
+          color: var(--dark-gray);
+        }
+
+        .glassmorphism-input:focus {
+          border-color: var(--primary-orange);
+          box-shadow: 0 0 0 0.2rem rgba(255, 102, 0, 0.25);
+          background: rgba(255, 255, 255, 0.15);
+        }
+
+        .glassmorphism-btn {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 8px;
+          transition: all 0.3s ease;
+          color: var(--dark-gray);
+        }
+
+        .glassmorphism-btn:hover {
+          background: rgba(255, 255, 255, 0.2);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .glassmorphism-badge {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 20px;
+        }
+
+        .glassmorphism-progress {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border-radius: 10px;
+          overflow: hidden;
+        }
+
+        .glassmorphism-item {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
+          margin: 0.5rem 0;
+        }
+
+        .glassmorphism-header {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(10px);
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glassmorphism-link {
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          transition: all 0.3s ease;
+        }
+
+        .glassmorphism-link:hover {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+        }
+
+        .slide-up {
+          animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .modern-accordion-item {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 16px;
+          margin-bottom: 1rem;
+          overflow: hidden;
+        }
+
+        .accordion-button {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border: none;
+          color: var(--dark-gray);
+          transition: all 0.3s ease;
+        }
+
+        .accordion-button:hover {
+          background: rgba(255, 255, 255, 0.15);
+        }
+
+        .accordion-button:not(.collapsed) {
+          background: rgba(255, 255, 255, 0.2);
+          color: var(--primary-blue);
+        }
+
+        .modern-accordion-body {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(10px);
+        }
+
+        /* Text color fixes for better contrast */
+        .modern-form-label {
+          color: var(--dark-gray) !important;
+        }
+
+        .modern-card-body {
+          color: var(--dark-gray);
+        }
+
+        .modern-card-body .text-muted {
+          color: var(--dark-gray) !important;
+        }
+
+        .modern-accordion-body .text-muted {
+          color: var(--dark-gray) !important;
+        }
+
+        .glassmorphism-item .text-muted {
+          color: var(--dark-gray) !important;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+          .glassmorphism-card {
+            margin: 0.5rem;
+            border-radius: 12px;
+          }
+
+          .accordion-button {
+            font-size: 0.9em;
+            padding: 1rem;
+          }
+
+          .modern-badge {
+            font-size: 0.8em;
+            padding: 0.3rem 0.6rem;
+          }
+        }
+      `}</style>
     </div>
   );
 };

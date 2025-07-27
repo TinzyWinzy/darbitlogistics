@@ -1,4 +1,4 @@
-// Minimal Express + PostgreSQL backend for Morres Logistics MVP (ES Module version)
+// Minimal Express + PostgreSQL backend for Dar Logistics MVP (ES Module version)
 import express from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
@@ -54,7 +54,7 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 
 const allowedOrigins = [
-  'https://morres-logistics.vercel.app',
+  'https://darlog-logistics.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000'
 ];
@@ -274,7 +274,7 @@ function generateTrackingId() {
 
 // Function to generate a unique booking code
 function generateBookingCode() {
-  const prefix = 'MB'; // MB for Morres Booking
+  const prefix = 'DB'; // DB for Dar Booking
   const timestamp = Date.now().toString().slice(-6);
   const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
   return `${prefix}${timestamp}${random}`;
@@ -585,7 +585,7 @@ app.post('/deliveries', authenticateJWT, checkQuota('delivery'), async (req, res
         
         // 5. Construct and send an enhanced SMS to the customer
         const trackingId = newDelivery.tracking_id;
-        const trackingBaseUrl = process.env.FRONTEND_URL || 'https://morres-logistics.vercel.app';
+        const trackingBaseUrl = process.env.FRONTEND_URL || 'https://darlog-logistics.vercel.app';
 
         const smsMessage = `Hi ${customer_name}, your delivery with tracking ID ${trackingId} has been dispatched. Track its progress here: ${trackingBaseUrl}/track-delivery?id=${trackingId}`;
         const smsRes = await sendSMS(phone_number, smsMessage);
@@ -1015,9 +1015,9 @@ app.post('/send-notification', authenticateJWT, async (req, res) => {
     }
 
     const notificationPayload = JSON.stringify({
-      title: 'Morres Logistics',
+      title: 'Dar Logistics',
       body: message,
-      icon: '/logo.jpg',
+              icon: '/logo.svg',
     });
 
     const promises = result.rows.map(row =>
@@ -1309,12 +1309,12 @@ app.post('/api/subscriptions', authenticateJWT, async (req, res) => {
       process.env.PAYNOW_INTEGRATION_ID,
       process.env.PAYNOW_INTEGRATION_KEY
     );
-    const userEmail = req.user.email || 'info@morres.com';
+    const userEmail = req.user.email || 'support@darlogistics.co.zw';
     const payment = paynowClient.createPayment(
       `Subscription ${tier} for user ${userId}`,
       userEmail
     );
-    payment.add(`Morres Logistics Subscription (${tier})`, subscriptionTiers[tier].price);
+    payment.add(`Dar Logistics Subscription (${tier})`, subscriptionTiers[tier].price);
     const response = await paynowClient.send(payment);
     if (response.success) {
       // Optionally, store poll URL in DB for later verification
@@ -1631,9 +1631,9 @@ cron.schedule('*/5 * * * *', async () => {
       const csv = new CsvParser({ fields: columns }).parse(data);
       // Email
       const mailOptions = {
-        from: process.env.SMTP_FROM || 'noreply@morreslogistics.com',
+        from: process.env.SMTP_FROM || 'noreply@darlogistics.co.zw',
         to: report.recipients,
-        subject: 'Scheduled Morres Logistics Report',
+        subject: 'Scheduled Dar Logistics Report',
         text: 'See attached CSV report.',
         attachments: [
           { filename: 'report.csv', content: csv }
@@ -1677,7 +1677,7 @@ app.post('/api/public/send-delivery', publicDeliveryLimiter, async (req, res) =>
   // Create Paynow payment for $1.00
   const paynowPayment = paynow.createPayment(
     `One-Time Delivery for ${customer_name}`,
-    phone_number + '@public.morres.com'
+    phone_number + '@public.darlogistics.co.zw'
   );
   paynowPayment.add('One-Time Delivery', 1.00);
   try {
@@ -1813,7 +1813,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/operators', authenticateJWT, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, username FROM users WHERE role = $1 ORDER BY id',
+      'SELECT id, username FROM users WHERE role = $1 AND deactivated = false ORDER BY id',
       ['operator']
     );
     res.json({ operators: result.rows });

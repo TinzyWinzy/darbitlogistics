@@ -1,5 +1,5 @@
 {
-  "name": "morres-app",
+  "name": "darlog-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -22,6 +22,7 @@
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.0",
     "bootstrap": "^5.3.6",
+    "canvas": "^3.1.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dexie": "^4.0.11",
@@ -30,6 +31,7 @@
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.1",
     "express-session": "^1.18.1",
+    "framer-motion": "^12.23.9",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.1",

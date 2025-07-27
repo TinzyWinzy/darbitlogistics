@@ -101,7 +101,7 @@ export async function createDelivery(req, res) {
           [req.subscription.id]
         );
         
-        const trackingBaseUrl = process.env.FRONTEND_URL || 'https://morres-logistics.vercel.app';
+        const trackingBaseUrl = process.env.FRONTEND_URL || 'https://darlog-logistics.vercel.app';
         const smsMessage = `Hi ${customer_name}, your delivery with tracking ID ${tracking_id} has been dispatched. Track its progress here: ${trackingBaseUrl}/track-delivery?id=${tracking_id}`;
         // ... (rest of the delivery creation logic, e.g., sendSMS, response, etc.)
       } catch (err) {

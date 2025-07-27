@@ -16,7 +16,7 @@ function requireAdmin(req, res, next) {
 // GET /api/admin/users - list all users
 router.get('/users', authenticateJWT, requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
+    const result = await pool.query('SELECT id, username, role, created_at, deactivated FROM users ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching users:', err);

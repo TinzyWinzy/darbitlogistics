@@ -1,4 +1,4 @@
-package com.morres.logistics;
+package com.darlog.logistics;
 
 import com.getcapacitor.BridgeActivity;
 
