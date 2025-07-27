@@ -101,11 +101,11 @@ Your backend will be available at:
 ## 🛠 Local Development
 
 ```bash
-# Frontend
+# Frontend (Vite dev server)
 npm run dev
 
-# Backend (if needed locally)
-node server.js
+# Backend (Express server)
+npm start
 ```
 
 ## 🔍 Troubleshooting
